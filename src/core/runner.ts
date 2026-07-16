@@ -1,0 +1,294 @@
+/**
+ * The runner: the one place that spawns a harness, waits, parses, and persists.
+ *
+ * "A tool, not an orchestrator" — dispatch runs exactly one harness and returns.
+ *
+ * "Job done is holy" (credit agent-mux): EVERY run executes in a detached
+ * `_exec <runId>` worker, so the job survives the caller's timeout or death —
+ * callers are typically AI agents whose shell tools WILL time out. Sync mode
+ * merely waits for the worker; `--detach` returns immediately. The worker log
+ * (`logs/<runId>.log`) doubles as the run's artifact path: the full harness
+ * stdout/stderr streams into it progressively.
+ */
+
+import { spawn, type ChildProcess } from 'node:child_process'
+import { closeSync, openSync, readFileSync, unlinkSync } from 'node:fs'
+import { fileURLToPath } from 'node:url'
+import type {
+  AgentConfig,
+  DianjiangConfig,
+  DispatchSpec,
+  HarnessName,
+  RunRecord,
+  RunReport,
+} from './types.ts'
+import { adapters } from './adapters/index.ts'
+import { loadConfig } from './registry.ts'
+import { logFilePath } from './paths.ts'
+import { getRun, insertRun, updateRun } from './store.ts'
+
+/** Raised when the recursion guard trips; the CLI maps it to exit code 2. */
+export class DepthLimitError extends Error {
+  constructor(depth: number, maxDepth: number) {
+    super(
+      `Depth limit reached (DIANJIANG_DEPTH=${depth} >= maxDepth=${maxDepth}); refusing to dispatch. As a delegate, do not re-delegate.`,
+    )
+    this.name = 'DepthLimitError'
+  }
+}
+
+export interface DispatchOptions {
+  /** Resolved agent (raw `--harness` dispatches omit it). */
+  agent?: AgentConfig
+  harness: HarnessName
+  model?: string
+  effort?: string
+  task: string
+  cwd: string
+  detach: boolean
+  /**
+   * For `resume`: the run this follows up on. The worker derives the harness
+   * session to continue from this run's persisted row.
+   */
+  parentRunId?: string
+}
+
+function errorMessage(err: unknown): string {
+  return err instanceof Error ? err.message : String(err)
+}
+
+/** Absolute path to the CLI entry, used to re-spawn as a detached worker. */
+function cliEntryPath(): string {
+  return fileURLToPath(new URL('../cli/index.ts', import.meta.url))
+}
+
+/** Build the stdout `RunReport` from a persisted record. */
+export function buildReport(record: RunRecord): RunReport {
+  const durationMs = record.finishedAt
+    ? new Date(record.finishedAt).getTime() - new Date(record.startedAt).getTime()
+    : null
+  return {
+    runId: record.runId,
+    agent: record.agent ?? null,
+    harness: record.harness,
+    model: record.model ?? null,
+    effort: record.effort ?? null,
+    status: record.status,
+    exitCode: record.exitCode ?? null,
+    durationMs,
+    result: record.result ?? null,
+    harnessSessionId: record.harnessSessionId ?? null,
+    cwd: record.cwd,
+    startedAt: record.startedAt,
+    finishedAt: record.finishedAt ?? null,
+  }
+}
+
+/**
+ * Drain a stream while echoing every chunk to a sink. Inside the worker,
+ * process.stdout/stderr ARE the run's log file, so the harness output is
+ * persisted progressively — partial output survives even a killed worker.
+ */
+async function tee(
+  stream: ReadableStream<Uint8Array>,
+  sink: { write(chunk: string): unknown },
+): Promise<string> {
+  const decoder = new TextDecoder()
+  let text = ''
+  for await (const chunk of stream) {
+    const part = decoder.decode(chunk, { stream: true })
+    text += part
+    sink.write(part)
+  }
+  return text + decoder.decode()
+}
+
+/**
+ * Spawn the harness for an already-persisted `running` record, await it, parse
+ * the result, persist the outcome, and return the report. Runs inside the
+ * `_exec` worker.
+ */
+async function runToCompletion(record: RunRecord, spec: DispatchSpec): Promise<RunReport> {
+  const adapter = adapters[record.harness]
+  const command = adapter.buildCommand(spec)
+  // The child is one level deeper; its own guard reads this.
+  const childDepth = Number(process.env.DIANJIANG_DEPTH ?? 0) + 1
+
+  const proc = Bun.spawn(command.cmd, {
+    cwd: record.cwd,
+    env: { ...process.env, ...(command.env ?? {}), DIANJIANG_DEPTH: String(childDepth) },
+    stdout: 'pipe',
+    stderr: 'pipe',
+  })
+
+  const [stdout, stderr] = await Promise.all([
+    tee(proc.stdout, process.stdout),
+    tee(proc.stderr, process.stderr),
+  ])
+  const exitCode = await proc.exited
+  const finishedAt = new Date().toISOString()
+
+  // Read then remove the adapter's temp output file, if it declared one.
+  let outputFileContents: string | undefined
+  if (command.outputFile) {
+    try {
+      outputFileContents = readFileSync(command.outputFile, 'utf8')
+    } catch {
+      // File never written; fall back to the JSONL stream.
+    }
+    try {
+      unlinkSync(command.outputFile)
+    } catch {
+      // Already gone; ignore.
+    }
+  }
+
+  let patch: Partial<RunRecord>
+  if (exitCode === 0) {
+    try {
+      const parsed = adapter.parseResult(spec, stdout, outputFileContents)
+      patch = {
+        status: 'completed',
+        exitCode,
+        result: parsed.result,
+        harnessSessionId: parsed.harnessSessionId,
+        finishedAt,
+      }
+    } catch (err) {
+      // A clean exit but unparseable output is still a failure for us.
+      patch = { status: 'failed', exitCode, result: `parseResult failed: ${errorMessage(err)}`, finishedAt }
+    }
+  } else {
+    // Non-zero: keep the tail of stderr as the surfaced result.
+    patch = { status: 'failed', exitCode, result: stderr.slice(-2000), finishedAt }
+  }
+
+  updateRun(record.runId, patch)
+  return buildReport({ ...record, ...patch })
+}
+
+/** True if a PID currently maps to a live process (signal 0 probe). */
+function isProcessAlive(pid: number): boolean {
+  try {
+    process.kill(pid, 0)
+    return true
+  } catch {
+    return false
+  }
+}
+
+/**
+ * Repair a stale record before reporting: a detached worker that died leaves
+ * status "running" forever, which would make a polling caller wait
+ * indefinitely. Only detached runs carry a pid, so sync runs are unaffected.
+ */
+export function reconcileRun(record: RunRecord): RunRecord {
+  if (record.status !== 'running' || record.pid === undefined || isProcessAlive(record.pid)) {
+    return record
+  }
+  // Re-read before patching: the worker may have finished (and exited) between
+  // our read and the liveness probe.
+  const fresh = getRun(record.runId)
+  if (fresh && fresh.status !== 'running') return fresh
+  const patch: Partial<RunRecord> = {
+    status: 'failed',
+    result: `Detached worker (pid ${record.pid}) died before completing; see its log under the dianjiang logs dir.`,
+    finishedAt: new Date().toISOString(),
+  }
+  updateRun(record.runId, patch)
+  return { ...record, ...patch }
+}
+
+/**
+ * Spawn the `_exec` worker for a persisted record. The worker is a detached
+ * session leader: killing the dispatching CLI (Ctrl-C, caller timeout) never
+ * kills the job.
+ */
+function spawnWorker(record: RunRecord, depth: number): ChildProcess {
+  const logFd = openSync(logFilePath(record.runId), 'a')
+  try {
+    const child = spawn(process.execPath, [cliEntryPath(), '_exec', record.runId], {
+      detached: true,
+      stdio: ['ignore', logFd, logFd],
+      cwd: record.cwd,
+      // Worker inherits the current depth; it re-derives childDepth itself.
+      env: { ...process.env, DIANJIANG_DEPTH: String(depth) },
+    })
+    updateRun(record.runId, { pid: child.pid })
+    return child
+  } finally {
+    closeSync(logFd)
+  }
+}
+
+/** Main entry: persist a run and execute it (sync or detached). */
+export async function dispatch(opts: DispatchOptions, config: DianjiangConfig): Promise<RunReport> {
+  const depth = Number(process.env.DIANJIANG_DEPTH ?? 0)
+  if (depth >= config.maxDepth) throw new DepthLimitError(depth, config.maxDepth)
+
+  const runId = crypto.randomUUID()
+  const record: RunRecord = {
+    runId,
+    agent: opts.agent?.name,
+    harness: opts.harness,
+    model: opts.model,
+    effort: opts.effort,
+    status: 'running',
+    cwd: opts.cwd,
+    task: opts.task,
+    startedAt: new Date().toISOString(),
+    parentRunId: opts.parentRunId,
+  }
+  insertRun(record)
+
+  const child = spawnWorker(record, depth)
+
+  if (opts.detach) {
+    child.unref()
+    // DB status stays "running"; only the immediate report says "detached".
+    return buildReport({ ...record, status: 'detached', pid: child.pid ?? undefined })
+  }
+
+  // Sync mode: wait for the worker, then report the persisted outcome.
+  await new Promise<void>((resolve) => {
+    child.once('exit', () => resolve())
+    child.once('error', () => resolve())
+  })
+  const fresh = getRun(runId) ?? record
+  // A worker that died without persisting an outcome reconciles to "failed".
+  return buildReport(reconcileRun(fresh))
+}
+
+/**
+ * Detached-worker entry: rebuild the DispatchSpec from the persisted row (plus
+ * config for agent instructions, and the parent row for a resume session id)
+ * and run it to completion.
+ */
+export async function executeRun(runId: string): Promise<RunReport> {
+  const record = getRun(runId)
+  if (!record) throw new Error(`Run ${runId} not found`)
+
+  let instructions: string | undefined
+  if (record.agent) {
+    try {
+      const config = loadConfig()
+      instructions = config.agents.find((a) => a.name === record.agent)?.instructions
+    } catch {
+      // Config changed/removed since dispatch; proceed without instructions.
+    }
+  }
+
+  // resume + detach: the follow-up session lives on the parent run's row.
+  let resumeSessionId: string | undefined
+  if (record.parentRunId) resumeSessionId = getRun(record.parentRunId)?.harnessSessionId
+
+  const spec: DispatchSpec = {
+    runId: record.runId,
+    prompt: record.task,
+    model: record.model,
+    effort: record.effort,
+    instructions,
+    resumeSessionId,
+  }
+  return runToCompletion(record, spec)
+}
