@@ -19,11 +19,11 @@
     "smoke": "bun run scripts/smoke.ts"
   },
   "dependencies": {
-    "citty": "^0.1.6",
+    "citty": "^0.2.2",
     "jsonc-parser": "^3.3.1"
   },
   "devDependencies": {
-    "@types/bun": "latest",
-    "typescript": "^5.5.0"
+    "@types/bun": "^1.3.14",
+    "typescript": "^7.0.2"
   }
 }

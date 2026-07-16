@@ -237,7 +237,7 @@ const configCmd = defineCommand({
 // Internal worker entry used by detached dispatch (the `_` prefix marks it as
 // non-public; citty's CommandMeta has no `hidden` flag). Output goes to a log.
 const exec = defineCommand({
-  meta: { name: '_exec', description: 'Internal: run a detached worker.' },
+  meta: { name: '_exec', description: 'Internal: run a detached worker.', hidden: true },
   args: { runId: { type: 'positional', required: true } },
   async run({ args }) {
     await executeRun(args.runId)
