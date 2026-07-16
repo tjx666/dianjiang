@@ -24,7 +24,8 @@ import {
   type DispatchOptions,
 } from '../core/runner.ts'
 import { defaultTargets, filterTargets, runRemove, runSetup, type SetupTargets } from '../core/setup.ts'
-import { getRun } from '../core/store.ts'
+import { computeStats } from '../core/stats.ts'
+import { getRun, listRuns } from '../core/store.ts'
 
 function errorMessage(err: unknown): string {
   return err instanceof Error ? err.message : String(err)
@@ -329,6 +330,21 @@ const configCmd = defineCommand({
   subCommands: { init: configInit, agents: configAgents, harnesses: configHarnesses },
 })
 
+const stats = defineCommand({
+  meta: {
+    name: 'stats',
+    description: 'Aggregate run usage per agent (runs, success, duration, tokens, turns, cost).',
+  },
+  args: {
+    agent: { type: 'string', description: 'Restrict the report to a single agent' },
+  },
+  run({ args }) {
+    // Token/cost fields are harness-reported sums, null when unreported; only
+    // claude reports a cost, so costUsd is null for codex/grok groups.
+    emit(computeStats(listRuns(), args.agent))
+  },
+})
+
 // Internal worker entry used by detached dispatch (the `_` prefix marks it as
 // non-public; citty's CommandMeta has no `hidden` flag). Output goes to a log.
 const exec = defineCommand({
@@ -347,6 +363,7 @@ const main = defineCommand({
     status,
     result,
     setup,
+    stats,
     config: configCmd,
     _exec: exec,
   },

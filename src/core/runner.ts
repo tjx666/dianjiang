@@ -82,6 +82,7 @@ export function buildReport(record: RunRecord): RunReport {
     cwd: record.cwd,
     startedAt: record.startedAt,
     finishedAt: record.finishedAt ?? null,
+    usage: record.usage ?? null,
   }
 }
 
@@ -153,6 +154,7 @@ async function runToCompletion(record: RunRecord, spec: DispatchSpec): Promise<R
         exitCode,
         result: parsed.result,
         harnessSessionId: parsed.harnessSessionId,
+        usage: parsed.usage,
         finishedAt,
       }
     } catch (err) {

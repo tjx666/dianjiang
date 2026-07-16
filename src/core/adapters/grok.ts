@@ -15,8 +15,25 @@
  * id equals the run id for new sessions.
  */
 
-import type { DispatchSpec, HarnessAdapter, HarnessResult } from '../types.ts'
-import { withInstructions } from './shared.ts'
+import type { DispatchSpec, HarnessAdapter, HarnessResult, RunUsage } from '../types.ts'
+import { asRecord, finalizeUsage, num, withInstructions } from './shared.ts'
+
+/**
+ * Extract grok's usage. Verified live, stdout carries:
+ *   { "usage": { "input_tokens", "cache_read_input_tokens", "output_tokens",
+ *     "reasoning_tokens", "total_tokens" }, "num_turns": 2 }
+ * Grok reports no cost. Every field defensive: missing/non-number → undefined.
+ */
+function extractUsage(obj: Record<string, unknown>): RunUsage | undefined {
+  const u = asRecord(obj['usage'])
+  return finalizeUsage({
+    inputTokens: num(u?.['input_tokens']),
+    outputTokens: num(u?.['output_tokens']),
+    cacheReadTokens: num(u?.['cache_read_input_tokens']),
+    totalTokens: num(u?.['total_tokens']),
+    turns: num(obj['num_turns']),
+  })
+}
 
 export const GROK_EFFORTS = ['low', 'medium', 'high'] as const
 
@@ -43,6 +60,7 @@ export const grokAdapter: HarnessAdapter = {
     // verified on this machine. Try the likely candidates in order and calibrate
     // against a real `--live` smoke run once available.
     let result = ''
+    let usage: RunUsage | undefined
     try {
       const obj = JSON.parse(stdout) as Record<string, unknown>
       for (const key of ['result', 'response', 'text']) {
@@ -53,9 +71,10 @@ export const grokAdapter: HarnessAdapter = {
         }
       }
       if (!result) result = stdout.trim()
+      usage = extractUsage(obj)
     } catch {
       result = stdout.trim()
     }
-    return { result, harnessSessionId: spec.resumeSessionId ?? spec.runId }
+    return { result, harnessSessionId: spec.resumeSessionId ?? spec.runId, usage }
   },
 }

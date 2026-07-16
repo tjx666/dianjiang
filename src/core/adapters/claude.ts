@@ -10,7 +10,26 @@
  * session id equals the run id for new sessions.
  */
 
-import type { DispatchSpec, HarnessAdapter, HarnessResult } from '../types.ts'
+import type { DispatchSpec, HarnessAdapter, HarnessResult, RunUsage } from '../types.ts'
+import { asRecord, finalizeUsage, num } from './shared.ts'
+
+/**
+ * Extract claude's usage from `--output-format json`:
+ *   { "usage": { "input_tokens", "output_tokens", "cache_read_input_tokens",
+ *     "cache_creation_input_tokens" }, "total_cost_usd", "num_turns" }
+ * claude is the only harness that reports a cost. Defensive throughout: any
+ * missing/non-number field → undefined; nothing found → undefined.
+ */
+function extractUsage(obj: Record<string, unknown>): RunUsage | undefined {
+  const u = asRecord(obj['usage'])
+  return finalizeUsage({
+    inputTokens: num(u?.['input_tokens']),
+    outputTokens: num(u?.['output_tokens']),
+    cacheReadTokens: num(u?.['cache_read_input_tokens']),
+    turns: num(obj['num_turns']),
+    costUsd: num(obj['total_cost_usd']),
+  })
+}
 
 export const CLAUDE_EFFORTS = ['low', 'medium', 'high', 'xhigh', 'max'] as const
 
@@ -36,8 +55,8 @@ export const claudeAdapter: HarnessAdapter = {
   },
 
   parseResult(spec: DispatchSpec, stdout: string): HarnessResult {
-    const obj = JSON.parse(stdout) as { result?: unknown }
-    const result = typeof obj.result === 'string' ? obj.result : ''
-    return { result, harnessSessionId: spec.resumeSessionId ?? spec.runId }
+    const obj = JSON.parse(stdout) as Record<string, unknown>
+    const result = typeof obj['result'] === 'string' ? obj['result'] : ''
+    return { result, harnessSessionId: spec.resumeSessionId ?? spec.runId, usage: extractUsage(obj) }
   },
 }

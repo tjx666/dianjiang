@@ -94,11 +94,27 @@ export interface HarnessCommand {
   outputFile?: string
 }
 
+/**
+ * Usage as reported by the harness; every field optional — never estimated.
+ * dianjiang records only what a harness actually prints: tokens/turns where
+ * available, and `costUsd` only where the harness reports a cost (claude).
+ */
+export interface RunUsage {
+  inputTokens?: number
+  outputTokens?: number
+  cacheReadTokens?: number
+  totalTokens?: number
+  turns?: number
+  costUsd?: number
+}
+
 export interface HarnessResult {
   /** Final assistant message. */
   result: string
   /** Harness-side session id (codex thread_id; equals runId for claude/grok). */
   harnessSessionId: string
+  /** Harness-reported usage, when the output carried any; never estimated. */
+  usage?: RunUsage
 }
 
 export interface HarnessAdapter {
@@ -137,6 +153,8 @@ export interface RunRecord {
   pid?: number
   /** For `resume` runs: the run this one follows up on. */
   parentRunId?: string
+  /** Harness-reported usage; stored as flat nullable columns (see store.ts). */
+  usage?: RunUsage
 }
 
 /** The single JSON object `run`/`resume`/`result` print on stdout. */
@@ -154,4 +172,6 @@ export interface RunReport {
   cwd: string
   startedAt: string
   finishedAt: string | null
+  /** Harness-reported usage; null when nothing was reported for this run. */
+  usage: RunUsage | null
 }

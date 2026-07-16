@@ -60,6 +60,37 @@ describe('claude adapter', () => {
     )
     expect(r.harnessSessionId).toBe(RESUME)
   })
+
+  test('parseResult extracts usage incl. cost (claude is the only harness with cost)', () => {
+    const stdout = JSON.stringify({
+      result: 'hello',
+      usage: {
+        input_tokens: 100,
+        output_tokens: 20,
+        cache_read_input_tokens: 80,
+        cache_creation_input_tokens: 5,
+      },
+      total_cost_usd: 0.0123,
+      num_turns: 3,
+    })
+    expect(adapters.claude.parseResult(spec(), stdout).usage).toEqual({
+      inputTokens: 100,
+      outputTokens: 20,
+      cacheReadTokens: 80,
+      turns: 3,
+      costUsd: 0.0123,
+    })
+  })
+
+  test('parseResult usage is undefined when the payload reports none', () => {
+    expect(adapters.claude.parseResult(spec(), JSON.stringify({ result: 'x' })).usage).toBeUndefined()
+  })
+
+  test('parseResult usage ignores non-number fields defensively', () => {
+    const stdout = JSON.stringify({ result: 'x', usage: { input_tokens: '100' }, num_turns: 2 })
+    // Bad input_tokens dropped; num_turns still captured.
+    expect(adapters.claude.parseResult(spec(), stdout).usage).toEqual({ turns: 2 })
+  })
 })
 
 describe('codex adapter', () => {
@@ -129,6 +160,40 @@ describe('codex adapter', () => {
     const r = adapters.codex.parseResult(spec({ resumeSessionId: RESUME }), stdout, 'DONE')
     expect(r.harnessSessionId).toBe(RESUME)
   })
+
+  test('parseResult: usage from turn.completed (real observed shape, no cost/total)', () => {
+    // Shape verified live (codex 0.144.4, `codex exec --json`).
+    const stdout = [
+      JSON.stringify({ type: 'thread.started', thread_id: 'T1' }),
+      JSON.stringify({ type: 'turn.started' }),
+      JSON.stringify({ type: 'item.completed', item: { type: 'agent_message', text: 'OK' } }),
+      JSON.stringify({
+        type: 'turn.completed',
+        usage: { input_tokens: 14697, cached_input_tokens: 2432, output_tokens: 27, reasoning_output_tokens: 20 },
+      }),
+    ].join('\n')
+    const r = adapters.codex.parseResult(spec(), stdout, 'OK')
+    expect(r.usage).toEqual({
+      inputTokens: 14697,
+      outputTokens: 27,
+      cacheReadTokens: 2432,
+      turns: 1,
+    })
+  })
+
+  test('parseResult: sums usage across multiple turn.completed events', () => {
+    const stdout = [
+      JSON.stringify({ type: 'turn.completed', usage: { input_tokens: 10, output_tokens: 2, cached_input_tokens: 1 } }),
+      JSON.stringify({ type: 'turn.completed', usage: { input_tokens: 5, output_tokens: 3, cached_input_tokens: 4 } }),
+    ].join('\n')
+    const r = adapters.codex.parseResult(spec(), stdout, 'x')
+    expect(r.usage).toEqual({ inputTokens: 15, outputTokens: 5, cacheReadTokens: 5, turns: 2 })
+  })
+
+  test('parseResult: no turn.completed → usage undefined', () => {
+    const stdout = JSON.stringify({ type: 'thread.started', thread_id: 'T1' })
+    expect(adapters.codex.parseResult(spec(), stdout, 'x').usage).toBeUndefined()
+  })
 })
 
 describe('grok adapter', () => {
@@ -178,5 +243,31 @@ describe('grok adapter', () => {
 
   test('parseResult session id equals runId', () => {
     expect(adapters.grok.parseResult(spec(), JSON.stringify({ result: 'a' })).harnessSessionId).toBe(RID)
+  })
+
+  test('parseResult extracts usage from the real observed shape (no cost)', () => {
+    // Shape verified live: cache_read_input_tokens + total_tokens + num_turns.
+    const stdout = JSON.stringify({
+      text: 'OK',
+      usage: {
+        input_tokens: 7672,
+        cache_read_input_tokens: 20682,
+        output_tokens: 302,
+        reasoning_tokens: 0,
+        total_tokens: 28656,
+      },
+      num_turns: 2,
+    })
+    expect(adapters.grok.parseResult(spec(), stdout).usage).toEqual({
+      inputTokens: 7672,
+      outputTokens: 302,
+      cacheReadTokens: 20682,
+      totalTokens: 28656,
+      turns: 2,
+    })
+  })
+
+  test('parseResult usage undefined when none reported', () => {
+    expect(adapters.grok.parseResult(spec(), JSON.stringify({ result: 'a' })).usage).toBeUndefined()
   })
 })

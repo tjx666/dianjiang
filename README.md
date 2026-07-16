@@ -64,7 +64,21 @@ dianjiang resume <runId> "also handle the error case"
 # Inspect
 dianjiang config agents
 dianjiang config harnesses      # self-check: installed CLIs + versions
+dianjiang stats                 # per-agent usage: runs, success, duration, tokens, cost
+dianjiang stats --agent implement   # restrict to one agent
 ```
+
+### Stats
+
+`dianjiang stats` aggregates the run store per agent (raw `--harness` dispatches
+group per harness), printing one JSON array: runs, completed/failed counts,
+durations, and summed tokens/turns/cost. dianjiang records **only what each
+harness reports** — no price tables, no estimation. Tokens and turns come from
+whatever the harness prints; cost is harness-reported only: claude reports
+`total_cost_usd`, so `costUsd` is populated for claude-backed groups and stays
+`null` for codex and grok (their subscription pricing makes any estimate
+fictional). A `null` token/cost field means "no run in that group reported it",
+never a synthesized zero.
 
 Every machine-readable command prints exactly one JSON value on stdout; harness
 logs and human chatter go to stderr. Exit codes: `0` ok, `1` error/failed run,
