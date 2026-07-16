@@ -203,6 +203,33 @@ export function defaultConfigJsonc(): string {
       "harness": "grok",
       // grok-composer-2.5-fast has no reasoning-effort flag, so omit "effort".
       "model": "grok-composer-2.5-fast"
+    },
+    {
+      "name": "search-twitter",
+      // grok has native live X search tools; verified working headless.
+      "useWhen": "live X/Twitter lookups: find tweets, threads, account activity, or what people say about a topic right now",
+      "dontUseWhen": "general web research (use explore) or anything needing code changes",
+      "harness": "grok",
+      "model": "grok-4.5",
+      "effort": "low",
+      "instructions": "Use your live X/Twitter search tools. Cite the tweet URL for every claim."
+    },
+    {
+      "name": "design-frontend",
+      "useWhen": "UI/UX work needing visual taste: components, layouts, styling, interaction polish, or design review of front-end code",
+      "dontUseWhen": "backend logic or refactors with no visual/UX judgment involved",
+      "harness": "claude",
+      "model": "fable",
+      "effort": "high"
+    },
+    {
+      "name": "rewrite-prompt",
+      // 1M-context opus: can ingest a huge corpus before rewriting.
+      "useWhen": "rewriting, compressing, or restructuring prompts and agent instructions, especially when a large corpus must be read first",
+      "dontUseWhen": "ordinary coding tasks",
+      "harness": "claude",
+      "model": "claude-opus-4-6[1m]",
+      "instructions": "Output only the rewritten prompt unless asked otherwise."
     }
   ],
 

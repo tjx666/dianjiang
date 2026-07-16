@@ -89,6 +89,26 @@ Values are initial guesses to be recalibrated by feel — that is exactly what
 config-time compilation is for. `explore` is the borderline one (overlaps with
 callers' built-in search subagents); first to cut if it underperforms.
 
+### Capability agents (added 2026-07-16, 靖哥)
+
+Beyond opinion/perspective agents, agents can expose a **capability** unique to
+one harness. Added (roster now 7 of the ~8 cap; all verified live):
+
+| Agent | Harness / model / effort | Capability |
+|---|---|---|
+| `search-twitter` | grok / grok-4.5 / low | grok's native live X/Twitter search tools (verified headless: returns real tweet URLs) |
+| `design-frontend` | claude / fable / high | strongest visual/UX taste for front-end work |
+| `rewrite-prompt` | claude / claude-opus-4-6[1m] / — | 1M-context ingestion before rewriting prompts/instructions |
+
+Capability agents need no `callers` overrides: they're picked for what they can
+do, not whose opinion they carry (self-vendor dispatch is fine).
+
+Blocked: `generate-image` via codex `gpt-image-2` — codex rejects image models
+under ChatGPT-subscription auth (`The 'gpt-image-2' model is not supported when
+using Codex with a ChatGPT account`, HTTP 400, verified 2026-07-16). Needs
+API-key auth on codex, or a different image-capable harness; parked until 靖哥
+decides.
+
 Locally verified model/effort space (2026-07-16):
 
 - claude: aliases `fable` / `opus` / `sonnet` (haiku unconfirmed on this

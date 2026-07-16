@@ -3,10 +3,18 @@ import type { DianjiangConfig } from '../src/core/types.ts'
 import { defaultConfigJsonc, findAgent, parseConfig, resolveAgent, validateConfig } from '../src/core/registry.ts'
 
 describe('defaultConfigJsonc', () => {
-  test('parses and validates via parseConfig (roster v1)', () => {
+  test('parses and validates via parseConfig (roster v1 + capability agents)', () => {
     const config = parseConfig(defaultConfigJsonc(), 'default')
     expect(config.maxDepth).toBe(2)
-    expect(config.agents.map((a) => a.name)).toEqual(['implement', 'review', 'second-opinion', 'explore'])
+    expect(config.agents.map((a) => a.name)).toEqual([
+      'implement',
+      'review',
+      'second-opinion',
+      'explore',
+      'search-twitter',
+      'design-frontend',
+      'rewrite-prompt',
+    ])
     // explore uses grok-composer-2.5-fast and must carry no effort.
     const explore = config.agents.find((a) => a.name === 'explore')
     expect(explore?.effort).toBeUndefined()
