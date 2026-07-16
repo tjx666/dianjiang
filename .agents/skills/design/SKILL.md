@@ -162,7 +162,7 @@ env sniffing; the base template below shows the caller-less form:
 
 ```markdown
 <!-- dianjiang:begin -->
-# Delegation roster (dianjiang)
+## Delegation roster (dianjiang)
 
 `dianjiang` dispatches self-contained tasks to other coding-agent CLIs.
 dianjiang agents are separate from your built-in subagents. Pick one by task
@@ -275,10 +275,10 @@ Decision (2026-07-16):
 - `append` (added 2026-07-17, 靖哥): `callers.<h>.append: string` — free-form
   markdown appended to that caller's injected roster block, after the rules
   list, inside the managed markers. For guidance about the caller's own
-  behavior that is not a dianjiang agent. First user: claude's block tells it
-  to implement with its built-in subagents on opus instead of delegating
-  implementation through dianjiang (this replaced the removed `implement`
-  agent).
+  behavior that is not a dianjiang agent. First user: claude's block defaults
+  its built-in subagents to the opus model for execution work instead of
+  delegating implementation through dianjiang (this replaced the removed
+  `implement` agent).
 - Not persisted: RunRecord stores the resolved harness/model/effort, not the
   caller; `resume` inherits the resolved binding from the original run.
 

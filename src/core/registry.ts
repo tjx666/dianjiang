@@ -274,7 +274,7 @@ export function defaultConfigJsonc(): string {
         "second-opinion": { "harness": "codex", "model": "gpt-5.6-sol", "effort": "xhigh" }
       },
       // Extra guidance appended to this caller's injected block.
-      "append": "For implementation work, use your built-in subagents (model: opus) — do not route implementation through dianjiang."
+      "append": "Default your built-in subagents to the opus model for execution work — implementation, mechanical edits, running tests. Do not route implementation through dianjiang."
     },
     "codex": {
       "agents": {

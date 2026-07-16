@@ -70,7 +70,7 @@ export function renderRosterBlock(config: DianjiangConfig, caller?: HarnessName)
   const appendSection = append ? `\n\n${append}` : ''
 
   return `${BEGIN}
-# Delegation roster (dianjiang)
+## Delegation roster (dianjiang)
 
 \`dianjiang\` dispatches self-contained tasks to other coding-agent CLIs.
 dianjiang agents are separate from your built-in subagents. Pick one by task

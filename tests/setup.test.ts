@@ -90,7 +90,7 @@ describe('injectBlock', () => {
     const content = readFileSync(file, 'utf8')
     expect(action).toBe('updated')
     expect(content).toContain('Existing content.')
-    expect(content).toContain('# Delegation roster (dianjiang)')
+    expect(content).toContain('## Delegation roster (dianjiang)')
   })
 
   test('replaces an existing managed block in place', () => {
@@ -131,7 +131,7 @@ describe('runSetup', () => {
     const results = runSetup(config, targets)
     expect(results.map((r) => r.action)).toEqual(['written', 'written', 'written'])
     for (const t of Object.values(targets)) {
-      expect(readFileSync(t, 'utf8')).toContain('# Delegation roster (dianjiang)')
+      expect(readFileSync(t, 'utf8')).toContain('## Delegation roster (dianjiang)')
     }
   })
 
@@ -155,7 +155,7 @@ describe('removeBlock', () => {
     writeFileSync(file, original)
     injectBlock(file, renderRosterBlock(config))
     // sanity: the block really was injected
-    expect(readFileSync(file, 'utf8')).toContain('# Delegation roster (dianjiang)')
+    expect(readFileSync(file, 'utf8')).toContain('## Delegation roster (dianjiang)')
 
     const action = removeBlock(file)
     expect(action).toBe('removed')
