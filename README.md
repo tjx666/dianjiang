@@ -16,7 +16,7 @@ way; loops, fan-out, and judgment stay with the calling agent.
 | Term | Meaning |
 |---|---|
 | **agent** | A named, human-compiled preset: harness + model + effort + optional instructions (e.g. `review`, `explore`). The product. |
-| **roster** | The small set of agents in `config.jsonc` (v1: 4, hard cap ~8). |
+| **roster** | The small set of agents in `config.jsonc` (v1: 6, hard cap ~8). |
 | **harness** | An underlying coding-agent CLI: `claude`, `codex`, or `grok`. |
 | **adapter** | The module that adapts one harness (its flags, event stream, session lifecycle) to dianjiang's contracts. |
 | **run** | One dispatched execution, addressed by a unified `runId` and persisted in SQLite. |
@@ -27,6 +27,15 @@ harness is calling. `setup` stamps `--caller <harness>` into each vendor's file.
 
 ## Install
 
+Requires the [Bun](https://bun.sh) runtime — dianjiang uses `bun:sqlite` and
+Bun process APIs and will not run under Node.
+
+```sh
+bun install -g dianjiang
+```
+
+Or from source:
+
 ```sh
 bun install
 bun link          # exposes `dianjiang` on your PATH
@@ -34,6 +43,22 @@ bun link          # exposes `dianjiang` on your PATH
 
 State lives in `~/.dianjiang/` (`config.jsonc` + `runs.sqlite`); override the
 directory with `DIANJIANG_HOME`.
+
+## Read before `setup` (what dianjiang touches)
+
+- `setup` writes a managed block (`<!-- dianjiang:begin/end -->`) into the
+  global instruction files of the harnesses you select: `~/.claude/CLAUDE.md`,
+  `~/.codex/AGENTS.md`, `~/.grok/AGENTS.md`. It never edits anything outside
+  the markers, re-runs idempotently, and `dianjiang setup --remove` strips the
+  block cleanly.
+- Dispatched harnesses run in **YOLO mode**: dianjiang passes each CLI's
+  permission-bypass flag (`--dangerously-skip-permissions`,
+  `--dangerously-bypass-approvals-and-sandbox`, `--always-approve`). A
+  dispatched agent can edit files and run commands unattended — only dispatch
+  tasks you would let an unattended agent do in that working directory.
+- The default roster pins concrete model names, and vendors rotate models
+  quickly; treat `dianjiang config harnesses` as the source of truth for what
+  your installed CLIs actually accept.
 
 ## Usage
 

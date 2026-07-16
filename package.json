@@ -4,8 +4,32 @@
   "description": "点将 — summon the right coding agent. Cross-vendor agent dispatch for Claude Code / Codex / Grok.",
   "type": "module",
   "license": "MIT",
+  "author": "YuTengjing",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/tjx666/dianjiang.git"
+  },
+  "homepage": "https://github.com/tjx666/dianjiang#readme",
+  "bugs": {
+    "url": "https://github.com/tjx666/dianjiang/issues"
+  },
+  "keywords": [
+    "cli",
+    "ai-agents",
+    "claude-code",
+    "codex",
+    "grok",
+    "agent-dispatch",
+    "delegation"
+  ],
+  "publishConfig": {
+    "registry": "https://registry.npmjs.org/"
+  },
   "bin": {
-    "dianjiang": "./src/cli/index.ts"
+    "dianjiang": "./src/cli/bin.ts"
+  },
+  "engines": {
+    "bun": ">=1.2.0"
   },
   "exports": {
     ".": "./src/core/index.ts"
@@ -14,6 +38,7 @@
     "src"
   ],
   "scripts": {
+    "prepublishOnly": "bun run check && bun test",
     "check": "tsc --noEmit",
     "test": "bun test",
     "smoke": "bun run scripts/smoke.ts"
