@@ -6,6 +6,7 @@
 export * from './types.ts'
 export * from './paths.ts'
 export * from './registry.ts'
+export * from './config-edit.ts'
 export * from './store.ts'
 export * from './stats.ts'
 export * from './runner.ts'

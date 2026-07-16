@@ -5,13 +5,21 @@
  * chatter goes to stderr. Exit codes: 0 ok, 1 error/failed run, 2 depth limit.
  */
 
-import { existsSync, writeFileSync } from 'node:fs'
-import { resolve } from 'node:path'
-import { isCancel, multiselect } from '@clack/prompts'
+import { existsSync, readFileSync, unlinkSync, writeFileSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join, resolve } from 'node:path'
+import { confirm, isCancel, multiselect, select, text as textPrompt } from '@clack/prompts'
 import { defineCommand, runMain } from 'citty'
-import type { DianjiangConfig, HarnessName } from '../core/types.ts'
+import type { AgentConfig, DianjiangConfig, HarnessName } from '../core/types.ts'
 import { HARNESS_NAMES } from '../core/types.ts'
-import { harnessVersions } from '../core/adapters/index.ts'
+import { adapters, harnessVersions } from '../core/adapters/index.ts'
+import {
+  appendAgent,
+  readConfigText,
+  removeAgent,
+  setAgentField,
+  writeConfigText,
+} from '../core/config-edit.ts'
 import { logEvent } from '../core/log.ts'
 import { configPath } from '../core/paths.ts'
 import { defaultConfigJsonc, findAgent, loadConfig, resolveAgent } from '../core/registry.ts'
@@ -294,6 +302,257 @@ const configInit = defineCommand({
   },
 })
 
+/** One accepted mutation, summarized for the editor's final JSON. */
+interface EditChange {
+  op: 'set' | 'add' | 'delete'
+  agent: string
+  /** For `set`: which field changed (`binding` for a harness/model/effort edit). */
+  field?: string
+}
+
+/** A resolved harness/model/effort binding gathered from the binding prompts. */
+interface BindingChoice {
+  harness: HarnessName
+  model?: string
+  effort?: string
+}
+
+/** Thrown when the user cancels any prompt; unwinds to the editor's top loop. */
+class EditorCancelled extends Error {}
+
+/** Reject clack's cancel symbol as a control-flow exception; else the value. */
+function unwrap<T>(value: T | symbol): T {
+  if (isCancel(value)) throw new EditorCancelled()
+  return value as T
+}
+
+/** `name (harness/model/effort)` line shown when picking an agent. */
+function bindingLabel(agent: AgentConfig): string {
+  return `${agent.harness}/${agent.model ?? 'default'}/${agent.effort ?? 'none'}`
+}
+
+/**
+ * Open `$EDITOR` (fallback `vi`) on a temp file seeded with `initial`, then
+ * return the trimmed contents. Blocks on the child's terminal (stdio inherit).
+ */
+function editInEditor(initial: string): string {
+  const file = join(tmpdir(), `dianjiang-edit-${Date.now()}-${Math.random().toString(36).slice(2)}.md`)
+  writeFileSync(file, initial)
+  // $EDITOR may carry args (e.g. "code -w"); split it into an argv.
+  const editor = (process.env.EDITOR ?? 'vi').trim() || 'vi'
+  try {
+    Bun.spawnSync({ cmd: [...editor.split(/\s+/), file], stdio: ['inherit', 'inherit', 'inherit'] })
+    return readFileSync(file, 'utf8').trim()
+  } finally {
+    try {
+      unlinkSync(file)
+    } catch {
+      // Best-effort cleanup; a leftover temp file is harmless.
+    }
+  }
+}
+
+/** Prompt for harness -> model -> effort. `current` seeds initial values. */
+async function promptBinding(current?: AgentConfig): Promise<BindingChoice> {
+  const harness = unwrap(
+    await select({
+      message: 'Harness',
+      options: HARNESS_NAMES.map((h) => ({ value: h, label: h })),
+      initialValue: current?.harness,
+      ...CLACK_OUT,
+    }),
+  ) as HarnessName
+
+  const modelInput = unwrap(
+    await textPrompt({
+      message: 'Model (leave empty for the harness default)',
+      // Preserve the current model only when the harness is unchanged.
+      initialValue: current?.harness === harness ? (current.model ?? '') : '',
+      ...CLACK_OUT,
+    }),
+  )
+  const model = modelInput.trim() ? modelInput.trim() : undefined
+
+  const efforts = adapters[harness].efforts
+  let effort: string | undefined
+  if (efforts.length > 0) {
+    // Sentinel for "no effort"; parenthesized so it can never collide with a
+    // real effort value (adapters only accept bare words like "high").
+    const NONE = '(none)'
+    const choice = unwrap(
+      await select({
+        message: 'Effort',
+        options: [...efforts.map((e) => ({ value: e, label: e })), { value: NONE, label: '(none)' }],
+        initialValue: current?.effort && efforts.includes(current.effort) ? current.effort : NONE,
+        ...CLACK_OUT,
+      }),
+    )
+    effort = choice === NONE ? undefined : choice
+  }
+  return { harness, model, effort }
+}
+
+/** Persist a pure mutation applied to the freshest on-disk config text. */
+function applyEdit(mutate: (text: string) => string): void {
+  writeConfigText(mutate(readConfigText()))
+}
+
+/**
+ * Persist one accepted editor mutation and record it. On failure (writeConfigText's
+ * validate-before-write gate rejected the result), report to stderr with
+ * `failLabel` and keep the session alive — the on-disk config is left untouched.
+ */
+function applyChange(
+  changes: EditChange[],
+  mutate: (text: string) => string,
+  change: EditChange,
+  failLabel: string,
+): void {
+  try {
+    applyEdit(mutate)
+    changes.push(change)
+  } catch (err) {
+    process.stderr.write(`${failLabel}: ${errorMessage(err)}\n`)
+  }
+}
+
+/** Edit one prose field via $EDITOR; empty removes it (except required useWhen). */
+function editProse(
+  agent: AgentConfig,
+  index: number,
+  field: 'useWhen' | 'dontUseWhen' | 'instructions',
+  changes: EditChange[],
+): void {
+  const edited = editInEditor(agent[field] ?? '')
+  if (edited === '') {
+    if (field === 'useWhen') {
+      process.stderr.write('useWhen is required and cannot be empty; no change made.\n')
+      return
+    }
+    applyEdit((t) => setAgentField(t, index, field, undefined))
+  } else {
+    applyEdit((t) => setAgentField(t, index, field, edited))
+  }
+  changes.push({ op: 'set', agent: agent.name, field })
+}
+
+/** Action menu for a single agent (edit binding / prose / delete). */
+async function editAgent(agent: AgentConfig, index: number, changes: EditChange[]): Promise<void> {
+  const action = unwrap(
+    await select({
+      message: `Agent "${agent.name}"`,
+      options: [
+        { value: 'binding', label: 'edit binding (harness/model/effort)' },
+        { value: 'useWhen', label: 'edit useWhen' },
+        { value: 'dontUseWhen', label: 'edit dontUseWhen' },
+        { value: 'instructions', label: 'edit instructions' },
+        { value: 'delete', label: 'delete' },
+        { value: 'back', label: 'back' },
+      ],
+      ...CLACK_OUT,
+    }),
+  )
+
+  switch (action) {
+    case 'back':
+      return
+    case 'binding': {
+      const binding = await promptBinding(agent)
+      // Apply all three fields, then validate once: an intermediate state
+      // (e.g. new harness before clearing an unsupported effort) may be
+      // invalid, so writeConfigText is the single gate.
+      applyChange(
+        changes,
+        (t) => {
+          let next = setAgentField(t, index, 'harness', binding.harness)
+          next = setAgentField(next, index, 'model', binding.model)
+          next = setAgentField(next, index, 'effort', binding.effort)
+          return next
+        },
+        { op: 'set', agent: agent.name, field: 'binding' },
+        'Not applied',
+      )
+      return
+    }
+    case 'delete': {
+      const ok = unwrap(await confirm({ message: `Delete agent "${agent.name}"?`, initialValue: false, ...CLACK_OUT }))
+      if (!ok) return
+      applyChange(changes, (t) => removeAgent(t, index), { op: 'delete', agent: agent.name }, 'Not deleted')
+      return
+    }
+    default:
+      editProse(agent, index, action as 'useWhen' | 'dontUseWhen' | 'instructions', changes)
+  }
+}
+
+/** Add a new agent: name -> useWhen ($EDITOR) -> binding. */
+async function addAgent(config: DianjiangConfig, changes: EditChange[]): Promise<void> {
+  const existing = new Set(config.agents.map((a) => a.name))
+  const name = unwrap(
+    await textPrompt({
+      message: 'New agent name',
+      validate(value) {
+        const trimmed = (value ?? '').trim()
+        if (!trimmed) return 'Name is required.'
+        if (existing.has(trimmed)) return `An agent named "${trimmed}" already exists.`
+        return undefined
+      },
+      ...CLACK_OUT,
+    }),
+  ).trim()
+
+  const useWhen = editInEditor('')
+  if (!useWhen) {
+    process.stderr.write('useWhen is required; agent not added.\n')
+    return
+  }
+
+  const binding = await promptBinding()
+  const agent: AgentConfig = { name, useWhen, harness: binding.harness }
+  if (binding.model !== undefined) agent.model = binding.model
+  if (binding.effort !== undefined) agent.effort = binding.effort
+
+  applyChange(changes, (t) => appendAgent(t, agent), { op: 'add', agent: name }, 'Not added')
+}
+
+/**
+ * Interactive agent editor. Reloads config each loop so accepted edits (written
+ * immediately, so a later cancel keeps earlier work) show up live. Returns a
+ * summary of what changed for the single stdout JSON.
+ */
+async function runAgentEditor(): Promise<{ file: string; changes: EditChange[] }> {
+  const changes: EditChange[] = []
+  try {
+    for (;;) {
+      const config = loadConfig()
+      const pick = unwrap(
+        await select({
+          message: 'Edit which agent?',
+          options: [
+            ...config.agents.map((a, i) => ({ value: String(i), label: `${a.name} (${bindingLabel(a)})` })),
+            { value: 'add', label: '+ add agent' },
+            { value: 'done', label: 'done' },
+          ],
+          ...CLACK_OUT,
+        }),
+      )
+      if (pick === 'done') break
+      if (pick === 'add') {
+        await addAgent(config, changes)
+        continue
+      }
+      const index = Number(pick)
+      const agent = config.agents[index]
+      if (agent) await editAgent(agent, index, changes)
+    }
+  } catch (err) {
+    // A cancel at any prompt ends the session gracefully, preserving the edits
+    // already written to disk; anything else is a real error.
+    if (!(err instanceof EditorCancelled)) throw err
+  }
+  return { file: configPath(), changes }
+}
+
 const configAgents = defineCommand({
   meta: { name: 'agents', description: 'Print the configured agents as JSON (or edit them with --edit).' },
   args: {
@@ -301,8 +560,23 @@ const configAgents = defineCommand({
       type: 'string',
       description: 'Emit the roster resolved for this caller (per-caller bindings applied)',
     },
+    edit: { type: 'boolean', default: false, description: 'Open the interactive agent editor (needs a TTY)' },
   },
   async run({ args }) {
+    if (args.edit) {
+      if (!process.stdin.isTTY) {
+        return fail('The interactive agent editor needs a TTY.')
+      }
+      // Ensure the config exists and is valid before entering the editor.
+      const config = tryLoadConfig()
+      if (!config) return
+      try {
+        emit(await runAgentEditor())
+      } catch (err) {
+        return fail(errorMessage(err))
+      }
+      return
+    }
     const config = tryLoadConfig()
     if (!config) return
     if (!args.caller) {
