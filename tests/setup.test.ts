@@ -2,8 +2,15 @@ import { afterEach, beforeEach, describe, expect, test } from 'bun:test'
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import type { DianjiangConfig } from '../src/core/types.ts'
-import { injectBlock, renderRosterBlock, runSetup } from '../src/core/setup.ts'
+import type { DianjiangConfig, HarnessName } from '../src/core/types.ts'
+import {
+  defaultTargets,
+  filterTargets,
+  injectBlock,
+  removeBlock,
+  renderRosterBlock,
+  runSetup,
+} from '../src/core/setup.ts'
 
 const config: DianjiangConfig = {
   maxDepth: 2,
@@ -106,5 +113,67 @@ describe('runSetup', () => {
     expect(readFileSync(targets.claude, 'utf8')).toContain('--caller claude')
     expect(readFileSync(targets.codex, 'utf8')).toContain('--caller codex')
     expect(readFileSync(targets.grok, 'utf8')).toContain('--caller grok')
+  })
+})
+
+describe('removeBlock', () => {
+  test('strips the block and its padding, leaving the remainder byte-identical', () => {
+    const file = join(dir, 'CLAUDE.md')
+    const original = '# My prefs\n\nExisting content.\n'
+    writeFileSync(file, original)
+    injectBlock(file, renderRosterBlock(config))
+    // sanity: the block really was injected
+    expect(readFileSync(file, 'utf8')).toContain('# Delegation roster (dianjiang)')
+
+    const action = removeBlock(file)
+    expect(action).toBe('removed')
+    expect(readFileSync(file, 'utf8')).toBe(original)
+  })
+
+  test('removes the whole file content when the block is all there was', () => {
+    const file = join(dir, 'AGENTS.md')
+    injectBlock(file, renderRosterBlock(config)) // creates a block-only file
+    expect(removeBlock(file)).toBe('removed')
+    expect(readFileSync(file, 'utf8')).toBe('')
+  })
+
+  test('missing file → skipped', () => {
+    expect(removeBlock(join(dir, 'nope.md'))).toBe('skipped')
+  })
+
+  test('file without markers → skipped, byte-identical', () => {
+    const file = join(dir, 'plain.md')
+    const original = 'no markers here\n'
+    writeFileSync(file, original)
+    expect(removeBlock(file)).toBe('skipped')
+    expect(readFileSync(file, 'utf8')).toBe(original)
+  })
+
+  test('inject → remove → inject roundtrip is stable', () => {
+    const file = join(dir, 'CLAUDE.md')
+    writeFileSync(file, '# My prefs\n\nExisting content.\n')
+    const block = renderRosterBlock(config)
+    injectBlock(file, block)
+    const afterFirstInject = readFileSync(file, 'utf8')
+    removeBlock(file)
+    injectBlock(file, block)
+    expect(readFileSync(file, 'utf8')).toBe(afterFirstInject)
+  })
+})
+
+describe('filterTargets', () => {
+  test('narrows to the requested subset, preserving the caller key', () => {
+    const all = defaultTargets('/home/tester')
+    const subset = filterTargets(['claude', 'grok'], all)
+    expect(Object.keys(subset).sort()).toEqual(['claude', 'grok'])
+    expect(subset.claude).toBe(all.claude)
+    expect(subset.grok).toBe(all.grok)
+    expect(subset.codex).toBeUndefined()
+  })
+
+  test('throws on an unknown harness name', () => {
+    expect(() => filterTargets(['gemini' as HarnessName], defaultTargets('/home/tester'))).toThrow(
+      /Unknown harness "gemini"/,
+    )
   })
 })

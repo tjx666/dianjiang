@@ -19,6 +19,7 @@
     "smoke": "bun run scripts/smoke.ts"
   },
   "dependencies": {
+    "@clack/prompts": "^1.7.0",
     "citty": "^0.2.2",
     "jsonc-parser": "^3.3.1"
   },

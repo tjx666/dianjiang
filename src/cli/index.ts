@@ -7,6 +7,7 @@
 
 import { existsSync, writeFileSync } from 'node:fs'
 import { resolve } from 'node:path'
+import { isCancel, multiselect } from '@clack/prompts'
 import { defineCommand, runMain } from 'citty'
 import type { DianjiangConfig, HarnessName } from '../core/types.ts'
 import { HARNESS_NAMES } from '../core/types.ts'
@@ -21,7 +22,7 @@ import {
   reconcileRun,
   type DispatchOptions,
 } from '../core/runner.ts'
-import { runSetup } from '../core/setup.ts'
+import { defaultTargets, filterTargets, runRemove, runSetup, type SetupTargets } from '../core/setup.ts'
 import { getRun } from '../core/store.ts'
 
 function errorMessage(err: unknown): string {
@@ -32,6 +33,9 @@ function errorMessage(err: unknown): string {
 function emit(value: unknown): void {
   process.stdout.write(`${JSON.stringify(value, null, 2)}\n`)
 }
+
+/** Route every clack prompt to stderr so stdout stays the single JSON value. */
+const CLACK_OUT = { output: process.stderr } as const
 
 /** Print a `{status:"failed", error}` object and set the exit code. */
 function fail(message: string, code = 1): void {
@@ -207,11 +211,66 @@ const status = reportCommand('status', 'Print the current state of a run.')
 const result = reportCommand('result', 'Fetch the final result of a run (same shape as status).')
 
 const setup = defineCommand({
-  meta: { name: 'setup', description: 'Inject the delegation roster into the global instruction files.' },
-  run() {
-    const config = tryLoadConfig()
-    if (!config) return
-    const results = runSetup(config)
+  meta: {
+    name: 'setup',
+    description: 'Inject (or remove, with --remove) the delegation roster in the global instruction files.',
+  },
+  args: {
+    all: { type: 'boolean', default: false, description: 'Target every installed harness without prompting' },
+    harness: {
+      type: 'string',
+      description: 'Comma-separated subset of harnesses to target (e.g. claude,codex)',
+    },
+    remove: { type: 'boolean', default: false, description: 'Remove the managed block instead of injecting it' },
+  },
+  async run({ args }) {
+    const installed = harnessVersions().filter((v) => v.installed)
+    const installedNames = installed.map((v) => v.name)
+
+    let selected: HarnessName[]
+    if (args.harness) {
+      // Explicit subset: every name must be a known harness AND installed.
+      const names = args.harness
+        .split(',')
+        .map((s) => s.trim())
+        .filter(Boolean)
+      for (const n of names) {
+        const harness = parseHarnessArg(n, 'harness')
+        if (!harness) return
+        if (!installedNames.includes(harness)) {
+          return fail(`Harness "${n}" is not installed.`)
+        }
+      }
+      selected = names as HarnessName[]
+    } else if (args.all || !process.stdin.isTTY) {
+      // --all, or a non-interactive stdin (piped/CI): every installed harness,
+      // no prompt — keeps the one-JSON machine-readable contract.
+      selected = installedNames
+    } else {
+      // Interactive TTY: multiselect over installed harnesses (all pre-checked,
+      // version shown as a hint). clack writes its UI to stdout by default, so
+      // we redirect it to stderr to keep stdout a single JSON value.
+      if (installedNames.length === 0) return fail('No installed harnesses to set up.')
+      const picked = await multiselect<HarnessName>({
+        message: args.remove ? 'Remove the roster from which harnesses?' : 'Inject the roster into which harnesses?',
+        options: installed.map((v) => ({ value: v.name, label: v.name, hint: v.version ?? undefined })),
+        initialValues: installedNames,
+        required: false,
+        ...CLACK_OUT,
+      })
+      if (isCancel(picked)) return fail('Setup cancelled.')
+      selected = picked
+    }
+
+    const targets: Partial<SetupTargets> = filterTargets(selected, defaultTargets())
+    let results
+    if (args.remove) {
+      results = runRemove(targets)
+    } else {
+      const config = tryLoadConfig()
+      if (!config) return
+      results = runSetup(config, targets)
+    }
     for (const r of results) process.stderr.write(`${r.action}: ${r.file}\n`)
     emit(results)
   },

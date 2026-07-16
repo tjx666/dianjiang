@@ -226,6 +226,31 @@ Rejected:
   moves runtime decisions back into the machine; violates human-compiles.
 - Env sniffing (`CLAUDECODE=1` and friends) — undocumented vendor behavior.
 
+## Ops & UX batch (decided 2026-07-16)
+
+- **setup selection**: `setup` scans installed harnesses (`harnessVersions()`)
+  and interactively multi-selects targets (@clack/prompts) when stdin is a
+  TTY; non-TTY or explicit flags (`--all`, `--harness a,b`) keep the
+  machine-readable one-JSON contract. Default selection = installed only
+  (previously: always all three).
+- **setup --remove**: strips the managed block from selected targets;
+  files without a block report `skipped`.
+- **Interactive agent editor**: `config agents --edit` — pick an agent, edit
+  harness/model/effort via validated select prompts, add/delete agents; prose
+  fields (useWhen/dontUseWhen/instructions) open `$EDITOR`. Writes back with
+  jsonc-parser's `modify`/`applyEdits` so JSONC comments survive. Scope
+  decided by 靖哥: bindings + add/delete; callers overrides stay file-edited.
+- **Operational log**: JSONL at `~/.dianjiang/dianjiang.log` — dispatch /
+  spawn / exit / reconcile / error events, runId-correlated, append-only v1.
+  Distinct from per-run harness stream logs (`logs/<runId>.log`).
+- **Usage stats**: adapters extract what each harness reports — tokens
+  (input/output/cache), turns, and cost. Decision (靖哥): record
+  harness-reported values only, no built-in price tables — claude reports
+  `total_cost_usd`; codex/grok report tokens but no cost, so cost stays null
+  there (subscription pricing makes estimates fictional anyway). Stored on
+  the run row (lazy ALTER TABLE migration); `dianjiang stats` aggregates per
+  agent (runs, success, duration, tokens, turns, cost).
+
 ## Harness capability matrix (verified locally, 2026-07-16)
 
 | | claude 2.1.211 | codex 0.144.4 | grok 0.2.101 |

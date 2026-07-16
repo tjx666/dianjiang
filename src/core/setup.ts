@@ -14,7 +14,7 @@ import type { DianjiangConfig, HarnessName } from './types.ts'
 const BEGIN = '<!-- dianjiang:begin -->'
 const END = '<!-- dianjiang:end -->'
 
-export type SetupAction = 'written' | 'updated'
+export type SetupAction = 'written' | 'updated' | 'removed' | 'skipped'
 
 export interface SetupResult {
   file: string
@@ -34,6 +34,20 @@ export function defaultTargets(home = homedir()): SetupTargets {
     codex: join(home, '.codex', 'AGENTS.md'),
     grok: join(home, '.grok', 'AGENTS.md'),
   }
+}
+
+/**
+ * Narrow `defaultTargets()` (or any full target set) to the given harness
+ * names, preserving the harness key so each file still stamps its own caller.
+ * Throws on an unknown harness name.
+ */
+export function filterTargets(names: HarnessName[], targets = defaultTargets()): Partial<SetupTargets> {
+  const out: Partial<SetupTargets> = {}
+  for (const name of names) {
+    if (!(name in targets)) throw new Error(`Unknown harness "${name}".`)
+    out[name] = targets[name]
+  }
+  return out
 }
 
 /**
@@ -105,14 +119,55 @@ export function injectBlock(filePath: string, block: string): SetupAction {
 }
 
 /**
+ * Remove the managed block from `filePath`, leaving the rest of the file
+ * byte-identical. Strips the block plus the blank-line padding that
+ * `injectBlock` added around it (a leading separator and/or a trailing newline)
+ * so a later re-inject produces the same result as a first-time inject.
+ *
+ * Returns `skipped` when the file is missing or has no complete marker pair,
+ * `removed` when a block was stripped.
+ */
+export function removeBlock(filePath: string): SetupAction {
+  if (!existsSync(filePath)) return 'skipped'
+
+  const content = readFileSync(filePath, 'utf8')
+  const beginIdx = content.indexOf(BEGIN)
+  const endIdx = content.indexOf(END)
+  if (beginIdx === -1 || endIdx === -1 || endIdx <= beginIdx) return 'skipped'
+
+  let before = content.slice(0, beginIdx)
+  let after = content.slice(endIdx + END.length)
+
+  // Drop the blank-line separator injectBlock inserted before the block, and
+  // the single trailing newline it appended after it. When the block was the
+  // whole file, both sides collapse to empty.
+  before = before.replace(/\n{1,2}$/, before.length > 0 && after.length > 0 ? '\n' : '')
+  after = after.replace(/^\n/, '')
+
+  writeFileSync(filePath, before + after)
+  return 'removed'
+}
+
+/**
  * Inject the roster block into the given targets (defaults to all three). Each
  * target is rendered with its own caller stamped in (the SetupTargets keys are
  * the caller harness names) so per-caller binding overrides resolve without env
  * sniffing.
  */
-export function runSetup(config: DianjiangConfig, targets = defaultTargets()): SetupResult[] {
+export function runSetup(config: DianjiangConfig, targets: Partial<SetupTargets> = defaultTargets()): SetupResult[] {
   return (Object.entries(targets) as [HarnessName, string][]).map(([caller, file]) => ({
     file,
     action: injectBlock(file, renderRosterBlock(config, caller)),
+  }))
+}
+
+/**
+ * Remove the managed block from the given targets (defaults to all three).
+ * Same one-JSON contract as `runSetup`; files without a block report `skipped`.
+ */
+export function runRemove(targets: Partial<SetupTargets> = defaultTargets()): SetupResult[] {
+  return (Object.entries(targets) as [HarnessName, string][]).map(([, file]) => ({
+    file,
+    action: removeBlock(file),
   }))
 }
