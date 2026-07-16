@@ -118,6 +118,11 @@ function validateCallers(config: DianjiangConfig, agentNames: Set<string>): void
         validateBinding(binding, label)
       }
     }
+    if (callerConfig.append !== undefined) {
+      if (typeof callerConfig.append !== 'string' || callerConfig.append.length === 0) {
+        throw new Error(`Invalid config: callers.${caller}.append must be a non-empty string.`)
+      }
+    }
     if (callerConfig.exclude !== undefined) {
       if (!Array.isArray(callerConfig.exclude) || callerConfig.exclude.some((n) => typeof n !== 'string')) {
         throw new Error(`Invalid config: callers.${caller}.exclude must be an array of agent names.`)
@@ -196,18 +201,8 @@ export function defaultConfigJsonc(): string {
   "maxDepth": 2,
 
   // The roster. The delegating AI picks an agent by task shape — never a model.
-  // Names are verb/deliverable-style; keep the roster small (v1: 7, hard cap ~8).
+  // Names are verb/deliverable-style; keep the roster small (v1: 6, hard cap ~8).
   "agents": [
-    {
-      "name": "implement",
-      // When the delegating AI SHOULD pick this agent.
-      "useWhen": "a well-scoped feature or module can be built independently of the caller's conversation context",
-      // When it should NOT.
-      "dontUseWhen": "the task needs the caller's live conversation context or ongoing back-and-forth",
-      "harness": "codex",
-      "model": "gpt-5.6-sol",
-      "effort": "high"
-    },
     {
       "name": "review",
       // Base is codex; the callers section rebinds it to a different vendor for
@@ -266,19 +261,20 @@ export function defaultConfigJsonc(): string {
     }
   ],
 
-  // Per-caller adjustments. The built-in bindings follow three rules:
-  //   implement              — same vendor as the caller (build with the caller's own flagship)
+  // Per-caller adjustments. The built-in bindings follow these rules:
   //   review, second-opinion — always a different vendor than the caller (avoid same-model blind spots)
   //   explore                — fixed cheap+fast grok; excluded when the caller IS grok
+  //   implementation         — not a dianjiang agent at all: callers build with their own subagents (see claude's \`append\`)
   // Base bindings are just the compiled view for the most common callers; \`exclude\`
   // hides an agent from a caller entirely. \`setup\` stamps \`--caller <harness>\`
   // into each vendor's instruction file so these resolve without env sniffing.
   "callers": {
     "claude": {
       "agents": {
-        "implement": { "harness": "claude", "model": "opus", "effort": "high" },
         "second-opinion": { "harness": "codex", "model": "gpt-5.6-sol", "effort": "xhigh" }
-      }
+      },
+      // Extra guidance appended to this caller's injected block.
+      "append": "For implementation work, use your built-in subagents (model: opus) — do not route implementation through dianjiang."
     },
     "codex": {
       "agents": {
@@ -286,7 +282,7 @@ export function defaultConfigJsonc(): string {
       }
     },
     "grok": {
-      "exclude": ["implement", "explore"]
+      "exclude": ["explore"]
     }
   }
 }

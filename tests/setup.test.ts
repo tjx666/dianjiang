@@ -62,6 +62,24 @@ describe('renderRosterBlock', () => {
     const claudeBlock = renderRosterBlock(withExclude, 'claude')
     expect(claudeBlock).toContain('| explore | search fast | — |')
   })
+
+  test("renders a caller's append after the rules and before the end marker", () => {
+    const withAppend: DianjiangConfig = {
+      ...config,
+      callers: { claude: { append: 'Use your built-in subagents for implementation.' } },
+    }
+    const claudeBlock = renderRosterBlock(withAppend, 'claude')
+    // The append text lands inside the managed block, after the rules list.
+    expect(claudeBlock).toContain('Use your built-in subagents for implementation.')
+    const appendIdx = claudeBlock.indexOf('Use your built-in subagents for implementation.')
+    const rulesIdx = claudeBlock.indexOf('Rules:')
+    const endIdx = claudeBlock.indexOf('<!-- dianjiang:end -->')
+    expect(rulesIdx).toBeLessThan(appendIdx)
+    expect(appendIdx).toBeLessThan(endIdx)
+    // Other callers (and the caller-less render) do NOT carry the append.
+    expect(renderRosterBlock(withAppend, 'codex')).not.toContain('Use your built-in subagents for implementation.')
+    expect(renderRosterBlock(withAppend, 'grok')).not.toContain('Use your built-in subagents for implementation.')
+  })
 })
 
 describe('injectBlock', () => {

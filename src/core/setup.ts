@@ -56,6 +56,8 @@ export function filterTargets(names: HarnessName[], targets = defaultTargets()):
  * `dianjiang run --caller <caller> ...` so per-caller binding overrides resolve
  * without env sniffing; the raw escape-hatch command stays caller-less. When
  * `caller` is undefined the block renders exactly as the caller-less template.
+ * A caller's optional `append` is inserted after the rules list, still inside
+ * the managed block.
  */
 export function renderRosterBlock(config: DianjiangConfig, caller?: HarnessName): string {
   const excluded = caller ? config.callers?.[caller]?.exclude ?? [] : []
@@ -64,6 +66,8 @@ export function renderRosterBlock(config: DianjiangConfig, caller?: HarnessName)
     .map((a) => `| ${a.name} | ${a.useWhen} | ${a.dontUseWhen ?? '—'} |`)
     .join('\n')
   const runCmd = caller ? `dianjiang run --caller ${caller} <agent> "<task>"` : 'dianjiang run <agent> "<task>"'
+  const append = caller ? config.callers?.[caller]?.append : undefined
+  const appendSection = append ? `\n\n${append}` : ''
 
   return `${BEGIN}
 # Delegation roster (dianjiang)
@@ -87,7 +91,7 @@ Rules:
 - If the human explicitly names a vendor, harness, or model, relay their choice:
   \`dianjiang run --harness <claude|codex|grok> [-m <model>] [--effort <level>] "<task>"\`,
   or override an agent preset with \`-m\`/\`--effort\`. Relay only — the choice stays the human's.
-- If \`DIANJIANG_DEPTH\` is set in your environment, you ARE a delegate — never call dianjiang.
+- If \`DIANJIANG_DEPTH\` is set in your environment, you ARE a delegate — never call dianjiang.${appendSection}
 ${END}`
 }
 

@@ -15,7 +15,7 @@ way; loops, fan-out, and judgment stay with the calling agent.
 
 | Term | Meaning |
 |---|---|
-| **agent** | A named, human-compiled preset: harness + model + effort + optional instructions (e.g. `implement`, `review`). The product. |
+| **agent** | A named, human-compiled preset: harness + model + effort + optional instructions (e.g. `review`, `explore`). The product. |
 | **roster** | The small set of agents in `config.jsonc` (v1: 4, hard cap ~8). |
 | **harness** | An underlying coding-agent CLI: `claude`, `codex`, or `grok`. |
 | **adapter** | The module that adapts one harness (its flags, event stream, session lifecycle) to dianjiang's contracts. |
@@ -44,7 +44,7 @@ dianjiang config init
 dianjiang setup
 
 # Dispatch by agent (primary path) — blocks, prints one JSON object; read .result
-dianjiang run implement "Add a --verbose flag to src/cli.ts; update tests"
+dianjiang run explore "Find every call site of parseConfig across src/"
 
 # Resolve an agent's binding relative to the caller (see `callers` in config).
 # From a codex session, `review` rebinds off codex to another vendor.
@@ -54,7 +54,7 @@ dianjiang run --caller codex review "Review the diff in src/parser.ts"
 dianjiang run --harness codex -m gpt-5.6-sol "Refactor the parser"
 
 # Long task: return immediately, then poll / fetch
-dianjiang run implement "large migration" --detach
+dianjiang run review "review a large multi-file diff" --detach
 dianjiang status <runId>
 dianjiang result <runId>
 
@@ -65,7 +65,7 @@ dianjiang resume <runId> "also handle the error case"
 dianjiang config agents
 dianjiang config harnesses      # self-check: installed CLIs, versions, efforts + accepted models
 dianjiang stats                 # per-agent usage: runs, success, duration, tokens, cost
-dianjiang stats --agent implement   # restrict to one agent
+dianjiang stats --agent review   # restrict to one agent
 ```
 
 ### Stats

@@ -78,13 +78,17 @@ mechanisms (e.g. Claude Code custom agents already cover mechanical fix/doc
 work). dianjiang agents earn their place by being **cross-vendor**: a different
 vendor's perspective, or offloading onto a different subscription's quota.
 
-Recalibrated 2026-07-17 (靖哥). The core-4 bindings are not absolute values —
+Recalibrated 2026-07-17 (靖哥). The core bindings are not absolute values —
 each is a **rule over the caller**, compiled into base + sparse `callers`
 overrides/excludes:
 
-- `implement` — **same vendor as the caller** (the caller's own flagship plus
-  its own subagents already handle building; no third-party vendor needed);
-  grok has no same-vendor coding flagship → excluded for grok.
+- `implement` — **removed** (2026-07-17). Every caller implements natively
+  with its own subagents; same-vendor dispatch through dianjiang adds a
+  process hop and a fresh context for nothing (same subscription, so no quota
+  offload either). It was also the only agent violating the admission
+  principle above (neither cross-vendor perspective nor unique capability).
+  The steer lives in `callers.claude.append` instead: "use your built-in
+  subagents (model: opus)".
 - `review` / `second-opinion` — **always a different vendor than the caller**
   (avoid same-model blind spots); review runs xhigh, second-opinion runs the
   other vendor's flagship with effort graded per model — fable stays at high
@@ -106,22 +110,22 @@ Cost/strength rationale (靖哥, 2026-07-17):
 
 | Agent | Base binding | claude caller | codex caller | grok caller |
 |---|---|---|---|---|
-| `implement` | codex / gpt-5.6-sol / high | claude / opus / high | (base) | excluded |
 | `review` | codex / gpt-5.6-sol / xhigh | (base) | claude / opus / xhigh | (base) |
 | `second-opinion` | claude / fable / high | codex / gpt-5.6-sol / xhigh | (base) | (base) |
 | `explore` | grok / grok-4.5 / high | (base) | (base) | excluded |
 
 Base = the compiled view for the most common callers (and callerless human
 runs). Values recalibrate by feel — that is exactly what config-time
-compilation is for. Earlier iteration (2026-07-16) had review on grok-4.5 and
-explore on grok-composer-2.5-fast; composer's answers were fast but padded
-with narration (see Open questions), and grok as sole reviewer underused the
-stronger vendors.
+compilation is for. Earlier iterations (2026-07-16/17) had review on grok-4.5,
+explore on grok-composer-2.5-fast (fast but padded answers with narration —
+see Open questions), and an `implement` agent bound to the caller's own
+flagship before it was removed outright.
 
 ### Capability agents (added 2026-07-16, 靖哥)
 
 Beyond opinion/perspective agents, agents can expose a **capability** unique to
-one harness. Added (roster now 7 of the ~8 cap; all verified live):
+one harness. Added (roster now 6 of the ~8 cap after `implement` was removed;
+all verified live):
 
 | Agent | Harness / model / effort | Capability |
 |---|---|---|
@@ -166,7 +170,7 @@ shape — never pick harnesses or models on your own judgment:
 
 | Agent | Use when | Don't use when |
 |---|---|---|
-| implement | …rendered from each agent's useWhen… | …dontUseWhen… |
+| review | …rendered from each agent's useWhen… | …dontUseWhen… |
 
 Rules:
 - `dianjiang run <agent> "<task>"` blocks until done and prints one JSON object; read `.result`.
@@ -219,12 +223,12 @@ Single `~/.dianjiang/config.jsonc`; runs metadata in `~/.dianjiang/runs.sqlite`.
   "maxDepth": 2,
   "agents": [
     {
-      "name": "implement",
-      "useWhen": "a well-scoped feature or module can be built independently",
-      "dontUseWhen": "the task needs the caller's conversation context",
+      "name": "review",
+      "useWhen": "you want a second opinion on a diff from a different vendor",
+      "dontUseWhen": "a quick lint/style pass your own subagents already cover",
       "harness": "codex",
       "model": "gpt-5.6-sol",
-      "effort": "high",
+      "effort": "xhigh",
       "instructions": "…optional, keep short…"
     }
   ]
@@ -267,7 +271,14 @@ Decision (2026-07-16):
   agent from that caller entirely — omitted from its injected roster and from
   `config agents --caller <h>`, rejected at dispatch with a clear error. A name
   in both `exclude` and that caller's `agents` overrides is a validation error.
-  First users: grok excludes `implement` and `explore` (see Roster v1 rules).
+  First user: grok excludes `explore` (see Roster v1 rules).
+- `append` (added 2026-07-17, 靖哥): `callers.<h>.append: string` — free-form
+  markdown appended to that caller's injected roster block, after the rules
+  list, inside the managed markers. For guidance about the caller's own
+  behavior that is not a dianjiang agent. First user: claude's block tells it
+  to implement with its built-in subagents on opus instead of delegating
+  implementation through dianjiang (this replaced the removed `implement`
+  agent).
 - Not persisted: RunRecord stores the resolved harness/model/effort, not the
   caller; `resume` inherits the resolved binding from the original run.
 
