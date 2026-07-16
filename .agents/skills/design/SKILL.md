@@ -38,7 +38,7 @@ the caller (usually another AI) picks an **agent**, not a model.
 | Recursion guard | `DIANJIANG_DEPTH` env var; refuse beyond depth limit. Injected prompt also states "when you are the delegate, do not re-delegate." |
 | Attribution | Credit agent-mux in README |
 | Config | Single `~/.dianjiang/config.jsonc` (JSONC over JSON5: VS Code-native tsconfig-style editing, parse with `jsonc-parser`). Agents inline; split into `agents/*.md` only if instructions grow long. Project-level override deferred to phase 2. |
-| Background runs | Every run executes in a detached `_exec` worker; sync mode just waits for it ("job done is holy", credit agent-mux — the job survives caller timeout/death, and callers are AI agents whose shell tools cap at ~10 min). `--detach` returns immediately; poll via `status`, fetch via `result`. Artifact path: full harness stdout/stderr tees to `logs/<runId>.log` progressively. |
+| Background runs | Every run executes in a detached `_exec` worker; sync mode just waits for it ("job done is holy", credit agent-mux — the job survives caller timeout/death, and callers are AI agents whose shell tools cap at ~10 min). `--detach` returns immediately; block on `result --wait [--timeout <sec>]` (store-polling, since the worker isn't waitpid-able; added 2026-07-17 after a caller was observed guessing `sleep 60` between `status` polls — the original design accepted agent-polling as "别扭 but consistent" and never considered a *bounded* block, which waits without reintroducing the caller-shell-timeout problem that motivated `--detach`), instant snapshot via `status`. Artifact path: full harness stdout/stderr tees to `logs/<runId>.log` progressively. |
 | CLI framework | citty (TS-first, lightweight); core stays dependency-light (`bun:sqlite` built-in) |
 | Extension point | `adapter`, not `provider`. Ecosystem rule: "provider" = another chat/completions endpoint (AI SDK, LiteLLM, opencode); "adapter" = a full external runtime with its own event stream and session lifecycle (agent-mux "harness adapters", terminal-bench adapters, LobeHub agent adaptor). Custom harness support later = public `HarnessAdapter` interface. |
 | Caller-relative bindings | `callers.<harness>.agents.<name>` sparse binding overrides; `setup` stamps `--caller <harness>` into each vendor's file (see "Caller-relative agents") |
@@ -49,8 +49,8 @@ the caller (usually another AI) picks an **agent**, not a model.
 dianjiang run <agent> "task" [--detach]  # agent-based dispatch (primary path)
 dianjiang run --harness codex -m gpt-5.5 "task"  # raw escape hatch
 dianjiang resume <run-id> "follow-up"
-dianjiang status <run-id>                # poll a detached run
-dianjiang result <run-id>                # fetch final JSON of a finished run
+dianjiang status <run-id>                # instant snapshot of a run (never blocks)
+dianjiang result <run-id> [--wait [--timeout <sec>]]  # fetch final JSON; --wait blocks until done
 dianjiang setup                          # inject agent roster into global instruction files
 dianjiang config ...                     # agent CRUD + harnesses self-check (config harnesses --json)
 ```
@@ -158,34 +158,53 @@ Locally verified model/effort space (2026-07-16):
 instruction files. Each target is rendered with its own caller stamped into
 the documented commands (`dianjiang run --caller codex <agent> "<task>"` in
 `~/.codex/AGENTS.md`, etc.) so per-caller binding overrides resolve without
-env sniffing; the base template below shows the caller-less form:
+env sniffing; the base template below shows the caller-less form.
+
+Format decision (2026-07-17, 靖哥): the block body is **XML**, not a markdown
+heading + table. Reasons: a column-padded table is unreadable as raw text
+(these files are edited in plain editors, not previewed); an injected `##`
+heading interferes with the host file's own outline (we had already demoted
+it h1→h2 once — a wrapper element removes the problem entirely); and XML
+sectioning is what LLM prompting guides recommend anyway. One `<agent>`
+element per agent; optional `dontUseWhen` omits its element instead of
+rendering a placeholder dash. The HTML-comment begin/end markers are the
+inject/remove contract and stay unchanged, so existing installs re-inject in
+place:
 
 ```markdown
 <!-- dianjiang:begin -->
-## Delegation roster (dianjiang)
+<dianjiang-roster>
 
 `dianjiang` dispatches self-contained tasks to other coding-agent CLIs.
 dianjiang agents are separate from your built-in subagents. Pick one by task
-shape — never pick harnesses or models on your own judgment:
+shape — never pick harnesses or models on your own judgment.
 
-| Agent | Use when | Don't use when |
-|---|---|---|
-| review | …rendered from each agent's useWhen… | …dontUseWhen… |
+<agent name="review">
+  <use-when>…rendered from the agent's useWhen…</use-when>
+  <dont-use-when>…dontUseWhen (element omitted when unset)…</dont-use-when>
+</agent>
 
-Rules:
+<rules>
 - `dianjiang run <agent> "<task>"` blocks until done and prints one JSON object; read `.result`.
 - Write tasks self-contained: background, file paths, acceptance criteria, expected output.
 - Follow up in the same session with `dianjiang resume <runId> "<message>"`.
-- For tasks likely over ~5 minutes, add `--detach`, then poll `dianjiang status <runId>`
-  and fetch `dianjiang result <runId>` when completed.
+- For tasks likely over ~5 minutes, add `--detach`, then block on
+  `dianjiang result <runId> --wait --timeout 300` — it returns the moment the
+  run finishes; on timeout it prints `status: "running"`, just re-run it.
+  Never guess with `sleep N` before checking.
 - If your command times out or is killed, the run keeps going in the background —
   recover it any time with `dianjiang result <runId>`.
 - If the human explicitly names a vendor, harness, or model, relay their choice:
   `dianjiang run --harness <claude|codex|grok> [-m <model>] [--effort <level>] "<task>"`,
   or override an agent preset with `-m`/`--effort`. Relay only — the choice stays the human's.
 - If `DIANJIANG_DEPTH` is set in your environment, you ARE a delegate — never call dianjiang.
+</rules>
+
+</dianjiang-roster>
 <!-- dianjiang:end -->
 ```
+
+A caller's `append` renders after `</rules>`, before `</dianjiang-roster>`.
 
 ## `run` JSON output
 

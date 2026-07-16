@@ -78,10 +78,10 @@ dianjiang run --caller codex review "Review the diff in src/parser.ts"
 # Raw escape hatch — bypass the registry
 dianjiang run --harness codex -m gpt-5.6-sol "Refactor the parser"
 
-# Long task: return immediately, then poll / fetch
+# Long task: return immediately, then block until it finishes (no sleep-polling)
 dianjiang run review "review a large multi-file diff" --detach
-dianjiang status <runId>
-dianjiang result <runId>
+dianjiang result <runId> --wait --timeout 300   # on timeout: status "running", re-run to keep waiting
+dianjiang status <runId>                        # instant snapshot, never blocks
 
 # Follow up in the same harness session
 dianjiang resume <runId> "also handle the error case"

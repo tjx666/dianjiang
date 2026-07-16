@@ -51,47 +51,60 @@ export function filterTargets(names: HarnessName[], targets = defaultTargets()):
 }
 
 /**
- * Render the managed markdown block from the roster (see DESIGN.md template).
+ * Render the managed roster block (see the design skill's template). The body
+ * is XML (`<dianjiang-roster>` wrapping one `<agent>` element per agent):
+ * markdown tables are unreadable as raw text and an injected `##` heading
+ * interferes with the host file's outline, while XML sectioning is also what
+ * LLM prompting guides recommend. The HTML-comment markers stay — they are the
+ * inject/remove contract, not part of the format.
+ *
  * When `caller` is set, the blocking-run rule documents
  * `dianjiang run --caller <caller> ...` so per-caller binding overrides resolve
  * without env sniffing; the raw escape-hatch command stays caller-less. When
  * `caller` is undefined the block renders exactly as the caller-less template.
- * A caller's optional `append` is inserted after the rules list, still inside
- * the managed block.
+ * A caller's optional `append` is inserted after the rules, still inside the
+ * managed block.
  */
 export function renderRosterBlock(config: DianjiangConfig, caller?: HarnessName): string {
   const excluded = caller ? config.callers?.[caller]?.exclude ?? [] : []
-  const rows = config.agents
+  const agents = config.agents
     .filter((a) => !excluded.includes(a.name))
-    .map((a) => `| ${a.name} | ${a.useWhen} | ${a.dontUseWhen ?? '—'} |`)
-    .join('\n')
+    .map((a) => {
+      // dontUseWhen is optional: omit the element rather than render a blank.
+      const dontUse = a.dontUseWhen ? `\n  <dont-use-when>${a.dontUseWhen}</dont-use-when>` : ''
+      return `<agent name="${a.name}">\n  <use-when>${a.useWhen}</use-when>${dontUse}\n</agent>`
+    })
+    .join('\n\n')
   const runCmd = caller ? `dianjiang run --caller ${caller} <agent> "<task>"` : 'dianjiang run <agent> "<task>"'
   const append = caller ? config.callers?.[caller]?.append : undefined
   const appendSection = append ? `\n\n${append}` : ''
 
   return `${BEGIN}
-## Delegation roster (dianjiang)
+<dianjiang-roster>
 
 \`dianjiang\` dispatches self-contained tasks to other coding-agent CLIs.
 dianjiang agents are separate from your built-in subagents. Pick one by task
-shape — never pick harnesses or models on your own judgment:
+shape — never pick harnesses or models on your own judgment.
 
-| Agent | Use when | Don't use when |
-|---|---|---|
-${rows}
+${agents}
 
-Rules:
+<rules>
 - \`${runCmd}\` blocks until done and prints one JSON object; read \`.result\`.
 - Write tasks self-contained: background, file paths, acceptance criteria, expected output.
 - Follow up in the same session with \`dianjiang resume <runId> "<message>"\`.
-- For tasks likely over ~5 minutes, add \`--detach\`, then poll \`dianjiang status <runId>\`
-  and fetch \`dianjiang result <runId>\` when completed.
+- For tasks likely over ~5 minutes, add \`--detach\`, then block on
+  \`dianjiang result <runId> --wait --timeout 300\` — it returns the moment the
+  run finishes; on timeout it prints \`status: "running"\`, just re-run it.
+  Never guess with \`sleep N\` before checking.
 - If your command times out or is killed, the run keeps going in the background —
   recover it any time with \`dianjiang result <runId>\`.
 - If the human explicitly names a vendor, harness, or model, relay their choice:
   \`dianjiang run --harness <claude|codex|grok> [-m <model>] [--effort <level>] "<task>"\`,
   or override an agent preset with \`-m\`/\`--effort\`. Relay only — the choice stays the human's.
-- If \`DIANJIANG_DEPTH\` is set in your environment, you ARE a delegate — never call dianjiang.${appendSection}
+- If \`DIANJIANG_DEPTH\` is set in your environment, you ARE a delegate — never call dianjiang.
+</rules>${appendSection}
+
+</dianjiang-roster>
 ${END}`
 }
 

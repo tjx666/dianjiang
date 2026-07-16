@@ -31,13 +31,15 @@ afterEach(() => {
 })
 
 describe('renderRosterBlock', () => {
-  test('renders a row per agent with begin/end markers', () => {
+  test('renders an <agent> element per agent with begin/end markers', () => {
     const block = renderRosterBlock(config)
     expect(block).toContain('<!-- dianjiang:begin -->')
     expect(block).toContain('<!-- dianjiang:end -->')
-    expect(block).toContain('| implement | build a module | need live context |')
-    // missing dontUseWhen renders an em dash
-    expect(block).toContain('| explore | search fast | — |')
+    expect(block).toContain(
+      '<agent name="implement">\n  <use-when>build a module</use-when>\n  <dont-use-when>need live context</dont-use-when>\n</agent>',
+    )
+    // missing dontUseWhen: the element is omitted entirely
+    expect(block).toContain('<agent name="explore">\n  <use-when>search fast</use-when>\n</agent>')
   })
 
   test('caller-less block documents no --caller flag', () => {
@@ -54,13 +56,13 @@ describe('renderRosterBlock', () => {
       ...config,
       callers: { grok: { exclude: ['explore'] } },
     }
-    // grok excludes explore: its row is dropped, implement stays.
+    // grok excludes explore: its element is dropped, implement stays.
     const grokBlock = renderRosterBlock(withExclude, 'grok')
-    expect(grokBlock).not.toContain('| explore |')
-    expect(grokBlock).toContain('| implement | build a module | need live context |')
+    expect(grokBlock).not.toContain('<agent name="explore">')
+    expect(grokBlock).toContain('<agent name="implement">')
     // claude has no exclude: the full roster renders.
     const claudeBlock = renderRosterBlock(withExclude, 'claude')
-    expect(claudeBlock).toContain('| explore | search fast | — |')
+    expect(claudeBlock).toContain('<agent name="explore">')
   })
 
   test("renders a caller's append after the rules and before the end marker", () => {
@@ -72,9 +74,9 @@ describe('renderRosterBlock', () => {
     // The append text lands inside the managed block, after the rules list.
     expect(claudeBlock).toContain('Use your built-in subagents for implementation.')
     const appendIdx = claudeBlock.indexOf('Use your built-in subagents for implementation.')
-    const rulesIdx = claudeBlock.indexOf('Rules:')
+    const rulesEndIdx = claudeBlock.indexOf('</rules>')
     const endIdx = claudeBlock.indexOf('<!-- dianjiang:end -->')
-    expect(rulesIdx).toBeLessThan(appendIdx)
+    expect(rulesEndIdx).toBeLessThan(appendIdx)
     expect(appendIdx).toBeLessThan(endIdx)
     // Other callers (and the caller-less render) do NOT carry the append.
     expect(renderRosterBlock(withAppend, 'codex')).not.toContain('Use your built-in subagents for implementation.')
@@ -90,7 +92,7 @@ describe('injectBlock', () => {
     const content = readFileSync(file, 'utf8')
     expect(action).toBe('updated')
     expect(content).toContain('Existing content.')
-    expect(content).toContain('## Delegation roster (dianjiang)')
+    expect(content).toContain('<dianjiang-roster>')
   })
 
   test('replaces an existing managed block in place', () => {
@@ -103,8 +105,8 @@ describe('injectBlock', () => {
     }
     injectBlock(file, renderRosterBlock(changed))
     const content = readFileSync(file, 'utf8')
-    expect(content).toContain('| review | second opinion | — |')
-    expect(content).not.toContain('| implement |')
+    expect(content).toContain('<agent name="review">')
+    expect(content).not.toContain('<agent name="implement">')
     // exactly one managed block remains
     expect(content.split('<!-- dianjiang:begin -->').length - 1).toBe(1)
   })
@@ -131,7 +133,7 @@ describe('runSetup', () => {
     const results = runSetup(config, targets)
     expect(results.map((r) => r.action)).toEqual(['written', 'written', 'written'])
     for (const t of Object.values(targets)) {
-      expect(readFileSync(t, 'utf8')).toContain('## Delegation roster (dianjiang)')
+      expect(readFileSync(t, 'utf8')).toContain('<dianjiang-roster>')
     }
   })
 
@@ -155,7 +157,7 @@ describe('removeBlock', () => {
     writeFileSync(file, original)
     injectBlock(file, renderRosterBlock(config))
     // sanity: the block really was injected
-    expect(readFileSync(file, 'utf8')).toContain('## Delegation roster (dianjiang)')
+    expect(readFileSync(file, 'utf8')).toContain('<dianjiang-roster>')
 
     const action = removeBlock(file)
     expect(action).toBe('removed')

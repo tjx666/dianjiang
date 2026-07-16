@@ -29,6 +29,7 @@ import {
   DepthLimitError,
   executeRun,
   reconcileRun,
+  waitForRun,
   type DispatchOptions,
 } from '../core/runner.ts'
 import { defaultTargets, filterTargets, runRemove, runSetup, type SetupTargets } from '../core/setup.ts'
@@ -205,21 +206,47 @@ const resume = defineCommand({
   },
 })
 
-/** `status` and `result` are the same command: report a run by id. */
-function reportCommand(name: string, description: string) {
-  return defineCommand({
-    meta: { name, description },
-    args: { runId: { type: 'positional', required: true, description: 'Run id' } },
-    run({ args }) {
+const status = defineCommand({
+  meta: { name: 'status', description: 'Print the current state of a run.' },
+  args: { runId: { type: 'positional', required: true, description: 'Run id' } },
+  run({ args }) {
+    const record = getRun(args.runId)
+    if (!record) return fail(`Run ${args.runId} not found.`)
+    emit(buildReport(reconcileRun(record)))
+  },
+})
+
+const result = defineCommand({
+  meta: { name: 'result', description: 'Fetch the final result of a run (same shape as status).' },
+  args: {
+    runId: { type: 'positional', required: true, description: 'Run id' },
+    wait: { type: 'boolean', default: false, description: 'Block until the run finishes' },
+    timeout: {
+      type: 'string',
+      description: 'With --wait: give up after this many seconds (run keeps going; re-run to keep waiting)',
+    },
+  },
+  async run({ args }) {
+    if (!args.wait) {
       const record = getRun(args.runId)
       if (!record) return fail(`Run ${args.runId} not found.`)
       emit(buildReport(reconcileRun(record)))
-    },
-  })
-}
-
-const status = reportCommand('status', 'Print the current state of a run.')
-const result = reportCommand('result', 'Fetch the final result of a run (same shape as status).')
+      return
+    }
+    let timeoutMs: number | undefined
+    if (args.timeout !== undefined) {
+      const seconds = Number(args.timeout)
+      if (!Number.isFinite(seconds) || seconds <= 0) {
+        return fail(`Invalid --timeout "${args.timeout}" (expected a positive number of seconds).`)
+      }
+      timeoutMs = seconds * 1000
+    }
+    const record = await waitForRun(args.runId, { timeoutMs })
+    if (!record) return fail(`Run ${args.runId} not found.`)
+    // On timeout the report still says "running" — the caller reads .status.
+    emit(buildReport(record))
+  },
+})
 
 const setup = defineCommand({
   meta: {

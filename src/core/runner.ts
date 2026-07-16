@@ -203,6 +203,34 @@ export function reconcileRun(record: RunRecord): RunRecord {
   return { ...record, ...patch }
 }
 
+export interface WaitOptions {
+  /** Give up after this long; the run keeps going. Omit to wait indefinitely. */
+  timeoutMs?: number
+  /** Store poll interval (default 500ms). */
+  pollMs?: number
+}
+
+/**
+ * Block until a run reaches a terminal status (or the timeout elapses) and
+ * return its freshest record. The worker is a detached process we cannot
+ * `waitpid`, so this polls the store; `reconcileRun` on each tick turns a
+ * dead-worker "running" row into "failed" instead of waiting forever. On
+ * timeout the record is returned as-is (status still "running") — the run
+ * itself is unaffected and can be waited on again.
+ */
+export async function waitForRun(runId: string, opts: WaitOptions = {}): Promise<RunRecord | undefined> {
+  const pollMs = opts.pollMs ?? 500
+  const deadline = opts.timeoutMs === undefined ? undefined : Date.now() + opts.timeoutMs
+  for (;;) {
+    const record = getRun(runId)
+    if (!record) return undefined
+    const fresh = reconcileRun(record)
+    if (fresh.status !== 'running') return fresh
+    if (deadline !== undefined && Date.now() >= deadline) return fresh
+    await new Promise((resolve) => setTimeout(resolve, pollMs))
+  }
+}
+
 /**
  * Spawn the `_exec` worker for a persisted record. The worker is a detached
  * session leader: killing the dispatching CLI (Ctrl-C, caller timeout) never
