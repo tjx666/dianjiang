@@ -24,6 +24,7 @@ import type {
 } from './types.ts'
 import { adapters } from './adapters/index.ts'
 import { loadConfig } from './registry.ts'
+import { logEvent } from './log.ts'
 import { logFilePath } from './paths.ts'
 import { getRun, insertRun, updateRun } from './store.ts'
 
@@ -196,6 +197,7 @@ export function reconcileRun(record: RunRecord): RunRecord {
     finishedAt: new Date().toISOString(),
   }
   updateRun(record.runId, patch)
+  logEvent('reconcile.failed', { runId: record.runId, pid: record.pid })
   return { ...record, ...patch }
 }
 
@@ -215,6 +217,7 @@ function spawnWorker(record: RunRecord, depth: number): ChildProcess {
       env: { ...process.env, DIANJIANG_DEPTH: String(depth) },
     })
     updateRun(record.runId, { pid: child.pid })
+    logEvent('spawn', { runId: record.runId, pid: child.pid })
     return child
   } finally {
     closeSync(logFd)
@@ -240,6 +243,13 @@ export async function dispatch(opts: DispatchOptions, config: DianjiangConfig): 
     parentRunId: opts.parentRunId,
   }
   insertRun(record)
+  logEvent('dispatch', {
+    runId,
+    agent: opts.agent?.name,
+    harness: opts.harness,
+    model: opts.model,
+    detach: opts.detach,
+  })
 
   const child = spawnWorker(record, depth)
 
@@ -265,6 +275,7 @@ export async function dispatch(opts: DispatchOptions, config: DianjiangConfig): 
  * and run it to completion.
  */
 export async function executeRun(runId: string): Promise<RunReport> {
+  logEvent('exec.start', { runId })
   const record = getRun(runId)
   if (!record) throw new Error(`Run ${runId} not found`)
 
@@ -290,5 +301,12 @@ export async function executeRun(runId: string): Promise<RunReport> {
     instructions,
     resumeSessionId,
   }
-  return runToCompletion(record, spec)
+  try {
+    const report = await runToCompletion(record, spec)
+    logEvent('exec.done', { runId, exitCode: report.exitCode, status: report.status })
+    return report
+  } catch (err) {
+    logEvent('exec.error', { runId, message: errorMessage(err) })
+    throw err
+  }
 }

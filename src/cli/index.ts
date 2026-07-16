@@ -12,6 +12,7 @@ import { defineCommand, runMain } from 'citty'
 import type { DianjiangConfig, HarnessName } from '../core/types.ts'
 import { HARNESS_NAMES } from '../core/types.ts'
 import { harnessVersions } from '../core/adapters/index.ts'
+import { logEvent } from '../core/log.ts'
 import { configPath } from '../core/paths.ts'
 import { defaultConfigJsonc, findAgent, loadConfig, resolveAgent } from '../core/registry.ts'
 import {
@@ -39,6 +40,7 @@ const CLACK_OUT = { output: process.stderr } as const
 
 /** Print a `{status:"failed", error}` object and set the exit code. */
 function fail(message: string, code = 1): void {
+  logEvent('cli.error', { message, exitCode: code })
   emit({ status: 'failed', error: message })
   process.exitCode = code
 }

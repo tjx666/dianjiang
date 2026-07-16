@@ -38,3 +38,12 @@ export function logsDir(): string {
 export function logFilePath(runId: string): string {
   return join(logsDir(), `${runId}.log`)
 }
+
+/**
+ * Append-only operational log (`<DIANJIANG_HOME>/dianjiang.log`). Distinct from
+ * per-run harness stream logs: this records dispatch/spawn/exit/reconcile/error
+ * events across all runs. Parent dir ensured (lazy mkdir).
+ */
+export function opLogPath(): string {
+  return join(ensureDir(dianjiangHome()), 'dianjiang.log')
+}
