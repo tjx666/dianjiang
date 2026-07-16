@@ -1,3 +1,8 @@
+---
+name: design
+description: dianjiang's design source of truth — frozen terminology (agent/roster/harness/adapter), decided trade-offs, roster v1, harness invocation matrix, and open questions. Read before making architecture, naming, or CLI-surface decisions.
+---
+
 # dianjiang (点将)
 
 > 点将 — in classical Chinese military drama, the commander reviews the roster and
