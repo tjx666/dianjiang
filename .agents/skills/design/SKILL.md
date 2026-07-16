@@ -41,6 +41,7 @@ the caller (usually another AI) picks an **agent**, not a model.
 | Background runs | Every run executes in a detached `_exec` worker; sync mode just waits for it ("job done is holy", credit agent-mux — the job survives caller timeout/death, and callers are AI agents whose shell tools cap at ~10 min). `--detach` returns immediately; poll via `status`, fetch via `result`. Artifact path: full harness stdout/stderr tees to `logs/<runId>.log` progressively. |
 | CLI framework | citty (TS-first, lightweight); core stays dependency-light (`bun:sqlite` built-in) |
 | Extension point | `adapter`, not `provider`. Ecosystem rule: "provider" = another chat/completions endpoint (AI SDK, LiteLLM, opencode); "adapter" = a full external runtime with its own event stream and session lifecycle (agent-mux "harness adapters", terminal-bench adapters, LobeHub agent adaptor). Custom harness support later = public `HarnessAdapter` interface. |
+| Caller-relative bindings | `callers.<harness>.agents.<name>` sparse binding overrides; `setup` stamps `--caller <harness>` into each vendor's file (see "Caller-relative agents") |
 
 ## Command surface (phase 1)
 
@@ -101,7 +102,10 @@ Locally verified model/effort space (2026-07-16):
 ## Injected roster template
 
 `setup` renders this managed block from config into all three global
-instruction files:
+instruction files. Each target is rendered with its own caller stamped into
+the documented commands (`dianjiang run --caller codex <agent> "<task>"` in
+`~/.codex/AGENTS.md`, etc.) so per-caller binding overrides resolve without
+env sniffing; the base template below shows the caller-less form:
 
 ```markdown
 <!-- dianjiang:begin -->
@@ -109,7 +113,7 @@ instruction files:
 
 `dianjiang` dispatches self-contained tasks to other coding-agent CLIs.
 dianjiang agents are separate from your built-in subagents. Pick one by task
-shape — never pick harnesses or models yourself:
+shape — never pick harnesses or models on your own judgment:
 
 | Agent | Use when | Don't use when |
 |---|---|---|
@@ -123,6 +127,9 @@ Rules:
   and fetch `dianjiang result <runId>` when completed.
 - If your command times out or is killed, the run keeps going in the background —
   recover it any time with `dianjiang result <runId>`.
+- If the human explicitly names a vendor, harness, or model, relay their choice:
+  `dianjiang run --harness <claude|codex|grok> [-m <model>] [--effort <level>] "<task>"`,
+  or override an agent preset with `-m`/`--effort`. Relay only — the choice stays the human's.
 - If `DIANJIANG_DEPTH` is set in your environment, you ARE a delegate — never call dianjiang.
 <!-- dianjiang:end -->
 ```
@@ -182,6 +189,43 @@ Single `~/.dianjiang/config.jsonc`; runs metadata in `~/.dianjiang/runs.sqlite`.
   into `~/.dianjiang/agents/*.md` (frontmatter + markdown body) behind the same
   registry API.
 
+## Caller-relative agents (`callers` namespace)
+
+Some agents are defined *relative to* the caller, not absolutely: `review`'s
+definition is literally "a different vendor than the implementer and caller",
+and `second-opinion` from a codex/gpt-5.6-sol session back to gpt-5.6-sol is
+self-consultation. The name and useWhen are stable semantics; only the binding
+should vary per caller.
+
+Decision (2026-07-16):
+
+- Config gains a `callers.<harness>` namespace. `callers.<h>.agents.<name>`
+  sparsely overrides that agent's binding for that caller. An override
+  replaces the whole binding (`{harness, model?, effort?}`, harness required —
+  no field merging, so a cross-vendor override can never inherit another
+  vendor's model name). `name`/`useWhen`/`dontUseWhen`/`instructions` always
+  come from the base agent: semantics stay single-source.
+- Caller identification: no env sniffing (no stable cross-vendor contract;
+  breaks on vendor upgrades). `setup` already writes one file per vendor, so
+  it stamps `--caller <harness>` into each file's documented run command; the
+  AI relays it verbatim. An omitted flag degrades gracefully to the base
+  roster.
+- Deliberately named `callers`, not `callerOverrides`: per-caller settings
+  beyond bindings are anticipated — roster subsets (`exclude`), inject path
+  (`target`), extra template rules, per-caller `maxDepth`/`disabled`. Only
+  `agents` is implemented today; containers named "override" always grow
+  non-override siblings.
+- Not persisted: RunRecord stores the resolved harness/model/effort, not the
+  caller; `resume` inherits the resolved binding from the original run.
+
+Rejected:
+
+- Full per-caller rosters (`rosters: {claude: [...], codex: [...], ...}`) —
+  duplicates useWhen prose ×3, breaks single-source.
+- Relative semantics in config (`harness: "not-caller"` + fallback chains) —
+  moves runtime decisions back into the machine; violates human-compiles.
+- Env sniffing (`CLAUDECODE=1` and friends) — undocumented vendor behavior.
+
 ## Harness capability matrix (verified locally, 2026-07-16)
 
 | | claude 2.1.211 | codex 0.144.4 | grok 0.2.101 |
@@ -230,6 +274,18 @@ Crowded space; two camps, each missing half of this idea:
 
 ## Open questions
 
+- Progressive-disclosure model metrics (deferred by 靖哥, 2026-07-16): keep the
+  default agent-driven, but a `config models` subcommand could list
+  harnesses × models × human-set rankings plus a prose "how to apply", so the
+  AI can choose informedly when no preset fits. This is a middle point the
+  original "config-time aid vs runtime prompt" dichotomy missed; evidence the
+  read-a-human-table variant works: theo's CLAUDE.md scorecard
+  (x.com/theo/status/2072482460122964067, agent-PR discard rate 50%→0).
+  Revisit once dogfooding shows how often raw mode is actually needed.
+- grok-composer includes narration in `result` (e.g. "Reading runner.ts to
+  find why…" before the answer). Fix candidates: instructions-level ("output
+  only the answer") or adapter-level (take last message if the event stream
+  distinguishes narration). Observed in first dogfood dispatch.
 - Does `grok-composer-2.5-fast` actually hold up for `explore`? Needs real-use
   calibration; cut the agent if it underperforms.
 - Config schema validation: zod vs hand-rolled checks (minor).

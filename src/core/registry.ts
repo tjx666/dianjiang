@@ -6,7 +6,7 @@
 
 import { existsSync, readFileSync } from 'node:fs'
 import { parse as parseJsonc, printParseErrorCode, type ParseError } from 'jsonc-parser'
-import type { AgentConfig, DianjiangConfig } from './types.ts'
+import type { AgentBinding, AgentConfig, DianjiangConfig, HarnessName } from './types.ts'
 import { HARNESS_NAMES } from './types.ts'
 import { adapters } from './adapters/index.ts'
 import { configPath } from './paths.ts'
@@ -14,20 +14,29 @@ import { configPath } from './paths.ts'
 /** grok's fast composer model has no reasoning-effort flag at all. */
 const GROK_NO_EFFORT_MODEL = 'grok-composer-2.5-fast'
 
+/**
+ * Validate a harness/model/effort binding (the GROK_NO_EFFORT_MODEL rule plus
+ * the per-harness effort whitelist). Reusable for base agents and per-caller
+ * overrides; `label` names the offending entry in error messages.
+ */
+function validateBinding(binding: AgentBinding, label: string): void {
+  if (binding.effort === undefined) return
+  if (binding.harness === 'grok' && binding.model === GROK_NO_EFFORT_MODEL) {
+    throw new Error(
+      `Invalid config: ${label} sets an effort, but model "${GROK_NO_EFFORT_MODEL}" does not support effort.`,
+    )
+  }
+  const allowed = adapters[binding.harness].efforts
+  if (!allowed.includes(binding.effort)) {
+    throw new Error(
+      `Invalid config: ${label} has invalid effort "${binding.effort}" for harness "${binding.harness}" (expected one of: ${allowed.join(', ')}).`,
+    )
+  }
+}
+
 /** Validate one agent's effort against its harness (and model exceptions). */
 function validateEffort(agent: AgentConfig): void {
-  if (agent.effort === undefined) return
-  if (agent.harness === 'grok' && agent.model === GROK_NO_EFFORT_MODEL) {
-    throw new Error(
-      `Invalid config: agent "${agent.name}" sets an effort, but model "${GROK_NO_EFFORT_MODEL}" does not support effort.`,
-    )
-  }
-  const allowed = adapters[agent.harness].efforts
-  if (!allowed.includes(agent.effort)) {
-    throw new Error(
-      `Invalid config: agent "${agent.name}" has invalid effort "${agent.effort}" for harness "${agent.harness}" (expected one of: ${allowed.join(', ')}).`,
-    )
-  }
+  validateBinding(agent, `agent "${agent.name}"`)
 }
 
 /** Throw a descriptive Error if the config is structurally invalid. */
@@ -59,6 +68,42 @@ export function validateConfig(config: DianjiangConfig): void {
       )
     }
     validateEffort(agent)
+  }
+  validateCallers(config, seen)
+}
+
+/** Throw `message` unless `value` is a non-null object. */
+function assertObject(value: unknown, message: string): void {
+  if (value === null || typeof value !== 'object') throw new Error(message)
+}
+
+/** Validate the optional `callers` namespace against the base roster. */
+function validateCallers(config: DianjiangConfig, agentNames: Set<string>): void {
+  if (config.callers === undefined) return
+  assertObject(config.callers, 'Invalid config: "callers" must be an object keyed by harness name.')
+  for (const [caller, callerConfig] of Object.entries(config.callers)) {
+    if (!HARNESS_NAMES.includes(caller as HarnessName)) {
+      throw new Error(
+        `Invalid config: callers.${caller} is not a known harness (expected one of: ${HARNESS_NAMES.join(', ')}).`,
+      )
+    }
+    if (callerConfig === undefined) continue
+    assertObject(callerConfig, `Invalid config: callers.${caller} must be an object.`)
+    if (callerConfig.agents === undefined) continue
+    assertObject(callerConfig.agents, `Invalid config: callers.${caller}.agents must be an object keyed by agent name.`)
+    for (const [name, binding] of Object.entries(callerConfig.agents)) {
+      const label = `callers.${caller}.agents.${name}`
+      if (!agentNames.has(name)) {
+        throw new Error(`Invalid config: ${label} overrides an unknown agent (not in the base roster).`)
+      }
+      assertObject(binding, `Invalid config: ${label} must be a binding object with a "harness".`)
+      if (!HARNESS_NAMES.includes(binding.harness)) {
+        throw new Error(
+          `Invalid config: ${label} has unknown harness "${String(binding.harness)}" (expected one of: ${HARNESS_NAMES.join(', ')}).`,
+        )
+      }
+      validateBinding(binding, label)
+    }
   }
 }
 
@@ -92,6 +137,25 @@ export function findAgent(config: DianjiangConfig, name: string): AgentConfig {
     throw new Error(`Unknown agent "${name}". Available agents: ${names}.`)
   }
   return agent
+}
+
+/**
+ * Resolve an agent for a given caller. Looks up the base agent by name, then —
+ * if `caller` has an override for that name — returns the base agent with its
+ * harness/model/effort REPLACED by the override. The override's undefined
+ * model/effort mean "harness default", not the base agent's values; name /
+ * useWhen / dontUseWhen / instructions always stay single-source from the base.
+ */
+export function resolveAgent(config: DianjiangConfig, name: string, caller?: HarnessName): AgentConfig {
+  const agent = findAgent(config, name)
+  const override = caller ? config.callers?.[caller]?.agents?.[name] : undefined
+  if (!override) return agent
+  return {
+    ...agent,
+    harness: override.harness,
+    model: override.model,
+    effort: override.effort,
+  }
 }
 
 /** The commented JSONC template written by `dianjiang config init` (roster v1). */
@@ -140,7 +204,25 @@ export function defaultConfigJsonc(): string {
       // grok-composer-2.5-fast has no reasoning-effort flag, so omit "effort".
       "model": "grok-composer-2.5-fast"
     }
-  ]
+  ],
+
+  // Per-caller binding overrides. Some agents are defined relative to the
+  // caller: \`review\` must be a different vendor than the caller. \`setup\`
+  // stamps \`--caller <harness>\` into each vendor's instruction file.
+  "callers": {
+    "codex": {
+      "agents": {
+        // Base second-opinion is codex itself — self-consultation. Ask claude instead.
+        "second-opinion": { "harness": "claude", "model": "fable", "effort": "max" }
+      }
+    },
+    "grok": {
+      "agents": {
+        // Base review is grok itself — cross-vendor review needs another vendor.
+        "review": { "harness": "codex", "model": "gpt-5.6-sol", "effort": "high" }
+      }
+    }
+  }
 }
 `
 }

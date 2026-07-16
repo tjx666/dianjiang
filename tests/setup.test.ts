@@ -32,6 +32,15 @@ describe('renderRosterBlock', () => {
     // missing dontUseWhen renders an em dash
     expect(block).toContain('| explore | search fast | — |')
   })
+
+  test('caller-less block documents no --caller flag', () => {
+    expect(renderRosterBlock(config)).not.toContain('--caller')
+  })
+
+  test('stamps --caller into the blocking-run rule when a caller is given', () => {
+    const block = renderRosterBlock(config, 'grok')
+    expect(block).toContain('dianjiang run --caller grok <agent> "<task>"')
+  })
 })
 
 describe('injectBlock', () => {
@@ -85,5 +94,17 @@ describe('runSetup', () => {
     for (const t of Object.values(targets)) {
       expect(readFileSync(t, 'utf8')).toContain('# Delegation roster (dianjiang)')
     }
+  })
+
+  test('stamps each target with its own caller', () => {
+    const targets = {
+      claude: join(dir, '.claude', 'CLAUDE.md'),
+      codex: join(dir, '.codex', 'AGENTS.md'),
+      grok: join(dir, '.grok', 'AGENTS.md'),
+    }
+    runSetup(config, targets)
+    expect(readFileSync(targets.claude, 'utf8')).toContain('--caller claude')
+    expect(readFileSync(targets.codex, 'utf8')).toContain('--caller codex')
+    expect(readFileSync(targets.grok, 'utf8')).toContain('--caller grok')
   })
 })

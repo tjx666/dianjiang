@@ -12,7 +12,7 @@ import type { DianjiangConfig, HarnessName } from '../core/types.ts'
 import { HARNESS_NAMES } from '../core/types.ts'
 import { harnessVersions } from '../core/adapters/index.ts'
 import { configPath } from '../core/paths.ts'
-import { defaultConfigJsonc, findAgent, loadConfig } from '../core/registry.ts'
+import { defaultConfigJsonc, findAgent, loadConfig, resolveAgent } from '../core/registry.ts'
 import {
   buildReport,
   dispatch,
@@ -37,6 +37,17 @@ function emit(value: unknown): void {
 function fail(message: string, code = 1): void {
   emit({ status: 'failed', error: message })
   process.exitCode = code
+}
+
+/**
+ * Narrow a harness-name arg. On an unknown name, emit the standard failure
+ * (setting the exit code) and return undefined — the caller should then
+ * `return`. `noun` names the offending arg in the message ("harness"/"caller").
+ */
+function parseHarnessArg(value: string, noun: string): HarnessName | undefined {
+  if (HARNESS_NAMES.includes(value as HarnessName)) return value as HarnessName
+  fail(`Unknown ${noun} "${value}" (expected one of: ${HARNESS_NAMES.join(', ')}).`)
+  return undefined
 }
 
 /** Load config, reporting a friendly error if it's missing/invalid. */
@@ -74,18 +85,27 @@ const run = defineCommand({
     effort: { type: 'string', description: 'Override effort (raw mode / advanced)' },
     detach: { type: 'boolean', default: false, description: 'Return immediately; run in the background' },
     cwd: { type: 'string', default: process.cwd(), description: 'Working directory for the harness' },
+    caller: {
+      type: 'string',
+      description: 'Which harness is calling (stamped by setup); resolves per-caller agent bindings',
+    },
   },
   async run({ args }) {
     const config = tryLoadConfig()
     if (!config) return
     const cwd = resolve(args.cwd)
 
+    // Validate --caller when provided; raw --harness mode ignores it.
+    let caller: HarnessName | undefined
+    if (args.caller) {
+      caller = parseHarnessArg(args.caller, 'caller')
+      if (!caller) return
+    }
+
     if (args.harness) {
       // Raw mode: the sole positional is the task; validate the harness name.
-      const harness = args.harness as HarnessName
-      if (!HARNESS_NAMES.includes(harness)) {
-        return fail(`Unknown harness "${args.harness}" (expected one of: ${HARNESS_NAMES.join(', ')}).`)
-      }
+      const harness = parseHarnessArg(args.harness, 'harness')
+      if (!harness) return
       const task = args.agent ?? args.task
       if (!task) return fail('Missing task. Usage: dianjiang run --harness <name> "<task>".')
       await runDispatch(
@@ -108,7 +128,7 @@ const run = defineCommand({
     }
     let agent
     try {
-      agent = findAgent(config, args.agent)
+      agent = resolveAgent(config, args.agent, caller)
     } catch (err) {
       return fail(errorMessage(err))
     }
@@ -213,11 +233,25 @@ const configInit = defineCommand({
 })
 
 const configAgents = defineCommand({
-  meta: { name: 'agents', description: 'Print the configured agents as JSON.' },
-  run() {
+  meta: { name: 'agents', description: 'Print the configured agents as JSON (or edit them with --edit).' },
+  args: {
+    caller: {
+      type: 'string',
+      description: 'Emit the roster resolved for this caller (per-caller bindings applied)',
+    },
+  },
+  async run({ args }) {
     const config = tryLoadConfig()
     if (!config) return
-    emit(config.agents)
+    if (!args.caller) {
+      emit(config.agents)
+      return
+    }
+    const caller = parseHarnessArg(args.caller, 'caller')
+    if (!caller) return
+    // Emit each agent with its binding resolved for the given caller, so
+    // per-caller overrides are inspectable.
+    emit(config.agents.map((a) => resolveAgent(config, a.name, caller)))
   },
 })
 

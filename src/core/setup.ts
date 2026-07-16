@@ -9,7 +9,7 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { dirname, join } from 'node:path'
-import type { DianjiangConfig } from './types.ts'
+import type { DianjiangConfig, HarnessName } from './types.ts'
 
 const BEGIN = '<!-- dianjiang:begin -->'
 const END = '<!-- dianjiang:end -->'
@@ -36,31 +36,41 @@ export function defaultTargets(home = homedir()): SetupTargets {
   }
 }
 
-/** Render the managed markdown block from the roster (see DESIGN.md template). */
-export function renderRosterBlock(config: DianjiangConfig): string {
+/**
+ * Render the managed markdown block from the roster (see DESIGN.md template).
+ * When `caller` is set, the blocking-run rule documents
+ * `dianjiang run --caller <caller> ...` so per-caller binding overrides resolve
+ * without env sniffing; the raw escape-hatch command stays caller-less. When
+ * `caller` is undefined the block renders exactly as the caller-less template.
+ */
+export function renderRosterBlock(config: DianjiangConfig, caller?: HarnessName): string {
   const rows = config.agents
     .map((a) => `| ${a.name} | ${a.useWhen} | ${a.dontUseWhen ?? '—'} |`)
     .join('\n')
+  const runCmd = caller ? `dianjiang run --caller ${caller} <agent> "<task>"` : 'dianjiang run <agent> "<task>"'
 
   return `${BEGIN}
 # Delegation roster (dianjiang)
 
 \`dianjiang\` dispatches self-contained tasks to other coding-agent CLIs.
 dianjiang agents are separate from your built-in subagents. Pick one by task
-shape — never pick harnesses or models yourself:
+shape — never pick harnesses or models on your own judgment:
 
 | Agent | Use when | Don't use when |
 |---|---|---|
 ${rows}
 
 Rules:
-- \`dianjiang run <agent> "<task>"\` blocks until done and prints one JSON object; read \`.result\`.
+- \`${runCmd}\` blocks until done and prints one JSON object; read \`.result\`.
 - Write tasks self-contained: background, file paths, acceptance criteria, expected output.
 - Follow up in the same session with \`dianjiang resume <runId> "<message>"\`.
 - For tasks likely over ~5 minutes, add \`--detach\`, then poll \`dianjiang status <runId>\`
   and fetch \`dianjiang result <runId>\` when completed.
 - If your command times out or is killed, the run keeps going in the background —
   recover it any time with \`dianjiang result <runId>\`.
+- If the human explicitly names a vendor, harness, or model, relay their choice:
+  \`dianjiang run --harness <claude|codex|grok> [-m <model>] [--effort <level>] "<task>"\`,
+  or override an agent preset with \`-m\`/\`--effort\`. Relay only — the choice stays the human's.
 - If \`DIANJIANG_DEPTH\` is set in your environment, you ARE a delegate — never call dianjiang.
 ${END}`
 }
@@ -94,11 +104,15 @@ export function injectBlock(filePath: string, block: string): SetupAction {
   return 'updated'
 }
 
-/** Inject the roster block into all three targets. */
+/**
+ * Inject the roster block into the given targets (defaults to all three). Each
+ * target is rendered with its own caller stamped in (the SetupTargets keys are
+ * the caller harness names) so per-caller binding overrides resolve without env
+ * sniffing.
+ */
 export function runSetup(config: DianjiangConfig, targets = defaultTargets()): SetupResult[] {
-  const block = renderRosterBlock(config)
-  return Object.values(targets).map((file) => ({
+  return (Object.entries(targets) as [HarnessName, string][]).map(([caller, file]) => ({
     file,
-    action: injectBlock(file, block),
+    action: injectBlock(file, renderRosterBlock(config, caller)),
   }))
 }

@@ -29,10 +29,39 @@ export interface AgentConfig {
   instructions?: string
 }
 
+/**
+ * A per-caller override of an agent's binding. An override REPLACES the whole
+ * binding: there is no field merging, so a cross-vendor override never inherits
+ * another vendor's model name. An omitted `model`/`effort` means "harness
+ * default", NOT the base agent's value.
+ */
+export interface AgentBinding {
+  harness: HarnessName
+  /** Harness-native model name; omit to use the harness's default. */
+  model?: string
+  /** Harness-native effort value; validated per harness by the registry. */
+  effort?: string
+}
+
+/**
+ * Per-caller configuration. Future per-caller fields (e.g. roster `exclude`,
+ * inject `target`) are anticipated; only `agents` exists today.
+ */
+export interface CallerConfig {
+  /** Sparse per-caller binding overrides, keyed by base agent name. */
+  agents?: Record<string, AgentBinding>
+}
+
 export interface DianjiangConfig {
   /** Recursion guard: refuse to dispatch when DIANJIANG_DEPTH >= maxDepth. */
   maxDepth: number
   agents: AgentConfig[]
+  /**
+   * Per-caller binding overrides. Some agents are defined relative to the
+   * caller (e.g. `review` must be a different vendor than the caller); this
+   * namespace lets each caller harness rebind them.
+   */
+  callers?: Partial<Record<HarnessName, CallerConfig>>
 }
 
 /** What the runner asks an adapter to execute. */

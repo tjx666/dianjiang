@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'bun:test'
 import type { DianjiangConfig } from '../src/core/types.ts'
-import { defaultConfigJsonc, findAgent, parseConfig, validateConfig } from '../src/core/registry.ts'
+import { defaultConfigJsonc, findAgent, parseConfig, resolveAgent, validateConfig } from '../src/core/registry.ts'
 
 describe('defaultConfigJsonc', () => {
   test('parses and validates via parseConfig (roster v1)', () => {
@@ -68,5 +68,75 @@ describe('findAgent', () => {
 
   test('lists available names on a miss', () => {
     expect(() => findAgent(config, 'nope')).toThrow(/Available agents: implement/)
+  })
+})
+
+describe('validateConfig (callers)', () => {
+  function withCallers(callers: unknown): DianjiangConfig {
+    return {
+      maxDepth: 2,
+      agents: [{ name: 'review', useWhen: 'x', harness: 'grok', model: 'grok-4.5', effort: 'high' }],
+      callers: callers as DianjiangConfig['callers'],
+    }
+  }
+
+  test('accepts a valid caller override', () => {
+    const cfg = withCallers({ grok: { agents: { review: { harness: 'codex', model: 'gpt-5.6-sol', effort: 'high' } } } })
+    expect(() => validateConfig(cfg)).not.toThrow()
+  })
+
+  test('rejects an unknown caller key', () => {
+    const cfg = withCallers({ gemini: { agents: {} } })
+    expect(() => validateConfig(cfg)).toThrow(/callers\.gemini/)
+  })
+
+  test('rejects an override of an unknown agent name', () => {
+    const cfg = withCallers({ grok: { agents: { nope: { harness: 'codex' } } } })
+    expect(() => validateConfig(cfg)).toThrow(/callers\.grok\.agents\.nope/)
+  })
+
+  test('rejects an invalid effort in an override', () => {
+    const cfg = withCallers({ grok: { agents: { review: { harness: 'grok', effort: 'ultra' } } } })
+    expect(() => validateConfig(cfg)).toThrow(/callers\.grok\.agents\.review/)
+  })
+})
+
+describe('resolveAgent', () => {
+  const config: DianjiangConfig = {
+    maxDepth: 2,
+    agents: [{ name: 'review', useWhen: 'x', harness: 'grok', model: 'grok-4.5', effort: 'high' }],
+    callers: {
+      grok: { agents: { review: { harness: 'codex', model: 'gpt-5.6-sol', effort: 'high' } } },
+      // Override without a model: resolved model must be undefined, NOT the base's.
+      codex: { agents: { review: { harness: 'claude' } } },
+    },
+  }
+
+  test('returns the base binding when no caller is given', () => {
+    const a = resolveAgent(config, 'review')
+    expect(a.harness).toBe('grok')
+    expect(a.model).toBe('grok-4.5')
+  })
+
+  test('returns the base binding when the caller has no matching override', () => {
+    const a = resolveAgent(config, 'review', 'claude')
+    expect(a.harness).toBe('grok')
+    expect(a.model).toBe('grok-4.5')
+  })
+
+  test('replaces the whole binding for a matching caller override', () => {
+    const a = resolveAgent(config, 'review', 'grok')
+    expect(a.harness).toBe('codex')
+    expect(a.model).toBe('gpt-5.6-sol')
+    expect(a.effort).toBe('high')
+    // Semantics stay single-source from the base agent.
+    expect(a.useWhen).toBe('x')
+  })
+
+  test('override without a model resolves to harness default, not the base model', () => {
+    const a = resolveAgent(config, 'review', 'codex')
+    expect(a.harness).toBe('claude')
+    expect(a.model).toBeUndefined()
+    expect(a.effort).toBeUndefined()
   })
 })

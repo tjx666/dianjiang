@@ -21,6 +21,10 @@ way; loops, fan-out, and judgment stay with the calling agent.
 | **adapter** | The module that adapts one harness (its flags, event stream, session lifecycle) to dianjiang's contracts. |
 | **run** | One dispatched execution, addressed by a unified `runId` and persisted in SQLite. |
 
+An agent's binding can be overridden per caller via the `callers` namespace in
+`config.jsonc` — e.g. `review` rebinds to a different vendor depending on which
+harness is calling. `setup` stamps `--caller <harness>` into each vendor's file.
+
 ## Install
 
 ```sh
@@ -41,6 +45,10 @@ dianjiang setup
 
 # Dispatch by agent (primary path) — blocks, prints one JSON object; read .result
 dianjiang run implement "Add a --verbose flag to src/cli.ts; update tests"
+
+# Resolve an agent's binding relative to the caller (see `callers` in config).
+# From a codex session, `review` rebinds off codex to another vendor.
+dianjiang run --caller codex review "Review the diff in src/parser.ts"
 
 # Raw escape hatch — bypass the registry
 dianjiang run --harness codex -m gpt-5.6-sol "Refactor the parser"
