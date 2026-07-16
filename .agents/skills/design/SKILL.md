@@ -78,16 +78,45 @@ mechanisms (e.g. Claude Code custom agents already cover mechanical fix/doc
 work). dianjiang agents earn their place by being **cross-vendor**: a different
 vendor's perspective, or offloading onto a different subscription's quota.
 
-| Agent | Harness / model / effort | Use when |
-|---|---|---|
-| `implement` | codex / gpt-5.6-sol / high | a well-scoped feature or module can be built independently of the caller's conversation context |
-| `review` | grok / grok-4.5 / high | second opinion on a diff; vendor differs from both the implementer (codex) and the typical caller (claude) — avoids same-model blind spots |
-| `second-opinion` | codex / gpt-5.6-sol / ultra | consult-only, no code changes: hard debugging hypotheses, architecture/design review; max firepower (`ultra` exists only on gpt-5.6-sol/terra) |
-| `explore` | grok / grok-composer-2.5-fast / — (no effort support) | broad codebase search / research / summarization, cheap and fast |
+Recalibrated 2026-07-17 (靖哥). The core-4 bindings are not absolute values —
+each is a **rule over the caller**, compiled into base + sparse `callers`
+overrides/excludes:
 
-Values are initial guesses to be recalibrated by feel — that is exactly what
-config-time compilation is for. `explore` is the borderline one (overlaps with
-callers' built-in search subagents); first to cut if it underperforms.
+- `implement` — **same vendor as the caller** (the caller's own flagship plus
+  its own subagents already handle building; no third-party vendor needed);
+  grok has no same-vendor coding flagship → excluded for grok.
+- `review` / `second-opinion` — **always a different vendor than the caller**
+  (avoid same-model blind spots); review runs xhigh, second-opinion runs the
+  other vendor's flagship with effort graded per model — fable stays at high
+  (expensive; high already delivers), gpt-5.6-sol goes to xhigh.
+- `explore` — **fixed cheap+fast grok**, excluded when the caller IS grok
+  (no point round-tripping to yourself).
+
+Cost/strength rationale (靖哥, 2026-07-17):
+
+- **fable is reserved for low-frequency, judgment-heavy roles** — second
+  brain (`second-opinion`) and visual taste (`design-frontend`). It is too
+  expensive for `review`, which is high-frequency; review gets the neighbor
+  vendor's cheaper flagship (gpt-5.6-sol or opus 4.8) at xhigh instead.
+- Per-caller character: claude and codex implement with their own flagship;
+  grok is fast and has native X search but weak reasoning, so it borrows
+  fable to plan/consult and codex gpt-5.6-sol to review, and never gets
+  `implement`/`explore`.
+- opus 4.6 has the best prose style (文风) → `rewrite-prompt`.
+
+| Agent | Base binding | claude caller | codex caller | grok caller |
+|---|---|---|---|---|
+| `implement` | codex / gpt-5.6-sol / high | claude / opus / high | (base) | excluded |
+| `review` | codex / gpt-5.6-sol / xhigh | (base) | claude / opus / xhigh | (base) |
+| `second-opinion` | claude / fable / high | codex / gpt-5.6-sol / xhigh | (base) | (base) |
+| `explore` | grok / grok-4.5 / high | (base) | (base) | excluded |
+
+Base = the compiled view for the most common callers (and callerless human
+runs). Values recalibrate by feel — that is exactly what config-time
+compilation is for. Earlier iteration (2026-07-16) had review on grok-4.5 and
+explore on grok-composer-2.5-fast; composer's answers were fast but padded
+with narration (see Open questions), and grok as sole reviewer underused the
+stronger vendors.
 
 ### Capability agents (added 2026-07-16, 靖哥)
 
@@ -232,9 +261,13 @@ Decision (2026-07-16):
   roster.
 - Deliberately named `callers`, not `callerOverrides`: per-caller settings
   beyond bindings are anticipated — roster subsets (`exclude`), inject path
-  (`target`), extra template rules, per-caller `maxDepth`/`disabled`. Only
-  `agents` is implemented today; containers named "override" always grow
-  non-override siblings.
+  (`target`), extra template rules, per-caller `maxDepth`/`disabled`.
+  Containers named "override" always grow non-override siblings.
+- `exclude` (added 2026-07-17, 靖哥): `callers.<h>.exclude: string[]` hides an
+  agent from that caller entirely — omitted from its injected roster and from
+  `config agents --caller <h>`, rejected at dispatch with a clear error. A name
+  in both `exclude` and that caller's `agents` overrides is a validation error.
+  First users: grok excludes `implement` and `explore` (see Roster v1 rules).
 - Not persisted: RunRecord stores the resolved harness/model/effort, not the
   caller; `resume` inherits the resolved binding from the original run.
 

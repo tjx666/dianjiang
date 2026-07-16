@@ -98,20 +98,38 @@ function validateCallers(config: DianjiangConfig, agentNames: Set<string>): void
     }
     if (callerConfig === undefined) continue
     assertObject(callerConfig, `Invalid config: callers.${caller} must be an object.`)
-    if (callerConfig.agents === undefined) continue
-    assertObject(callerConfig.agents, `Invalid config: callers.${caller}.agents must be an object keyed by agent name.`)
-    for (const [name, binding] of Object.entries(callerConfig.agents)) {
-      const label = `callers.${caller}.agents.${name}`
-      if (!agentNames.has(name)) {
-        throw new Error(`Invalid config: ${label} overrides an unknown agent (not in the base roster).`)
+    const overrides = callerConfig.agents ?? {}
+    if (callerConfig.agents !== undefined) {
+      assertObject(
+        callerConfig.agents,
+        `Invalid config: callers.${caller}.agents must be an object keyed by agent name.`,
+      )
+      for (const [name, binding] of Object.entries(callerConfig.agents)) {
+        const label = `callers.${caller}.agents.${name}`
+        if (!agentNames.has(name)) {
+          throw new Error(`Invalid config: ${label} overrides an unknown agent (not in the base roster).`)
+        }
+        assertObject(binding, `Invalid config: ${label} must be a binding object with a "harness".`)
+        if (!HARNESS_NAMES.includes(binding.harness)) {
+          throw new Error(
+            `Invalid config: ${label} has unknown harness "${String(binding.harness)}" (expected one of: ${HARNESS_NAMES.join(', ')}).`,
+          )
+        }
+        validateBinding(binding, label)
       }
-      assertObject(binding, `Invalid config: ${label} must be a binding object with a "harness".`)
-      if (!HARNESS_NAMES.includes(binding.harness)) {
-        throw new Error(
-          `Invalid config: ${label} has unknown harness "${String(binding.harness)}" (expected one of: ${HARNESS_NAMES.join(', ')}).`,
-        )
+    }
+    if (callerConfig.exclude !== undefined) {
+      if (!Array.isArray(callerConfig.exclude) || callerConfig.exclude.some((n) => typeof n !== 'string')) {
+        throw new Error(`Invalid config: callers.${caller}.exclude must be an array of agent names.`)
       }
-      validateBinding(binding, label)
+      for (const name of callerConfig.exclude) {
+        if (!agentNames.has(name)) {
+          throw new Error(`Invalid config: callers.${caller}.exclude references unknown agent "${name}".`)
+        }
+        if (name in overrides) {
+          throw new Error(`Invalid config: callers.${caller} excludes "${name}" but also overrides it in "agents".`)
+        }
+      }
     }
   }
 }
@@ -157,7 +175,11 @@ export function findAgent(config: DianjiangConfig, name: string): AgentConfig {
  */
 export function resolveAgent(config: DianjiangConfig, name: string, caller?: HarnessName): AgentConfig {
   const agent = findAgent(config, name)
-  const override = caller ? config.callers?.[caller]?.agents?.[name] : undefined
+  const callerConfig = caller ? config.callers?.[caller] : undefined
+  if (callerConfig?.exclude?.includes(name)) {
+    throw new Error(`Agent "${name}" is not available to caller "${caller}" (excluded in config).`)
+  }
+  const override = callerConfig?.agents?.[name]
   if (!override) return agent
   return {
     ...agent,
@@ -174,7 +196,7 @@ export function defaultConfigJsonc(): string {
   "maxDepth": 2,
 
   // The roster. The delegating AI picks an agent by task shape — never a model.
-  // Names are verb/deliverable-style; keep the roster small (v1: 4, hard cap ~8).
+  // Names are verb/deliverable-style; keep the roster small (v1: 7, hard cap ~8).
   "agents": [
     {
       "name": "implement",
@@ -188,30 +210,32 @@ export function defaultConfigJsonc(): string {
     },
     {
       "name": "review",
-      // Vendor differs from both the implementer (codex) and the typical caller
-      // (claude) — avoids same-model blind spots.
+      // Base is codex; the callers section rebinds it to a different vendor for
+      // the codex caller so review is never same-model as the code under review.
       "useWhen": "you want a second opinion on a diff from a different vendor than the implementer and caller",
       "dontUseWhen": "a quick lint/style pass your own subagents already cover",
-      "harness": "grok",
-      "model": "grok-4.5",
-      "effort": "high"
+      "harness": "codex",
+      "model": "gpt-5.6-sol",
+      "effort": "xhigh"
     },
     {
       "name": "second-opinion",
-      // Consult-only, maximum firepower ("ultra" exists only on gpt-5.6-sol/terra).
+      // Consult-only; base is claude/fable, rebound to a different vendor for the
+      // claude caller so consulting never lands on the caller's own model.
       "useWhen": "consult-only: hard debugging hypotheses or architecture/design review needing maximum firepower",
       "dontUseWhen": "the task requires editing code (this agent must not make changes)",
-      "harness": "codex",
-      "model": "gpt-5.6-sol",
-      "effort": "ultra"
+      "harness": "claude",
+      "model": "fable",
+      "effort": "high"
     },
     {
       "name": "explore",
+      // Fixed cheap+fast grok; excluded when the caller IS grok (see callers).
       "useWhen": "broad codebase search, research, or summarization where cheap and fast matters",
       "dontUseWhen": "the task needs deep reasoning or code changes",
       "harness": "grok",
-      // grok-composer-2.5-fast has no reasoning-effort flag, so omit "effort".
-      "model": "grok-composer-2.5-fast"
+      "model": "grok-4.5",
+      "effort": "high"
     },
     {
       "name": "search-twitter",
@@ -242,21 +266,27 @@ export function defaultConfigJsonc(): string {
     }
   ],
 
-  // Per-caller binding overrides. Some agents are defined relative to the
-  // caller: \`review\` must be a different vendor than the caller. \`setup\`
-  // stamps \`--caller <harness>\` into each vendor's instruction file.
+  // Per-caller adjustments. The built-in bindings follow three rules:
+  //   implement              — same vendor as the caller (build with the caller's own flagship)
+  //   review, second-opinion — always a different vendor than the caller (avoid same-model blind spots)
+  //   explore                — fixed cheap+fast grok; excluded when the caller IS grok
+  // Base bindings are just the compiled view for the most common callers; \`exclude\`
+  // hides an agent from a caller entirely. \`setup\` stamps \`--caller <harness>\`
+  // into each vendor's instruction file so these resolve without env sniffing.
   "callers": {
+    "claude": {
+      "agents": {
+        "implement": { "harness": "claude", "model": "opus", "effort": "high" },
+        "second-opinion": { "harness": "codex", "model": "gpt-5.6-sol", "effort": "xhigh" }
+      }
+    },
     "codex": {
       "agents": {
-        // Base second-opinion is codex itself — self-consultation. Ask claude instead.
-        "second-opinion": { "harness": "claude", "model": "fable", "effort": "max" }
+        "review": { "harness": "claude", "model": "opus", "effort": "xhigh" }
       }
     },
     "grok": {
-      "agents": {
-        // Base review is grok itself — cross-vendor review needs another vendor.
-        "review": { "harness": "codex", "model": "gpt-5.6-sol", "effort": "high" }
-      }
+      "exclude": ["implement", "explore"]
     }
   }
 }

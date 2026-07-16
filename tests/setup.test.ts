@@ -48,6 +48,20 @@ describe('renderRosterBlock', () => {
     const block = renderRosterBlock(config, 'grok')
     expect(block).toContain('dianjiang run --caller grok <agent> "<task>"')
   })
+
+  test('omits excluded agents for the excluding caller but keeps them for others', () => {
+    const withExclude: DianjiangConfig = {
+      ...config,
+      callers: { grok: { exclude: ['explore'] } },
+    }
+    // grok excludes explore: its row is dropped, implement stays.
+    const grokBlock = renderRosterBlock(withExclude, 'grok')
+    expect(grokBlock).not.toContain('| explore |')
+    expect(grokBlock).toContain('| implement | build a module | need live context |')
+    // claude has no exclude: the full roster renders.
+    const claudeBlock = renderRosterBlock(withExclude, 'claude')
+    expect(claudeBlock).toContain('| explore | search fast | — |')
+  })
 })
 
 describe('injectBlock', () => {

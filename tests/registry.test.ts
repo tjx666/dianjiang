@@ -15,9 +15,15 @@ describe('defaultConfigJsonc', () => {
       'design-frontend',
       'rewrite-prompt',
     ])
-    // explore uses grok-composer-2.5-fast and must carry no effort.
+    // explore is fixed cheap+fast grok with an explicit effort.
     const explore = config.agents.find((a) => a.name === 'explore')
-    expect(explore?.effort).toBeUndefined()
+    expect(explore?.harness).toBe('grok')
+    expect(explore?.model).toBe('grok-4.5')
+    expect(explore?.effort).toBe('high')
+    // Caller-relative rules compile into base + sparse overrides + grok exclude.
+    expect(config.callers?.claude?.agents?.implement).toEqual({ harness: 'claude', model: 'opus', effort: 'high' })
+    expect(config.callers?.codex?.agents?.review).toEqual({ harness: 'claude', model: 'opus', effort: 'xhigh' })
+    expect(config.callers?.grok?.exclude).toEqual(['implement', 'explore'])
   })
 })
 
@@ -125,6 +131,28 @@ describe('validateConfig (callers)', () => {
     const cfg = withCallers({ grok: { agents: { review: { harness: 'grok', effort: 'ultra' } } } })
     expect(() => validateConfig(cfg)).toThrow(/callers\.grok\.agents\.review/)
   })
+
+  test('accepts a valid exclude list', () => {
+    const cfg = withCallers({ grok: { exclude: ['review'] } })
+    expect(() => validateConfig(cfg)).not.toThrow()
+  })
+
+  test('rejects an exclude referencing an unknown agent', () => {
+    const cfg = withCallers({ grok: { exclude: ['nope'] } })
+    expect(() => validateConfig(cfg)).toThrow(/callers\.grok\.exclude references unknown agent "nope"/)
+  })
+
+  test('rejects an agent both excluded and overridden', () => {
+    const cfg = withCallers({
+      grok: { exclude: ['review'], agents: { review: { harness: 'codex', model: 'gpt-5.6-sol', effort: 'high' } } },
+    })
+    expect(() => validateConfig(cfg)).toThrow(/callers\.grok excludes "review" but also overrides it in "agents"/)
+  })
+
+  test('rejects a non-array exclude', () => {
+    const cfg = withCallers({ grok: { exclude: 'review' } })
+    expect(() => validateConfig(cfg)).toThrow(/callers\.grok\.exclude must be an array/)
+  })
 })
 
 describe('resolveAgent', () => {
@@ -164,5 +192,18 @@ describe('resolveAgent', () => {
     expect(a.harness).toBe('claude')
     expect(a.model).toBeUndefined()
     expect(a.effort).toBeUndefined()
+  })
+
+  test('throws for an excluded caller/agent pair', () => {
+    const excludeCfg: DianjiangConfig = {
+      maxDepth: 2,
+      agents: [{ name: 'implement', useWhen: 'x', harness: 'codex' }],
+      callers: { grok: { exclude: ['implement'] } },
+    }
+    expect(() => resolveAgent(excludeCfg, 'implement', 'grok')).toThrow(
+      /Agent "implement" is not available to caller "grok" \(excluded in config\)/,
+    )
+    // Still resolves for a non-excluded caller.
+    expect(resolveAgent(excludeCfg, 'implement', 'claude').harness).toBe('codex')
   })
 })

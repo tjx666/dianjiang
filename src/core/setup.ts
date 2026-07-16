@@ -58,7 +58,9 @@ export function filterTargets(names: HarnessName[], targets = defaultTargets()):
  * `caller` is undefined the block renders exactly as the caller-less template.
  */
 export function renderRosterBlock(config: DianjiangConfig, caller?: HarnessName): string {
+  const excluded = caller ? config.callers?.[caller]?.exclude ?? [] : []
   const rows = config.agents
+    .filter((a) => !excluded.includes(a.name))
     .map((a) => `| ${a.name} | ${a.useWhen} | ${a.dontUseWhen ?? '—'} |`)
     .join('\n')
   const runCmd = caller ? `dianjiang run --caller ${caller} <agent> "<task>"` : 'dianjiang run <agent> "<task>"'

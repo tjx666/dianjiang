@@ -586,8 +586,10 @@ const configAgents = defineCommand({
     const caller = parseHarnessArg(args.caller, 'caller')
     if (!caller) return
     // Emit each agent with its binding resolved for the given caller, so
-    // per-caller overrides are inspectable.
-    emit(config.agents.map((a) => resolveAgent(config, a.name, caller)))
+    // per-caller overrides are inspectable. Excluded agents are omitted — the
+    // listing shows what that caller sees, matching the injected roster.
+    const excluded = config.callers?.[caller]?.exclude ?? []
+    emit(config.agents.filter((a) => !excluded.includes(a.name)).map((a) => resolveAgent(config, a.name, caller)))
   },
 })
 

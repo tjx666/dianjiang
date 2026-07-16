@@ -44,12 +44,14 @@ export interface AgentBinding {
 }
 
 /**
- * Per-caller configuration. Future per-caller fields (e.g. roster `exclude`,
- * inject `target`) are anticipated; only `agents` exists today.
+ * Per-caller configuration. Future per-caller fields (e.g. inject `target`) are
+ * anticipated; `agents` and `exclude` exist today.
  */
 export interface CallerConfig {
   /** Sparse per-caller binding overrides, keyed by base agent name. */
   agents?: Record<string, AgentBinding>
+  /** Agent names hidden from this caller: not injected into its roster and rejected at dispatch. */
+  exclude?: string[]
 }
 
 export interface DianjiangConfig {
