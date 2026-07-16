@@ -10,7 +10,7 @@
  * session id equals the run id for new sessions.
  */
 
-import type { DispatchSpec, HarnessAdapter, HarnessResult, RunUsage } from '../types.ts'
+import type { DispatchSpec, HarnessAdapter, HarnessResult, KnownModel, RunUsage } from '../types.ts'
 import { asRecord, finalizeUsage, num } from './shared.ts'
 
 /**
@@ -33,9 +33,29 @@ function extractUsage(obj: Record<string, unknown>): RunUsage | undefined {
 
 export const CLAUDE_EFFORTS = ['low', 'medium', 'high', 'xhigh', 'max'] as const
 
+/**
+ * Locally-verified claude models (2026-07-16). Aliases only; the CLI also
+ * accepts full model IDs and the `[1m]` 1M-context suffix — e.g.
+ * `claude-opus-4-6[1m]` (verified) — which validation passes through as
+ * unknown-but-permitted names. The CLI has no headless model-list command, so
+ * there is no `listModels`.
+ */
+export const CLAUDE_MODELS: readonly KnownModel[] = [
+  {
+    name: 'fable',
+    efforts: CLAUDE_EFFORTS,
+    isDefault: true,
+    note: 'Full model IDs and the [1m] 1M-context suffix are also accepted (e.g. claude-opus-4-6[1m], verified).',
+  },
+  { name: 'opus', efforts: CLAUDE_EFFORTS },
+  { name: 'sonnet', efforts: CLAUDE_EFFORTS },
+]
+
 export const claudeAdapter: HarnessAdapter = {
   name: 'claude',
   efforts: CLAUDE_EFFORTS,
+  knownModels: CLAUDE_MODELS,
+  modelsVerifiedAt: '2026-07-16',
   versionArgs: ['--version'],
 
   buildCommand(spec: DispatchSpec) {

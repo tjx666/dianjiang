@@ -63,7 +63,7 @@ dianjiang resume <runId> "also handle the error case"
 
 # Inspect
 dianjiang config agents
-dianjiang config harnesses      # self-check: installed CLIs + versions
+dianjiang config harnesses      # self-check: installed CLIs, versions, efforts + accepted models
 dianjiang stats                 # per-agent usage: runs, success, duration, tokens, cost
 dianjiang stats --agent implement   # restrict to one agent
 ```

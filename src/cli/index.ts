@@ -12,7 +12,7 @@ import { confirm, isCancel, multiselect, select, text as textPrompt } from '@cla
 import { defineCommand, runMain } from 'citty'
 import type { AgentConfig, DianjiangConfig, HarnessName } from '../core/types.ts'
 import { HARNESS_NAMES } from '../core/types.ts'
-import { adapters, harnessVersions } from '../core/adapters/index.ts'
+import { adapters, describeHarness, harnessVersions } from '../core/adapters/index.ts'
 import {
   appendAgent,
   readConfigText,
@@ -592,10 +592,13 @@ const configAgents = defineCommand({
 })
 
 const configHarnesses = defineCommand({
-  meta: { name: 'harnesses', description: 'Self-check: which harness CLIs are installed and their versions.' },
+  meta: {
+    name: 'harnesses',
+    description: 'Self-check: installed harness CLIs, versions, efforts, and accepted models.',
+  },
   args: { json: { type: 'boolean', default: false, description: 'JSON output (default is already JSON)' } },
   run() {
-    emit(harnessVersions())
+    emit(HARNESS_NAMES.map(describeHarness))
   },
 })
 

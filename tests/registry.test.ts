@@ -55,7 +55,25 @@ describe('validateConfig', () => {
     expect(() => validateConfig(cfg)).toThrow(/invalid effort/)
   })
 
-  test('rejects effort on grok-composer-2.5-fast', () => {
+  test('rejects an effort a known model does not support (gpt-5.4-mini + ultra)', () => {
+    const cfg: DianjiangConfig = {
+      maxDepth: 2,
+      agents: [{ name: 'a', useWhen: 'x', harness: 'codex', model: 'gpt-5.4-mini', effort: 'ultra' }],
+    }
+    // Model-aware: ultra is a valid codex effort but not for gpt-5.4-mini.
+    expect(() => validateConfig(cfg)).toThrow(/invalid effort "ultra" for model "gpt-5.4-mini"/)
+  })
+
+  test('accepts an unknown model with a harness-valid effort (permissive pass-through)', () => {
+    const cfg: DianjiangConfig = {
+      maxDepth: 2,
+      agents: [{ name: 'a', useWhen: 'x', harness: 'codex', model: 'gpt-6.0-future', effort: 'xhigh' }],
+    }
+    expect(() => validateConfig(cfg)).not.toThrow()
+  })
+
+  test('rejects any effort on the no-effort grok-composer model', () => {
+    // The curated knownModels entry (efforts: []) subsumes the old special case.
     const cfg: DianjiangConfig = {
       maxDepth: 2,
       agents: [{ name: 'a', useWhen: 'x', harness: 'grok', model: 'grok-composer-2.5-fast', effort: 'high' }],

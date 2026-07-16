@@ -117,10 +117,35 @@ export interface HarnessResult {
   usage?: RunUsage
 }
 
+/** One model this harness is known to accept (locally verified). */
+export interface KnownModel {
+  name: string
+  /** Effort values valid for THIS model; empty = model takes no effort flag. */
+  efforts: readonly string[]
+  /** True for the harness's default model. */
+  isDefault?: boolean
+  note?: string
+}
+
 export interface HarnessAdapter {
   name: HarnessName
   /** Effort values this harness accepts; empty means no effort support. */
   efforts: readonly string[]
+  /**
+   * Curated, locally-verified snapshot of models this harness accepts under the
+   * current auth, with per-model effort sets. Drives effort validation (known
+   * model → validate against its efforts; unknown model → permissive) and the
+   * `config harnesses` self-check.
+   */
+  knownModels: readonly KnownModel[]
+  /** ISO date the `knownModels` snapshot was last verified locally. */
+  modelsVerifiedAt: string
+  /**
+   * Live model enumeration where the CLI supports it (only grok today). Returns
+   * the accepted model names, or undefined when the CLI can't be queried
+   * (spawn failure, unparseable output) — callers fall back to `knownModels`.
+   */
+  listModels?(): string[] | undefined
   buildCommand(spec: DispatchSpec): HarnessCommand
   /**
    * Parse the finished process's stdout (and outputFile contents, if the

@@ -271,6 +271,36 @@ Rejected:
   the run row (lazy ALTER TABLE migration); `dianjiang stats` aggregates per
   agent (runs, success, duration, tokens, turns, cost).
 
+## Model/effort discovery (decided 2026-07-16)
+
+The question that matters for dispatch is "what strings does THIS harness CLI,
+under THIS auth, accept" — and only the local CLI knows. Two dogfood-proven
+counterexamples: `gpt-image-2` exists in every external registry yet codex
+under ChatGPT-subscription auth 400s it; opus 4.6 exists but claude only
+accepts the `claude-opus-4-6[1m]` spelling. Layered sources:
+
+1. **Live CLI enumeration** where it exists — only grok today (`grok models`,
+   works even unauthenticated). Adapters expose optional `listModels()`.
+2. **Curated in-adapter snapshot** (`knownModels` + `modelsVerifiedAt`) for
+   claude/codex, refreshed alongside smoke/dogfooding. Per-model effort sets
+   live here (codex `ultra` only on 5.6-sol/terra; grok-composer none) and
+   drive validation: known model → validate against its effort set; unknown
+   model → permissive pass-through (new models ship weekly; never hard-reject).
+   This subsumes the old GROK_NO_EFFORT_MODEL special case.
+3. **Third-party registries** (models.dev — opencode's registry; LiteLLM's
+   model-prices JSON) — reserved as *enrichment* for the deferred
+   progressive-disclosure `config models` (objective fields: context window,
+   list price; human adds subjective scores). If adopted: explicit `--refresh`
+   fetch, cached locally with a fetch date, never a runtime network dependency.
+4. **Scraping official docs HTML** — rejected: no contract, most fragile, and
+   answers the same question as layer 3 less reliably.
+
+Surface: `config harnesses` gains `efforts` + `models` (with
+`source: live | curated` and `verifiedAt`) per harness — no new command.
+Watch item: codex clearly has an internal model-metadata table ("Model
+metadata for `x` not found" on bogus models); if a future codex exposes it,
+layer 2 retires for codex.
+
 ## Harness capability matrix (verified locally, 2026-07-16)
 
 | | claude 2.1.211 | codex 0.144.4 | grok 0.2.101 |

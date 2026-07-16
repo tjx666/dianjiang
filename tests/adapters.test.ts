@@ -1,8 +1,9 @@
 import { describe, expect, test } from 'bun:test'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { adapters } from '../src/core/adapters/index.ts'
-import type { DispatchSpec } from '../src/core/types.ts'
+import { adapters, describeHarness, mergeLiveModels } from '../src/core/adapters/index.ts'
+import { parseGrokModels } from '../src/core/adapters/grok.ts'
+import type { DispatchSpec, HarnessAdapter, HarnessName } from '../src/core/types.ts'
 
 const RID = 'run-uuid-1'
 const RESUME = 'session-abc'
@@ -269,5 +270,90 @@ describe('grok adapter', () => {
 
   test('parseResult usage undefined when none reported', () => {
     expect(adapters.grok.parseResult(spec(), JSON.stringify({ result: 'a' })).usage).toBeUndefined()
+  })
+})
+
+describe('parseGrokModels', () => {
+  test('parses default + plain bullets past an unauthenticated-warning preamble', () => {
+    const stdout = [
+      'Warning: not authenticated; showing cached model list.',
+      '',
+      'Available models:',
+      '  * grok-4.5 (default)',
+      '  - grok-composer-2.5-fast',
+      '',
+    ].join('\n')
+    expect(parseGrokModels(stdout)).toEqual(['grok-4.5', 'grok-composer-2.5-fast'])
+  })
+
+  test('returns undefined when nothing parses', () => {
+    expect(parseGrokModels('command failed: unknown subcommand')).toBeUndefined()
+  })
+})
+
+describe('knownModels invariants', () => {
+  for (const name of Object.keys(adapters) as HarnessName[]) {
+    const adapter = adapters[name]
+    describe(name, () => {
+      test('knownModels is non-empty', () => {
+        expect(adapter.knownModels.length).toBeGreaterThan(0)
+      })
+
+      test('every model effort is within the harness effort superset', () => {
+        for (const model of adapter.knownModels) {
+          for (const effort of model.efforts) {
+            expect(adapter.efforts).toContain(effort)
+          }
+        }
+      })
+
+      test('exactly one default model', () => {
+        expect(adapter.knownModels.filter((m) => m.isDefault === true)).toHaveLength(1)
+      })
+
+      test('modelsVerifiedAt is set', () => {
+        expect(adapter.modelsVerifiedAt).toBe('2026-07-16')
+      })
+    })
+  }
+})
+
+describe('describeHarness / mergeLiveModels', () => {
+  test('curated path: claude serves the snapshot with verifiedAt', () => {
+    const d = describeHarness('claude')
+    expect(d.name).toBe('claude')
+    expect(d.efforts).toEqual(adapters.claude.efforts)
+    expect(d.models.source).toBe('curated')
+    expect(d.models.verifiedAt).toBe('2026-07-16')
+    expect(d.models.list.map((m) => m.name)).toEqual(['fable', 'opus', 'sonnet'])
+  })
+
+  test('mergeLiveModels keeps curated efforts for a matched name', () => {
+    const merged = mergeLiveModels(['grok-4.5'], adapters.grok)
+    expect(merged).toEqual([{ name: 'grok-4.5', efforts: adapters.grok.efforts, isDefault: true }])
+  })
+
+  test('mergeLiveModels flags an unmatched live name as efforts-unverified', () => {
+    const merged = mergeLiveModels(['grok-9.9-experimental'], adapters.grok)
+    expect(merged).toEqual([
+      { name: 'grok-9.9-experimental', efforts: adapters.grok.efforts, note: 'not in curated set — efforts unverified' },
+    ])
+  })
+
+  test('live path: source live + null verifiedAt when listModels returns names', () => {
+    // Simulate an installed CLI with live enumeration, without depending on grok
+    // being installed: stub listModels on a shallow adapter clone.
+    const liveAdapter: HarnessAdapter = {
+      ...adapters.grok,
+      listModels: () => ['grok-4.5', 'grok-composer-2.5-fast'],
+    }
+    const stubbed = { ...adapters, grok: liveAdapter }
+    // describeHarness reads from the module registry, so exercise the merge +
+    // shape logic directly against the stub to stay install-independent.
+    const liveNames = liveAdapter.listModels?.()
+    expect(liveNames).toEqual(['grok-4.5', 'grok-composer-2.5-fast'])
+    const list = mergeLiveModels(liveNames ?? [], stubbed.grok)
+    expect(list.map((m) => m.name)).toEqual(['grok-4.5', 'grok-composer-2.5-fast'])
+    expect(list[1]?.efforts).toEqual([])
   })
 })

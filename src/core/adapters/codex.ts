@@ -12,10 +12,30 @@
 
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import type { DispatchSpec, HarnessAdapter, HarnessResult, RunUsage } from '../types.ts'
+import type { DispatchSpec, HarnessAdapter, HarnessResult, KnownModel, RunUsage } from '../types.ts'
 import { asRecord, num, withInstructions } from './shared.ts'
 
 export const CODEX_EFFORTS = ['low', 'medium', 'high', 'xhigh', 'max', 'ultra'] as const
+
+/** Effort set for the 5.6 series minus `ultra` (luna). */
+const CODEX_56_NO_ULTRA = ['low', 'medium', 'high', 'xhigh', 'max'] as const
+/** Effort set for pre-5.6 models (no `max`/`ultra`). */
+const CODEX_PRE_56 = ['low', 'medium', 'high', 'xhigh'] as const
+
+/**
+ * Locally-verified codex models (2026-07-16). `ultra` exists only on
+ * gpt-5.6-sol/terra; `max` only on the 5.6 series. The CLI has no model-list
+ * command exposed under ChatGPT-subscription auth, so there is no `listModels`.
+ */
+export const CODEX_MODELS: readonly KnownModel[] = [
+  { name: 'gpt-5.6-sol', efforts: CODEX_EFFORTS, isDefault: true },
+  { name: 'gpt-5.6-terra', efforts: CODEX_EFFORTS },
+  { name: 'gpt-5.6-luna', efforts: CODEX_56_NO_ULTRA },
+  { name: 'gpt-5.5', efforts: CODEX_PRE_56 },
+  { name: 'gpt-5.4', efforts: CODEX_PRE_56 },
+  { name: 'gpt-5.4-mini', efforts: CODEX_PRE_56 },
+  { name: 'gpt-5.3-codex-spark', efforts: CODEX_PRE_56 },
+]
 
 /** Temp file codex writes its final message to (read + deleted after exit). */
 function outputFileFor(runId: string): string {
@@ -92,6 +112,8 @@ function extractAgentMessage(evt: Record<string, unknown>): string | undefined {
 export const codexAdapter: HarnessAdapter = {
   name: 'codex',
   efforts: CODEX_EFFORTS,
+  knownModels: CODEX_MODELS,
+  modelsVerifiedAt: '2026-07-16',
   versionArgs: ['--version'],
 
   buildCommand(spec: DispatchSpec) {

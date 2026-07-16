@@ -15,7 +15,7 @@
  * id equals the run id for new sessions.
  */
 
-import type { DispatchSpec, HarnessAdapter, HarnessResult, RunUsage } from '../types.ts'
+import type { DispatchSpec, HarnessAdapter, HarnessResult, KnownModel, RunUsage } from '../types.ts'
 import { asRecord, finalizeUsage, num, withInstructions } from './shared.ts'
 
 /**
@@ -37,10 +37,59 @@ function extractUsage(obj: Record<string, unknown>): RunUsage | undefined {
 
 export const GROK_EFFORTS = ['low', 'medium', 'high'] as const
 
+/**
+ * Locally-verified grok models (2026-07-16). grok-composer-2.5-fast takes no
+ * reasoning-effort flag at all (efforts: []). grok also supports live
+ * enumeration via `grok models`, so this snapshot is a fallback only.
+ */
+export const GROK_MODELS: readonly KnownModel[] = [
+  { name: 'grok-4.5', efforts: GROK_EFFORTS, isDefault: true },
+  { name: 'grok-composer-2.5-fast', efforts: [] },
+]
+
+/**
+ * Parse the output of `grok models` into model names. The command works even
+ * unauthenticated (it may print a warning preamble first). Under an
+ * "Available models:" header each model is a bullet line:
+ *   `  * grok-4.5 (default)`  — `*` marks the default, ` (default)` suffix
+ *   `  - grok-composer-2.5-fast`  — `-` marks a plain entry
+ * Returns the parsed names, or undefined when nothing parses.
+ */
+export function parseGrokModels(stdout: string): string[] | undefined {
+  const names: string[] = []
+  let inList = false
+  for (const raw of stdout.split('\n')) {
+    const line = raw.trim()
+    if (/^Available models:/i.test(line)) {
+      inList = true
+      continue
+    }
+    if (!inList) continue
+    const match = /^[*-]\s+(\S+)/.exec(line)
+    const name = match?.[1]
+    if (!name) continue
+    names.push(name.replace(/\s*\(default\)\s*$/i, ''))
+  }
+  return names.length > 0 ? names : undefined
+}
+
 export const grokAdapter: HarnessAdapter = {
   name: 'grok',
   efforts: GROK_EFFORTS,
+  knownModels: GROK_MODELS,
+  modelsVerifiedAt: '2026-07-16',
   versionArgs: ['--version'],
+
+  listModels(): string[] | undefined {
+    try {
+      const proc = Bun.spawnSync(['grok', 'models'])
+      if (proc.exitCode !== 0) return undefined
+      return parseGrokModels(proc.stdout.toString())
+    } catch {
+      // Binary not found or not executable.
+      return undefined
+    }
+  },
 
   buildCommand(spec: DispatchSpec) {
     const cmd = ['grok', '-p', withInstructions(spec), '--output-format', 'json']

@@ -11,22 +11,31 @@ import { HARNESS_NAMES } from './types.ts'
 import { adapters } from './adapters/index.ts'
 import { configPath } from './paths.ts'
 
-/** grok's fast composer model has no reasoning-effort flag at all. */
-const GROK_NO_EFFORT_MODEL = 'grok-composer-2.5-fast'
-
 /**
- * Validate a harness/model/effort binding (the GROK_NO_EFFORT_MODEL rule plus
- * the per-harness effort whitelist). Reusable for base agents and per-caller
- * overrides; `label` names the offending entry in error messages.
+ * Validate a harness/model/effort binding. Model-aware: when the binding's
+ * model matches a curated `knownModels` entry, the effort must be in THAT
+ * model's effort set (a model with an empty set — e.g. grok-composer-2.5-fast —
+ * rejects any effort). For an unknown model (or no model), fall back to the
+ * permissive harness-level whitelist so new models ship without a hard reject.
+ * Reusable for base agents and per-caller overrides; `label` names the
+ * offending entry in error messages.
  */
 function validateBinding(binding: AgentBinding, label: string): void {
   if (binding.effort === undefined) return
-  if (binding.harness === 'grok' && binding.model === GROK_NO_EFFORT_MODEL) {
-    throw new Error(
-      `Invalid config: ${label} sets an effort, but model "${GROK_NO_EFFORT_MODEL}" does not support effort.`,
-    )
+  const adapter = adapters[binding.harness]
+  const known = binding.model === undefined ? undefined : adapter.knownModels.find((m) => m.name === binding.model)
+  if (known) {
+    if (known.efforts.length === 0) {
+      throw new Error(`Invalid config: ${label} sets an effort, but model "${known.name}" does not support effort.`)
+    }
+    if (!known.efforts.includes(binding.effort)) {
+      throw new Error(
+        `Invalid config: ${label} has invalid effort "${binding.effort}" for model "${known.name}" (expected one of: ${known.efforts.join(', ')}).`,
+      )
+    }
+    return
   }
-  const allowed = adapters[binding.harness].efforts
+  const allowed = adapter.efforts
   if (!allowed.includes(binding.effort)) {
     throw new Error(
       `Invalid config: ${label} has invalid effort "${binding.effort}" for harness "${binding.harness}" (expected one of: ${allowed.join(', ')}).`,
