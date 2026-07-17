@@ -62,8 +62,9 @@ export function filterTargets(names: HarnessName[], targets = defaultTargets()):
  * `dianjiang run --caller <caller> ...` so per-caller binding overrides resolve
  * without env sniffing; the raw escape-hatch command stays caller-less. When
  * `caller` is undefined the block renders exactly as the caller-less template.
- * A caller's optional `append` is inserted after the rules, still inside the
- * managed block.
+ * A caller's optional `prepend` renders at the top of the block (before the
+ * intro — scoping rules read best before the roster) and `append` after the
+ * rules, both inside the managed block.
  */
 export function renderRosterBlock(config: DianjiangConfig, caller?: HarnessName): string {
   const excluded = caller ? config.callers?.[caller]?.exclude ?? [] : []
@@ -76,13 +77,14 @@ export function renderRosterBlock(config: DianjiangConfig, caller?: HarnessName)
     })
     .join('\n\n')
   const runCmd = caller ? `dianjiang run --caller ${caller} <agent> "<task>"` : 'dianjiang run <agent> "<task>"'
-  const append = caller ? config.callers?.[caller]?.append : undefined
-  const appendSection = append ? `\n\n${append}` : ''
+  const callerConfig = caller ? config.callers?.[caller] : undefined
+  const prependSection = callerConfig?.prepend ? `${callerConfig.prepend}\n\n` : ''
+  const appendSection = callerConfig?.append ? `\n\n${callerConfig.append}` : ''
 
   return `${BEGIN}
 <dianjiang-roster>
 
-\`dianjiang\` dispatches self-contained tasks to other coding-agent CLIs.
+${prependSection}\`dianjiang\` dispatches self-contained tasks to other coding-agent CLIs.
 dianjiang agents are separate from your built-in subagents. Pick one by task
 shape — never pick harnesses or models on your own judgment.
 

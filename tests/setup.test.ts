@@ -65,6 +65,22 @@ describe('renderRosterBlock', () => {
     expect(claudeBlock).toContain('<agent name="explore">')
   })
 
+  test("renders a caller's prepend at the top of the block, before the intro", () => {
+    const withPrepend: DianjiangConfig = {
+      ...config,
+      callers: { claude: { prepend: 'Implementation stays native.' } },
+    }
+    const claudeBlock = renderRosterBlock(withPrepend, 'claude')
+    const prependIdx = claudeBlock.indexOf('Implementation stays native.')
+    const wrapperIdx = claudeBlock.indexOf('<dianjiang-roster>')
+    const introIdx = claudeBlock.indexOf('dispatches self-contained tasks')
+    expect(prependIdx).toBeGreaterThan(wrapperIdx)
+    expect(prependIdx).toBeLessThan(introIdx)
+    // Other callers (and the caller-less render) do NOT carry the prepend.
+    expect(renderRosterBlock(withPrepend, 'codex')).not.toContain('Implementation stays native.')
+    expect(renderRosterBlock(withPrepend)).not.toContain('Implementation stays native.')
+  })
+
   test("renders a caller's append after the rules and before the end marker", () => {
     const withAppend: DianjiangConfig = {
       ...config,

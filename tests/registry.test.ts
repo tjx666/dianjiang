@@ -20,14 +20,14 @@ describe('defaultConfigJsonc', () => {
     expect(explore?.model).toBe('grok-4.5')
     expect(explore?.effort).toBe('high')
     // Caller-relative rules compile into base + sparse overrides + grok exclude.
-    // implement is no longer a dianjiang agent; claude carries an `append` instead.
+    // implement is no longer a dianjiang agent; claude carries a `prepend` instead.
     expect(config.callers?.claude?.agents?.implement).toBeUndefined()
     expect(config.callers?.claude?.agents?.['second-opinion']).toEqual({
       harness: 'codex',
       model: 'gpt-5.6-sol',
       effort: 'xhigh',
     })
-    expect(config.callers?.claude?.append).toContain('built-in subagents')
+    expect(config.callers?.claude?.prepend).toContain('built-in subagents')
     expect(config.callers?.codex?.agents?.review).toEqual({ harness: 'claude', model: 'opus', effort: 'xhigh' })
     expect(config.callers?.grok?.exclude).toEqual(['explore'])
   })
@@ -173,6 +173,13 @@ describe('validateConfig (callers)', () => {
   test('rejects a non-string append', () => {
     const cfg = withCallers({ claude: { append: 42 } })
     expect(() => validateConfig(cfg)).toThrow(/callers\.claude\.append must be a non-empty string/)
+  })
+
+  test('accepts a non-empty prepend and rejects an empty one', () => {
+    expect(() => validateConfig(withCallers({ claude: { prepend: 'Implement natively.' } }))).not.toThrow()
+    expect(() => validateConfig(withCallers({ claude: { prepend: '' } }))).toThrow(
+      /callers\.claude\.prepend must be a non-empty string/,
+    )
   })
 })
 

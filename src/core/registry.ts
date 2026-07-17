@@ -118,9 +118,10 @@ function validateCallers(config: DianjiangConfig, agentNames: Set<string>): void
         validateBinding(binding, label)
       }
     }
-    if (callerConfig.append !== undefined) {
-      if (typeof callerConfig.append !== 'string' || callerConfig.append.length === 0) {
-        throw new Error(`Invalid config: callers.${caller}.append must be a non-empty string.`)
+    for (const field of ['prepend', 'append'] as const) {
+      const value = callerConfig[field]
+      if (value !== undefined && (typeof value !== 'string' || value.length === 0)) {
+        throw new Error(`Invalid config: callers.${caller}.${field} must be a non-empty string.`)
       }
     }
     if (callerConfig.exclude !== undefined) {
@@ -264,7 +265,7 @@ export function defaultConfigJsonc(): string {
   // Per-caller adjustments. The built-in bindings follow these rules:
   //   review, second-opinion — always a different vendor than the caller (avoid same-model blind spots)
   //   explore                — fixed cheap+fast grok; excluded when the caller IS grok
-  //   implementation         — not a dianjiang agent at all: callers build with their own subagents (see claude's \`append\`)
+  //   implementation         — not a dianjiang agent at all: callers build with their own subagents (see claude's \`prepend\`)
   // Base bindings are just the compiled view for the most common callers; \`exclude\`
   // hides an agent from a caller entirely. \`setup\` stamps \`--caller <harness>\`
   // into each vendor's instruction file so these resolve without env sniffing.
@@ -273,8 +274,8 @@ export function defaultConfigJsonc(): string {
       "agents": {
         "second-opinion": { "harness": "codex", "model": "gpt-5.6-sol", "effort": "xhigh" }
       },
-      // Extra guidance appended to this caller's injected block.
-      "append": "Default your built-in subagents to the opus model for execution work — implementation, mechanical edits, running tests. Do not route implementation through dianjiang."
+      // Caller-behavior guidance rendered at the top of this caller's injected block.
+      "prepend": "If your session model is fable, act as an orchestrator to preserve fable tokens: delegate execution work (implementation, mechanical edits, broad searches, running tests/builds) to your built-in subagents with model: opus, keeping only planning, task decomposition, tricky debugging, and verification of subagent output for yourself."
     },
     "codex": {
       "agents": {
