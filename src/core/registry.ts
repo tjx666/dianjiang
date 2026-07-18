@@ -208,7 +208,7 @@ export function defaultConfigJsonc(): string {
       "name": "review",
       // Base is codex; the callers section rebinds it to a different vendor for
       // the codex caller so review is never same-model as the code under review.
-      "useWhen": "you want a second opinion on a diff from a different vendor than the implementer and caller",
+      "useWhen": "you want an independent cross-vendor code review of a diff",
       "dontUseWhen": "a quick lint/style pass your own subagents already cover",
       "harness": "codex",
       "model": "gpt-5.6-sol",
@@ -218,7 +218,7 @@ export function defaultConfigJsonc(): string {
       "name": "second-opinion",
       // Consult-only; base is claude/fable, rebound to a different vendor for the
       // claude caller so consulting never lands on the caller's own model.
-      "useWhen": "consult-only: hard debugging hypotheses or architecture/design review needing maximum firepower",
+      "useWhen": "consult-only: a hard debugging hypothesis or an architecture/design decision where you're stuck or the call is expensive to reverse",
       "dontUseWhen": "the task requires editing code (this agent must not make changes)",
       "harness": "claude",
       "model": "fable",
@@ -227,7 +227,7 @@ export function defaultConfigJsonc(): string {
     {
       "name": "explore",
       // Fixed cheap+fast grok; excluded when the caller IS grok (see callers).
-      "useWhen": "broad codebase search, research, or summarization where cheap and fast matters",
+      "useWhen": "broad codebase search, research, or summarization",
       "dontUseWhen": "the task needs deep reasoning or code changes",
       "harness": "grok",
       "model": "grok-4.5",
@@ -275,7 +275,7 @@ export function defaultConfigJsonc(): string {
         "second-opinion": { "harness": "codex", "model": "gpt-5.6-sol", "effort": "xhigh" }
       },
       // Caller-behavior guidance rendered at the top of this caller's injected block.
-      "prepend": "If your session model is fable, act as an orchestrator to preserve fable tokens: delegate execution work (implementation, mechanical edits, broad searches, running tests/builds) to your built-in subagents with model: opus, keeping only planning, task decomposition, tricky debugging, and verification of subagent output for yourself."
+      "prepend": "If your session model is fable, act as an orchestrator to preserve fable tokens: delegate execution work (implementation, mechanical edits, running tests/builds) to your built-in subagents with \`model: opus\`, keeping only planning, task decomposition, tricky debugging, and verification of subagent output for yourself. For cross-vendor perspectives or capabilities your subagents lack, use the dianjiang roster below."
     },
     "codex": {
       "agents": {

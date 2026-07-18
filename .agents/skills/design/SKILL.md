@@ -163,9 +163,12 @@ the body format:
 <!-- dianjiang:begin -->
 <dianjiang-roster>
 
-`dianjiang` dispatches self-contained tasks to other coding-agent CLIs.
-dianjiang agents are separate from your built-in subagents. Pick one by task
-shape — never pick harnesses or models on your own judgment.
+`dianjiang` is a CLI on this machine that dispatches self-contained tasks to
+other coding-agent CLIs (Claude Code / Codex / Grok). Each <agent> below is a
+preset the human already compiled — harness, model, and effort are decided;
+pick by task shape only, never by your own harness/model judgment. dianjiang
+agents are separate from your built-in subagents: default to your own tools
+and subagents, and reach for dianjiang only when an agent below clearly fits.
 
 <agent name="review">
   <use-when>…rendered from the agent's useWhen…</use-when>
@@ -173,15 +176,18 @@ shape — never pick harnesses or models on your own judgment.
 </agent>
 
 <rules>
-- `dianjiang run <agent> "<task>"` blocks until done and prints one JSON object; read `.result`.
-- Write tasks self-contained: background, file paths, acceptance criteria, expected output.
+- `dianjiang run <agent> "<task>"` blocks until done and prints one JSON object. Check `.status`
+  first: read `.result` when it is "completed" — on "failed" `.result` is the
+  stderr tail, not an answer. Keep `.runId` for resume/result.
+- Write tasks self-contained (background, file paths, acceptance criteria,
+  expected output): the delegate starts fresh in your cwd — it sees your files,
+  not your conversation.
 - Follow up in the same session with `dianjiang resume <runId> "<message>"`.
-- For tasks likely over ~5 minutes, add `--detach`, then block on
-  `dianjiang result <runId> --wait --timeout 300` — it returns the moment the
-  run finishes; on timeout it prints `status: "running"`, just re-run it.
-  Never guess with `sleep N` before checking.
-- If your command times out or is killed, the run keeps going in the background —
-  recover it any time with `dianjiang result <runId>`.
+- For tasks likely over ~5 minutes, start with `--detach` and save the returned
+  `.runId`, then block on `dianjiang result <runId> --wait --timeout 300` — it
+  returns the moment the run finishes; on timeout it prints `status: "running"`,
+  just re-run it — never guess with `sleep N`. The run survives even if that
+  wait command is killed: `dianjiang result <runId>` recovers it any time.
 - If the human explicitly names a vendor, harness, or model, relay their choice:
   `dianjiang run --harness <claude|codex|grok> [-m <model>] [--effort <level>] "<task>"`,
   or override an agent preset with `-m`/`--effort`. Relay only — the choice stays the human's.
@@ -193,7 +199,9 @@ shape — never pick harnesses or models on your own judgment.
 ```
 
 A caller's `prepend` renders right after `<dianjiang-roster>`, before the
-intro; its `append` renders after `</rules>`, before `</dianjiang-roster>`.
+intro, wrapped in a `<caller-guidance>` element so caller-behavior guidance is
+not read as a dianjiang usage rule; its `append` renders after `</rules>`,
+before `</dianjiang-roster>`.
 
 ## `run` JSON output
 
@@ -232,7 +240,7 @@ Single `~/.dianjiang/config.jsonc`; runs metadata in `~/.dianjiang/runs.sqlite`.
   "agents": [
     {
       "name": "review",
-      "useWhen": "you want a second opinion on a diff from a different vendor",
+      "useWhen": "you want an independent cross-vendor code review of a diff",
       "dontUseWhen": "a quick lint/style pass your own subagents already cover",
       "harness": "codex",
       "model": "gpt-5.6-sol",
@@ -285,8 +293,9 @@ should vary per caller.
   caller's `agents` overrides is a validation error. User: grok excludes
   `explore`.
 - `callers.<h>.prepend: string` — free-form markdown rendered at the TOP of
-  that caller's block (right after the wrapper tag, before the intro). For
-  scoping rules the caller should read before pattern-matching the roster;
+  that caller's block (right after the wrapper tag, before the intro), wrapped
+  in `<caller-guidance>` so it reads as caller behavior, not a dianjiang rule.
+  For scoping rules the caller should read before pattern-matching the roster;
   block-start position also gets higher LLM attention. User: claude's
   fable steer — a **role statement**, not just a model binding: when the
   session model is fable, act as an orchestrator (keep planning,

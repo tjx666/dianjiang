@@ -63,8 +63,10 @@ export function filterTargets(names: HarnessName[], targets = defaultTargets()):
  * without env sniffing; the raw escape-hatch command stays caller-less. When
  * `caller` is undefined the block renders exactly as the caller-less template.
  * A caller's optional `prepend` renders at the top of the block (before the
- * intro — scoping rules read best before the roster) and `append` after the
- * rules, both inside the managed block.
+ * intro — scoping rules read best before the roster), wrapped in a
+ * `<caller-guidance>` element so caller-behavior guidance (e.g. "use your own
+ * subagents for X") is not read as a dianjiang usage rule; `append` renders
+ * after the rules. Both live inside the managed block.
  */
 export function renderRosterBlock(config: DianjiangConfig, caller?: HarnessName): string {
   const excluded = caller ? config.callers?.[caller]?.exclude ?? [] : []
@@ -78,28 +80,36 @@ export function renderRosterBlock(config: DianjiangConfig, caller?: HarnessName)
     .join('\n\n')
   const runCmd = caller ? `dianjiang run --caller ${caller} <agent> "<task>"` : 'dianjiang run <agent> "<task>"'
   const callerConfig = caller ? config.callers?.[caller] : undefined
-  const prependSection = callerConfig?.prepend ? `${callerConfig.prepend}\n\n` : ''
+  const prependSection = callerConfig?.prepend
+    ? `<caller-guidance>\n${callerConfig.prepend}\n</caller-guidance>\n\n`
+    : ''
   const appendSection = callerConfig?.append ? `\n\n${callerConfig.append}` : ''
 
   return `${BEGIN}
 <dianjiang-roster>
 
-${prependSection}\`dianjiang\` dispatches self-contained tasks to other coding-agent CLIs.
-dianjiang agents are separate from your built-in subagents. Pick one by task
-shape — never pick harnesses or models on your own judgment.
+${prependSection}\`dianjiang\` is a CLI on this machine that dispatches self-contained tasks to
+other coding-agent CLIs (Claude Code / Codex / Grok). Each <agent> below is a
+preset the human already compiled — harness, model, and effort are decided;
+pick by task shape only, never by your own harness/model judgment. dianjiang
+agents are separate from your built-in subagents: default to your own tools
+and subagents, and reach for dianjiang only when an agent below clearly fits.
 
 ${agents}
 
 <rules>
-- \`${runCmd}\` blocks until done and prints one JSON object; read \`.result\`.
-- Write tasks self-contained: background, file paths, acceptance criteria, expected output.
+- \`${runCmd}\` blocks until done and prints one JSON object. Check \`.status\`
+  first: read \`.result\` when it is "completed" — on "failed" \`.result\` is the
+  stderr tail, not an answer. Keep \`.runId\` for resume/result.
+- Write tasks self-contained (background, file paths, acceptance criteria,
+  expected output): the delegate starts fresh in your cwd — it sees your files,
+  not your conversation.
 - Follow up in the same session with \`dianjiang resume <runId> "<message>"\`.
-- For tasks likely over ~5 minutes, add \`--detach\`, then block on
-  \`dianjiang result <runId> --wait --timeout 300\` — it returns the moment the
-  run finishes; on timeout it prints \`status: "running"\`, just re-run it.
-  Never guess with \`sleep N\` before checking.
-- If your command times out or is killed, the run keeps going in the background —
-  recover it any time with \`dianjiang result <runId>\`.
+- For tasks likely over ~5 minutes, start with \`--detach\` and save the returned
+  \`.runId\`, then block on \`dianjiang result <runId> --wait --timeout 300\` — it
+  returns the moment the run finishes; on timeout it prints \`status: "running"\`,
+  just re-run it — never guess with \`sleep N\`. The run survives even if that
+  wait command is killed: \`dianjiang result <runId>\` recovers it any time.
 - If the human explicitly names a vendor, harness, or model, relay their choice:
   \`dianjiang run --harness <claude|codex|grok> [-m <model>] [--effort <level>] "<task>"\`,
   or override an agent preset with \`-m\`/\`--effort\`. Relay only — the choice stays the human's.

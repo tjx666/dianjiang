@@ -71,11 +71,16 @@ describe('renderRosterBlock', () => {
       callers: { claude: { prepend: 'Implementation stays native.' } },
     }
     const claudeBlock = renderRosterBlock(withPrepend, 'claude')
+    // The prepend is wrapped in <caller-guidance> so it reads as caller
+    // behavior, not a dianjiang usage rule.
+    expect(claudeBlock).toContain('<caller-guidance>\nImplementation stays native.\n</caller-guidance>')
     const prependIdx = claudeBlock.indexOf('Implementation stays native.')
     const wrapperIdx = claudeBlock.indexOf('<dianjiang-roster>')
     const introIdx = claudeBlock.indexOf('dispatches self-contained tasks')
     expect(prependIdx).toBeGreaterThan(wrapperIdx)
     expect(prependIdx).toBeLessThan(introIdx)
+    // No prepend → no empty wrapper element.
+    expect(renderRosterBlock(withPrepend, 'codex')).not.toContain('<caller-guidance>')
     // Other callers (and the caller-less render) do NOT carry the prepend.
     expect(renderRosterBlock(withPrepend, 'codex')).not.toContain('Implementation stays native.')
     expect(renderRosterBlock(withPrepend)).not.toContain('Implementation stays native.')
