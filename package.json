@@ -1,6 +1,6 @@
 {
   "name": "dianjiang",
-  "version": "0.4.1",
+  "version": "0.5.0",
   "description": "点将 — summon the right coding agent. Cross-vendor agent dispatch for Claude Code / Codex / Grok.",
   "type": "module",
   "license": "MIT",
