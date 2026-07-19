@@ -292,7 +292,12 @@ export function defaultConfigJsonc(): string {
           "effort": "xhigh",
           "useWhen": "you want an independent cross-vendor code review of a diff; runs claude opus at xhigh"
         }
-      }
+      },
+      // codex-specific wait discipline: its shell sessions never push a completion
+      // event, so background waits get forgotten; spawn_agent completion DOES
+      // notify the parent (verified 2026-07), making a waiter subagent the only
+      // push channel. fork_turns "none" keeps the waiter's context (and cost) minimal.
+      "append": "Your shell sessions do NOT wake you when a background command finishes, and polling is easy to forget. To collect a dianjiang run without blocking, use your subagent notification channel: \`spawn_agent\` with \`fork_turns: \\\"none\\\"\` and the message \\\"Run \`dianjiang result <runId> --wait --timeout 300\`. If it prints status 'running', run it again. When the status is terminal, return the full JSON verbatim.\\\" — its completion notification wakes you with the result while you keep working. If you have nothing else to do, just run \`dianjiang result <runId> --wait --timeout 300\` in the foreground. Either way, never end your turn with a dispatched run uncollected."
     }
   }
 }

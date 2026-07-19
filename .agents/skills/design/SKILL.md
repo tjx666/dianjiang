@@ -114,9 +114,8 @@ Cost/strength rationale:
 | `review` | codex / gpt-5.6-sol / xhigh | (base) | claude / opus / xhigh | (base) |
 | `second-opinion` | claude / fable / high | codex / gpt-5.6-sol / xhigh | (base) | (base) |
 
-Base = the compiled view for the most common callers (and callerless human
-runs). Values recalibrate by feel — that is exactly what config-time
-compilation is for.
+Base = the compiled view for the most common callers. Values recalibrate by
+feel — that is exactly what config-time compilation is for.
 
 ### Capability agents
 
@@ -293,8 +292,12 @@ should vary per caller.
 - Caller identification: no env sniffing (no stable cross-vendor contract;
   breaks on vendor upgrades). `setup` already writes one file per vendor, so
   it stamps `--caller <harness>` into each file's documented run command; the
-  AI relays it verbatim. An omitted flag degrades gracefully to the base
-  roster.
+  AI relays it verbatim. Agent dispatch without `--caller` is a hard ERROR
+  (changed 2026-07 from graceful degradation): dianjiang is AI-caller-only —
+  there is no human dispatch path to protect — and a dropped flag silently
+  produced a same-vendor `review`, defeating the agent's purpose. Dogfood
+  evidence: codex omitted the stamped flag on its first real dispatch. Raw
+  `--harness` runs still take no `--caller` (they bypass the registry).
 - Deliberately named `callers`, not `callerOverrides`: per-caller settings
   beyond bindings are anticipated — inject path (`target`), extra template
   rules, per-caller `maxDepth`/`disabled`. Containers named "override" always
@@ -323,7 +326,14 @@ should vary per caller.
   dianjiang" — the roster has no implement agent; prohibiting a non-option is
   noise that implies the option exists).
 - `callers.<h>.append: string` — same, but rendered after the rules, for
-  guidance that reads best after the roster. Currently unused.
+  guidance that reads best after the roster. Used by codex: its shell
+  sessions never push a completion event (background waits get forgotten —
+  observed in dogfood), but `spawn_agent` completion DOES notify the parent
+  (verified 2026-07: spawn returns immediately, final answer arrives as an
+  event with no polling). The append teaches a waiter-subagent pattern —
+  `spawn_agent` + `fork_turns: "none"` (minimal context, no model override
+  available) running `result --wait` — as codex's push channel, with
+  foreground blocking as the nothing-else-to-do fallback.
 - Not persisted: RunRecord stores the resolved harness/model/effort, not the
   caller; `resume` inherits the resolved binding from the original run.
 
@@ -399,7 +409,7 @@ layer 2 retires for codex.
 | YOLO | `--dangerously-skip-permissions` | `--dangerously-bypass-approvals-and-sandbox` | `--always-approve` |
 | Final message | `--output-format json`, `.result` | `-o <file>` (easiest) or scan JSONL | `--output-format json` |
 | Global instructions | `~/.claude/CLAUDE.md` | `~/.codex/AGENTS.md` | `~/.grok/AGENTS.md` |
-| Agent-side background shell | `run_in_background` + completion notification (push) | `exec_command` returns a session id; poll/continue via `write_stdin` (pull, no push wake) | `run_terminal_command` `background: true` → task_id + completion notification (push) |
+| Agent-side background shell | `run_in_background` + completion notification (push) | `exec_command` returns a session id; poll/continue via `write_stdin` (pull, no push wake). Push exists one layer up: `spawn_agent` completion notifies the parent (waiter pattern, see `callers.codex.append`) | `run_terminal_command` `background: true` → task_id + completion notification (push) |
 
 Notes:
 - Grok's claude-compat is OFF in local config — it will not read `~/.claude/*`;

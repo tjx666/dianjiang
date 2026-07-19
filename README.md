@@ -68,8 +68,9 @@ directory with `DIANJIANG_HOME`.
 dianjiang config init
 dianjiang setup
 
-# Dispatch by agent (primary path) — blocks, prints one JSON object; read .result
-dianjiang run search-twitter "What are people saying about bun 1.3 this week?"
+# Dispatch by agent (primary path) — blocks, prints one JSON object; read .result.
+# --caller names the dispatching harness (required: bindings resolve per caller)
+dianjiang run --caller claude search-twitter "What are people saying about bun 1.3 this week?"
 
 # Resolve an agent's binding relative to the caller (see `callers` in config).
 # From a codex session, `review` rebinds off codex to another vendor.
@@ -80,7 +81,7 @@ dianjiang run --harness codex -m gpt-5.6-sol "Refactor the parser"
 
 # Recommended for AI callers (any task length): dispatch detached, then block
 # until it finishes — event-driven, no sleep-polling, survives caller death
-dianjiang run review "review a large multi-file diff" --detach
+dianjiang run --caller claude review "review a large multi-file diff" --detach
 dianjiang result <runId> --wait --timeout 300   # on timeout: status "running", re-run to keep waiting
 dianjiang status <runId>                        # instant snapshot, never blocks
 

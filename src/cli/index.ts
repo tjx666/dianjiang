@@ -140,7 +140,16 @@ const run = defineCommand({
 
     // Agent mode: <agent> <task> resolved through the registry.
     if (!args.agent || !args.task) {
-      return fail('Usage: dianjiang run <agent> "<task>"  (or: run --harness <name> "<task>").')
+      return fail('Usage: dianjiang run --caller <name> <agent> "<task>"  (or: run --harness <name> "<task>").')
+    }
+    // dianjiang is AI-caller-only: agent dispatch REQUIRES --caller so
+    // per-caller bindings always resolve (a silently-degraded base binding
+    // defeats caller-relative agents like review). Raw --harness runs don't
+    // take it — they bypass the registry entirely.
+    if (!caller) {
+      return fail(
+        `Agent dispatch requires --caller <${HARNESS_NAMES.join('|')}> (your own harness, as stamped by setup).`,
+      )
     }
     let agent
     try {
