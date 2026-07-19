@@ -9,16 +9,10 @@ describe('defaultConfigJsonc', () => {
     expect(config.agents.map((a) => a.name)).toEqual([
       'review',
       'second-opinion',
-      'explore',
       'search-twitter',
       'design-frontend',
       'rewrite-prompt',
     ])
-    // explore is fixed cheap+fast grok with an explicit effort.
-    const explore = config.agents.find((a) => a.name === 'explore')
-    expect(explore?.harness).toBe('grok')
-    expect(explore?.model).toBe('grok-4.5')
-    expect(explore?.effort).toBe('high')
     // Caller-relative rules compile into base + sparse overrides + grok exclude.
     // implement is no longer a dianjiang agent; claude carries a `prepend` instead.
     expect(config.callers?.claude?.agents?.implement).toBeUndefined()
@@ -26,10 +20,20 @@ describe('defaultConfigJsonc', () => {
       harness: 'codex',
       model: 'gpt-5.6-sol',
       effort: 'xhigh',
+      useWhen: expect.stringContaining('runs gpt-5.6-sol at xhigh'),
     })
     expect(config.callers?.claude?.prepend).toContain('built-in subagents')
-    expect(config.callers?.codex?.agents?.review).toEqual({ harness: 'claude', model: 'opus', effort: 'xhigh' })
-    expect(config.callers?.grok?.exclude).toEqual(['explore'])
+    // design-frontend is claude/fable itself — hidden from the claude caller.
+    expect(config.callers?.claude?.exclude).toEqual(['design-frontend'])
+    expect(config.callers?.codex?.agents?.review).toEqual({
+      harness: 'claude',
+      model: 'opus',
+      effort: 'xhigh',
+      useWhen: expect.stringContaining('runs claude opus at xhigh'),
+    })
+    // explore was dropped from the roster (callers ship built-in explore
+    // subagents), taking the grok caller entry with it.
+    expect(config.callers?.grok).toBeUndefined()
   })
 })
 
@@ -181,6 +185,23 @@ describe('validateConfig (callers)', () => {
       /callers\.claude\.prepend must be a non-empty string/,
     )
   })
+
+  test('accepts useWhen/dontUseWhen overrides on a binding', () => {
+    const cfg = withCallers({
+      grok: { agents: { review: { harness: 'codex', useWhen: 'caller-relative use', dontUseWhen: 'caller-relative skip' } } },
+    })
+    expect(() => validateConfig(cfg)).not.toThrow()
+  })
+
+  test('rejects an empty-string useWhen override', () => {
+    const cfg = withCallers({ grok: { agents: { review: { harness: 'codex', useWhen: '' } } } })
+    expect(() => validateConfig(cfg)).toThrow(/callers\.grok\.agents\.review\.useWhen must be a non-empty string/)
+  })
+
+  test('rejects an empty-string dontUseWhen override', () => {
+    const cfg = withCallers({ grok: { agents: { review: { harness: 'codex', dontUseWhen: '' } } } })
+    expect(() => validateConfig(cfg)).toThrow(/callers\.grok\.agents\.review\.dontUseWhen must be a non-empty string/)
+  })
 })
 
 describe('resolveAgent', () => {
@@ -220,6 +241,29 @@ describe('resolveAgent', () => {
     expect(a.harness).toBe('claude')
     expect(a.model).toBeUndefined()
     expect(a.effort).toBeUndefined()
+  })
+
+  test('overrides useWhen/dontUseWhen when the override sets them, else falls back to base', () => {
+    const descCfg: DianjiangConfig = {
+      maxDepth: 2,
+      agents: [{ name: 'review', useWhen: 'base use', dontUseWhen: 'base skip', harness: 'grok', model: 'grok-4.5' }],
+      callers: {
+        // claude overrides both descriptions; codex overrides the binding only.
+        claude: { agents: { review: { harness: 'codex', useWhen: 'caller use', dontUseWhen: 'caller skip' } } },
+        codex: { agents: { review: { harness: 'claude' } } },
+      },
+    }
+    const claude = resolveAgent(descCfg, 'review', 'claude')
+    expect(claude.useWhen).toBe('caller use')
+    expect(claude.dontUseWhen).toBe('caller skip')
+    // Binding-only override: descriptions fall back to the base agent.
+    const codex = resolveAgent(descCfg, 'review', 'codex')
+    expect(codex.useWhen).toBe('base use')
+    expect(codex.dontUseWhen).toBe('base skip')
+    // No caller: base descriptions.
+    const base = resolveAgent(descCfg, 'review')
+    expect(base.useWhen).toBe('base use')
+    expect(base.dontUseWhen).toBe('base skip')
   })
 
   test('throws for an excluded caller/agent pair', () => {

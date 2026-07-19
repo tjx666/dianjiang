@@ -38,7 +38,7 @@ the caller (usually another AI) picks an **agent**, not a model.
 | Recursion guard | `DIANJIANG_DEPTH` env var; refuse beyond depth limit. Injected prompt also states "when you are the delegate, do not re-delegate." |
 | Attribution | Credit agent-mux in README |
 | Config | Single `~/.dianjiang/config.jsonc` (JSONC over JSON5: VS Code-native tsconfig-style editing, parse with `jsonc-parser`). Agents inline; split into `agents/*.md` only if instructions grow long. Project-level override deferred to phase 2. |
-| Background runs | Every run executes in a detached `_exec` worker; sync mode just waits for it ("job done is holy", credit agent-mux — the job survives caller timeout/death, and callers are AI agents whose shell tools cap at ~10 min). `--detach` returns immediately; block on `result --wait [--timeout <sec>]` (store-polling, since the worker isn't waitpid-able; bounded, so it never reintroduces the caller-shell-timeout problem that motivated `--detach` — never teach callers to sleep-and-poll), instant snapshot via `status`. Artifact path: full harness stdout/stderr tees to `logs/<runId>.log` progressively. |
+| Background runs | Every run executes in a detached `_exec` worker; sync mode just waits for it ("job done is holy", credit agent-mux — the job survives caller timeout/death, and callers are AI agents whose shell tools cap at ~10 min). `--detach` returns immediately; block on `result --wait [--timeout <sec>]` (store-polling, since the worker isn't waitpid-able; bounded, so it never reintroduces the caller-shell-timeout problem that motivated `--detach` — never teach callers to sleep-and-poll), instant snapshot via `status`. Artifact path: full harness stdout/stderr tees to `logs/<runId>.log` progressively. Injected rules teach AI callers to ALWAYS dispatch detached: the earlier "detach if likely >5 min" branch was removed (2026-07) because LLM duration estimates are unreliable, so any rule keyed on them mis-routes; detach costs one extra command and covers every case. Sync run remains for human use. |
 | CLI framework | citty (TS-first, lightweight); core stays dependency-light (`bun:sqlite` built-in) |
 | Extension point | `adapter`, not `provider`. Ecosystem rule: "provider" = another chat/completions endpoint (AI SDK, LiteLLM, opencode); "adapter" = a full external runtime with its own event stream and session lifecycle (agent-mux "harness adapters", terminal-bench adapters, LobeHub agent adaptor). Custom harness support later = public `HarnessAdapter` interface. |
 | Caller-relative bindings | `callers.<harness>.agents.<name>` sparse binding overrides; `setup` stamps `--caller <harness>` into each vendor's file (see "Caller-relative agents") |
@@ -60,7 +60,7 @@ dianjiang config ...                     # agent CRUD + harnesses self-check (co
 
 Agents are the product. Config fields per agent:
 
-- `name` — verb/deliverable-style, not job titles (`review`, `explore`,
+- `name` — verb/deliverable-style, not job titles (`review`,
   `rewrite-prompt`) — job titles force the AI to do a second inference hop
   ("which job owns this task?")
 - `description` — split into `useWhen` / `dontUseWhen`, written for the
@@ -69,7 +69,7 @@ Agents are the product. Config fields per agent:
 - `instructions` — optional agent system prompt, kept short. Cross-vendor
   baseline: prepend to user prompt; claude can use `--append-system-prompt`.
 
-Keep the roster small (currently 6; hard cap ~8). Overlapping agents
+Keep the roster small (currently 5; hard cap ~8). Overlapping agents
 reintroduce the scorecard's selection-paralysis problem in a new costume.
 
 ### Roster
@@ -91,8 +91,12 @@ bindings + sparse `callers` overrides/excludes:
   (avoid same-model blind spots); review runs xhigh, second-opinion runs the
   other vendor's flagship with effort graded per model — fable stays at high
   (expensive; high already delivers), gpt-5.6-sol goes to xhigh.
-- `explore` — **fixed cheap+fast grok**, excluded when the caller IS grok
-  (no point round-tripping to yourself).
+
+Removed: `explore` (was fixed cheap+fast grok) — every caller harness ships a
+built-in explore/search subagent, so cross-vendor dispatch added only a
+process hop; a 2026-07 A/B against claude's built-in Explore showed parity on
+accuracy with worse citations (no line numbers) and narration noise. Quota
+offload alone didn't justify a roster slot (admission principle).
 
 Cost/strength rationale:
 
@@ -102,15 +106,13 @@ Cost/strength rationale:
   vendor's cheaper flagship (gpt-5.6-sol or opus 4.8) at xhigh instead.
 - Per-caller character: claude and codex implement with their own flagship;
   grok is fast and has native X search but weak reasoning, so it borrows
-  fable to plan/consult and codex gpt-5.6-sol to review, and never gets
-  `explore`.
+  fable to plan/consult and codex gpt-5.6-sol to review.
 - opus 4.6 has the best prose style (文风) → `rewrite-prompt`.
 
 | Agent | Base binding | claude caller | codex caller | grok caller |
 |---|---|---|---|---|
 | `review` | codex / gpt-5.6-sol / xhigh | (base) | claude / opus / xhigh | (base) |
 | `second-opinion` | claude / fable / high | codex / gpt-5.6-sol / xhigh | (base) | (base) |
-| `explore` | grok / grok-4.5 / high | (base) | (base) | excluded |
 
 Base = the compiled view for the most common callers (and callerless human
 runs). Values recalibrate by feel — that is exactly what config-time
@@ -119,12 +121,14 @@ compilation is for.
 ### Capability agents
 
 Capability agents expose something only one harness can do; they need no
-`callers` overrides — they're picked for what they can do, not whose opinion
-they carry (self-vendor dispatch is fine). All verified live:
+`callers` binding overrides — they're picked for what they can do, not whose
+opinion they carry (self-vendor dispatch is fine; the one exception is
+`design-frontend`, excluded for the claude caller — it IS claude/fable, so
+that caller's own subagents cover it). All verified live:
 
 | Agent | Harness / model / effort | Capability |
 |---|---|---|
-| `search-twitter` | grok / grok-4.5 / low | grok's native live X/Twitter search tools (verified headless: returns real tweet URLs) |
+| `search-twitter` | grok / grok-4.5 / high | grok's native live X/Twitter search tools (verified headless: returns real tweet URLs) |
 | `design-frontend` | claude / fable / high | strongest visual/UX taste for front-end work |
 | `rewrite-prompt` | claude / claude-opus-4-6[1m] / — | 1M-context ingestion before rewriting prompts/instructions |
 
@@ -176,18 +180,21 @@ and subagents, and reach for dianjiang only when an agent below clearly fits.
 </agent>
 
 <rules>
-- `dianjiang run <agent> "<task>"` blocks until done and prints one JSON object. Check `.status`
-  first: read `.result` when it is "completed" — on "failed" `.result` is the
-  stderr tail, not an answer. Keep `.runId` for resume/result.
+- `dianjiang run <agent> "<task>" --detach` prints one JSON object immediately — save `.runId`, then
+  block on `dianjiang result <runId> --wait --timeout 300`: it exits with the
+  final JSON the moment the run finishes; on timeout it prints `status: "running"`,
+  just re-run it. Always dispatch detached — don't try to predict how long a
+  task will take, and never wait with `sleep N`. If your shell tool can run
+  commands in the background (or detach into a session you can check on later),
+  run the wait command there and collect it once it exits — you stay free to
+  work while it blocks. The run survives even if the wait command is killed —
+  `dianjiang result <runId>` recovers it any time.
+- Check `.status` first: read `.result` when it is "completed" — on "failed"
+  `.result` is the stderr tail, not an answer.
 - Write tasks self-contained (background, file paths, acceptance criteria,
   expected output): the delegate starts fresh in your cwd — it sees your files,
   not your conversation.
 - Follow up in the same session with `dianjiang resume <runId> "<message>"`.
-- For tasks likely over ~5 minutes, start with `--detach` and save the returned
-  `.runId`, then block on `dianjiang result <runId> --wait --timeout 300` — it
-  returns the moment the run finishes; on timeout it prints `status: "running"`,
-  just re-run it — never guess with `sleep N`. The run survives even if that
-  wait command is killed: `dianjiang result <runId>` recovers it any time.
 - If the human explicitly names a vendor, harness, or model, relay their choice:
   `dianjiang run --harness <claude|codex|grok> [-m <model>] [--effort <level>] "<task>"`,
   or override an agent preset with `-m`/`--effort`. Relay only — the choice stays the human's.
@@ -251,9 +258,9 @@ Single `~/.dianjiang/config.jsonc`; runs metadata in `~/.dianjiang/runs.sqlite`.
   "callers": {
     "claude": {
       "agents": { "second-opinion": { "harness": "codex", "model": "gpt-5.6-sol", "effort": "xhigh" } },
+      "exclude": ["design-frontend"],
       "prepend": "…caller-behavior guidance rendered at the top of claude's block…"
-    },
-    "grok": { "exclude": ["explore"] }
+    }
   }
 }
 ```
@@ -274,10 +281,12 @@ self-consultation. The name and useWhen are stable semantics; only the binding
 should vary per caller.
 
 - `callers.<h>.agents.<name>` sparsely overrides that agent's binding for that
-  caller. An override replaces the whole binding (`{harness, model?, effort?}`,
-  harness required — no field merging, so a cross-vendor override can never
-  inherit another vendor's model name). `name`/`useWhen`/`dontUseWhen`/
-  `instructions` always come from the base agent: semantics stay single-source.
+  caller. The `{harness, model?, effort?}` trio replaces the whole binding
+  (harness required — no field merging, so a cross-vendor override can never
+  inherit another vendor's model name). `useWhen`/`dontUseWhen` may optionally
+  be overridden per caller for caller-relative descriptions (model-strength
+  notes only make sense relative to the caller's own model), each falling back
+  to the base agent when omitted; `name`/`instructions` stay single-source.
 - Caller identification: no env sniffing (no stable cross-vendor contract;
   breaks on vendor upgrades). `setup` already writes one file per vendor, so
   it stamps `--caller <harness>` into each file's documented run command; the
@@ -290,8 +299,9 @@ should vary per caller.
 - `callers.<h>.exclude: string[]` hides an agent from that caller entirely —
   omitted from its injected roster and from `config agents --caller <h>`,
   rejected at dispatch with a clear error. A name in both `exclude` and that
-  caller's `agents` overrides is a validation error. User: grok excludes
-  `explore`.
+  caller's `agents` overrides is a validation error. User: claude excludes
+  `design-frontend` (it IS claude/fable — the claude caller gains nothing
+  over its own subagents).
 - `callers.<h>.prepend: string` — free-form markdown rendered at the TOP of
   that caller's block (right after the wrapper tag, before the intro), wrapped
   in `<caller-guidance>` so it reads as caller behavior, not a dianjiang rule.
@@ -383,6 +393,7 @@ layer 2 retires for codex.
 | YOLO | `--dangerously-skip-permissions` | `--dangerously-bypass-approvals-and-sandbox` | `--always-approve` |
 | Final message | `--output-format json`, `.result` | `-o <file>` (easiest) or scan JSONL | `--output-format json` |
 | Global instructions | `~/.claude/CLAUDE.md` | `~/.codex/AGENTS.md` | `~/.grok/AGENTS.md` |
+| Agent-side background shell | `run_in_background` + completion notification (push) | `exec_command` returns a session id; poll/continue via `write_stdin` (pull, no push wake) | `run_terminal_command` `background: true` → task_id + completion notification (push) |
 
 Notes:
 - Grok's claude-compat is OFF in local config — it will not read `~/.claude/*`;

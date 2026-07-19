@@ -115,6 +115,12 @@ function validateCallers(config: DianjiangConfig, agentNames: Set<string>): void
             `Invalid config: ${label} has unknown harness "${String(binding.harness)}" (expected one of: ${HARNESS_NAMES.join(', ')}).`,
           )
         }
+        for (const field of ['useWhen', 'dontUseWhen'] as const) {
+          const value = binding[field]
+          if (value !== undefined && (typeof value !== 'string' || value.length === 0)) {
+            throw new Error(`Invalid config: ${label}.${field} must be a non-empty string.`)
+          }
+        }
         validateBinding(binding, label)
       }
     }
@@ -176,8 +182,10 @@ export function findAgent(config: DianjiangConfig, name: string): AgentConfig {
  * Resolve an agent for a given caller. Looks up the base agent by name, then —
  * if `caller` has an override for that name — returns the base agent with its
  * harness/model/effort REPLACED by the override. The override's undefined
- * model/effort mean "harness default", not the base agent's values; name /
- * useWhen / dontUseWhen / instructions always stay single-source from the base.
+ * model/effort mean "harness default", not the base agent's values. `useWhen`/
+ * `dontUseWhen` may be overridden per caller (caller-relative descriptions),
+ * each falling back to the base agent when omitted; `name`/`instructions`
+ * always stay single-source from the base.
  */
 export function resolveAgent(config: DianjiangConfig, name: string, caller?: HarnessName): AgentConfig {
   const agent = findAgent(config, name)
@@ -192,6 +200,8 @@ export function resolveAgent(config: DianjiangConfig, name: string, caller?: Har
     harness: override.harness,
     model: override.model,
     effort: override.effort,
+    useWhen: override.useWhen ?? agent.useWhen,
+    dontUseWhen: override.dontUseWhen ?? agent.dontUseWhen,
   }
 }
 
@@ -202,13 +212,13 @@ export function defaultConfigJsonc(): string {
   "maxDepth": 2,
 
   // The roster. The delegating AI picks an agent by task shape — never a model.
-  // Names are verb/deliverable-style; keep the roster small (v1: 6, hard cap ~8).
+  // Names are verb/deliverable-style; keep the roster small (v1: 5, hard cap ~8).
   "agents": [
     {
       "name": "review",
       // Base is codex; the callers section rebinds it to a different vendor for
       // the codex caller so review is never same-model as the code under review.
-      "useWhen": "you want an independent cross-vendor code review of a diff",
+      "useWhen": "you want an independent cross-vendor code review of a diff; runs gpt-5.6-sol at xhigh — stronger reasoning than opus, slightly below fable",
       "dontUseWhen": "a quick lint/style pass your own subagents already cover",
       "harness": "codex",
       "model": "gpt-5.6-sol",
@@ -218,29 +228,20 @@ export function defaultConfigJsonc(): string {
       "name": "second-opinion",
       // Consult-only; base is claude/fable, rebound to a different vendor for the
       // claude caller so consulting never lands on the caller's own model.
-      "useWhen": "consult-only: a hard debugging hypothesis or an architecture/design decision where you're stuck or the call is expensive to reverse",
+      "useWhen": "consult-only: a hard debugging hypothesis or an architecture/design decision where you're stuck or the call is expensive to reverse; runs fable — Anthropic's strongest reasoning model",
       "dontUseWhen": "the task requires editing code (this agent must not make changes)",
       "harness": "claude",
       "model": "fable",
       "effort": "high"
     },
     {
-      "name": "explore",
-      // Fixed cheap+fast grok; excluded when the caller IS grok (see callers).
-      "useWhen": "broad codebase search, research, or summarization",
-      "dontUseWhen": "the task needs deep reasoning or code changes",
-      "harness": "grok",
-      "model": "grok-4.5",
-      "effort": "high"
-    },
-    {
       "name": "search-twitter",
       // grok has native live X search tools; verified working headless.
-      "useWhen": "live X/Twitter lookups: find tweets, threads, account activity, or what people say about a topic right now",
-      "dontUseWhen": "general web research (use explore) or anything needing code changes",
+      "useWhen": "live X/Twitter lookups: find tweets, threads, account activity, or what people say about a topic right now — grok's native X search is real-time and extremely fast",
+      "dontUseWhen": "general web research or anything needing code changes",
       "harness": "grok",
       "model": "grok-4.5",
-      "effort": "low",
+      "effort": "high",
       "instructions": "Use your live X/Twitter search tools. Cite the tweet URL for every claim."
     },
     {
@@ -254,7 +255,7 @@ export function defaultConfigJsonc(): string {
     {
       "name": "rewrite-prompt",
       // 1M-context opus: can ingest a huge corpus before rewriting.
-      "useWhen": "rewriting, compressing, or restructuring prompts and agent instructions, especially when a large corpus must be read first",
+      "useWhen": "rewriting, compressing, or restructuring prompts and agent instructions, especially when a large corpus must be read first; runs opus 4.6 with 1M context — better prose style (文风) than later opus generations",
       "dontUseWhen": "ordinary coding tasks",
       "harness": "claude",
       "model": "claude-opus-4-6[1m]",
@@ -264,7 +265,6 @@ export function defaultConfigJsonc(): string {
 
   // Per-caller adjustments. The built-in bindings follow these rules:
   //   review, second-opinion — always a different vendor than the caller (avoid same-model blind spots)
-  //   explore                — fixed cheap+fast grok; excluded when the caller IS grok
   //   implementation         — not a dianjiang agent at all: callers build with their own subagents (see claude's \`prepend\`)
   // Base bindings are just the compiled view for the most common callers; \`exclude\`
   // hides an agent from a caller entirely. \`setup\` stamps \`--caller <harness>\`
@@ -272,18 +272,27 @@ export function defaultConfigJsonc(): string {
   "callers": {
     "claude": {
       "agents": {
-        "second-opinion": { "harness": "codex", "model": "gpt-5.6-sol", "effort": "xhigh" }
+        "second-opinion": {
+          "harness": "codex",
+          "model": "gpt-5.6-sol",
+          "effort": "xhigh",
+          "useWhen": "consult-only: a hard debugging hypothesis or an architecture/design decision where you're stuck or the call is expensive to reverse; runs gpt-5.6-sol at xhigh — stronger reasoning than opus, slightly below fable"
+        }
       },
+      // design-frontend is claude/fable itself — the claude caller gains nothing over its own subagents.
+      "exclude": ["design-frontend"],
       // Caller-behavior guidance rendered at the top of this caller's injected block.
       "prepend": "If your session model is fable, act as an orchestrator to preserve fable tokens: delegate execution work (implementation, mechanical edits, running tests/builds) to your built-in subagents with \`model: opus\`, keeping only planning, task decomposition, tricky debugging, and verification of subagent output for yourself. For cross-vendor perspectives or capabilities your subagents lack, use the dianjiang roster below."
     },
     "codex": {
       "agents": {
-        "review": { "harness": "claude", "model": "opus", "effort": "xhigh" }
+        "review": {
+          "harness": "claude",
+          "model": "opus",
+          "effort": "xhigh",
+          "useWhen": "you want an independent cross-vendor code review of a diff; runs claude opus at xhigh"
+        }
       }
-    },
-    "grok": {
-      "exclude": ["explore"]
     }
   }
 }

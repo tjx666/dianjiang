@@ -15,8 +15,8 @@ way; loops, fan-out, and judgment stay with the calling agent.
 
 | Term | Meaning |
 |---|---|
-| **agent** | A named, human-compiled preset: harness + model + effort + optional instructions (e.g. `review`, `explore`). The product. |
-| **roster** | The small set of agents in `config.jsonc` (v1: 6, hard cap ~8). |
+| **agent** | A named, human-compiled preset: harness + model + effort + optional instructions (e.g. `review`, `search-twitter`). The product. |
+| **roster** | The small set of agents in `config.jsonc` (v1: 5, hard cap ~8). |
 | **harness** | An underlying coding-agent CLI: `claude`, `codex`, or `grok`. |
 | **adapter** | The module that adapts one harness (its flags, event stream, session lifecycle) to dianjiang's contracts. |
 | **run** | One dispatched execution, addressed by a unified `runId` and persisted in SQLite. |
@@ -69,7 +69,7 @@ dianjiang config init
 dianjiang setup
 
 # Dispatch by agent (primary path) — blocks, prints one JSON object; read .result
-dianjiang run explore "Find every call site of parseConfig across src/"
+dianjiang run search-twitter "What are people saying about bun 1.3 this week?"
 
 # Resolve an agent's binding relative to the caller (see `callers` in config).
 # From a codex session, `review` rebinds off codex to another vendor.
@@ -78,7 +78,8 @@ dianjiang run --caller codex review "Review the diff in src/parser.ts"
 # Raw escape hatch — bypass the registry
 dianjiang run --harness codex -m gpt-5.6-sol "Refactor the parser"
 
-# Long task: return immediately, then block until it finishes (no sleep-polling)
+# Recommended for AI callers (any task length): dispatch detached, then block
+# until it finishes — event-driven, no sleep-polling, survives caller death
 dianjiang run review "review a large multi-file diff" --detach
 dianjiang result <runId> --wait --timeout 300   # on timeout: status "running", re-run to keep waiting
 dianjiang status <runId>                        # instant snapshot, never blocks

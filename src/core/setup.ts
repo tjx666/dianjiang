@@ -10,6 +10,7 @@ import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { dirname, join } from 'node:path'
 import type { DianjiangConfig, HarnessName } from './types.ts'
+import { resolveAgent } from './registry.ts'
 
 const BEGIN = '<!-- dianjiang:begin -->'
 const END = '<!-- dianjiang:end -->'
@@ -67,15 +68,21 @@ export function filterTargets(names: HarnessName[], targets = defaultTargets()):
  * `<caller-guidance>` element so caller-behavior guidance (e.g. "use your own
  * subagents for X") is not read as a dianjiang usage rule; `append` renders
  * after the rules. Both live inside the managed block.
+ *
+ * Each agent is resolved through `resolveAgent(config, name, caller)` so the
+ * injected `<use-when>`/`<dont-use-when>` reflect any caller-relative
+ * description overrides (falling back to the base agent when unset). Exclude
+ * behavior is unchanged.
  */
 export function renderRosterBlock(config: DianjiangConfig, caller?: HarnessName): string {
   const excluded = caller ? config.callers?.[caller]?.exclude ?? [] : []
   const agents = config.agents
     .filter((a) => !excluded.includes(a.name))
     .map((a) => {
+      const resolved = resolveAgent(config, a.name, caller)
       // dontUseWhen is optional: omit the element rather than render a blank.
-      const dontUse = a.dontUseWhen ? `\n  <dont-use-when>${a.dontUseWhen}</dont-use-when>` : ''
-      return `<agent name="${a.name}">\n  <use-when>${a.useWhen}</use-when>${dontUse}\n</agent>`
+      const dontUse = resolved.dontUseWhen ? `\n  <dont-use-when>${resolved.dontUseWhen}</dont-use-when>` : ''
+      return `<agent name="${resolved.name}">\n  <use-when>${resolved.useWhen}</use-when>${dontUse}\n</agent>`
     })
     .join('\n\n')
   const runCmd = caller ? `dianjiang run --caller ${caller} <agent> "<task>"` : 'dianjiang run <agent> "<task>"'
@@ -98,18 +105,21 @@ and subagents, and reach for dianjiang only when an agent below clearly fits.
 ${agents}
 
 <rules>
-- \`${runCmd}\` blocks until done and prints one JSON object. Check \`.status\`
-  first: read \`.result\` when it is "completed" — on "failed" \`.result\` is the
-  stderr tail, not an answer. Keep \`.runId\` for resume/result.
+- \`${runCmd} --detach\` prints one JSON object immediately — save \`.runId\`, then
+  block on \`dianjiang result <runId> --wait --timeout 300\`: it exits with the
+  final JSON the moment the run finishes; on timeout it prints \`status: "running"\`,
+  just re-run it. Always dispatch detached — don't try to predict how long a
+  task will take, and never wait with \`sleep N\`. If your shell tool can run
+  commands in the background (or detach into a session you can check on later),
+  run the wait command there and collect it once it exits — you stay free to
+  work while it blocks. The run survives even if the wait command is killed —
+  \`dianjiang result <runId>\` recovers it any time.
+- Check \`.status\` first: read \`.result\` when it is "completed" — on "failed"
+  \`.result\` is the stderr tail, not an answer.
 - Write tasks self-contained (background, file paths, acceptance criteria,
   expected output): the delegate starts fresh in your cwd — it sees your files,
   not your conversation.
 - Follow up in the same session with \`dianjiang resume <runId> "<message>"\`.
-- For tasks likely over ~5 minutes, start with \`--detach\` and save the returned
-  \`.runId\`, then block on \`dianjiang result <runId> --wait --timeout 300\` — it
-  returns the moment the run finishes; on timeout it prints \`status: "running"\`,
-  just re-run it — never guess with \`sleep N\`. The run survives even if that
-  wait command is killed: \`dianjiang result <runId>\` recovers it any time.
 - If the human explicitly names a vendor, harness, or model, relay their choice:
   \`dianjiang run --harness <claude|codex|grok> [-m <model>] [--effort <level>] "<task>"\`,
   or override an agent preset with \`-m\`/\`--effort\`. Relay only — the choice stays the human's.

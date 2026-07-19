@@ -103,6 +103,23 @@ describe('renderRosterBlock', () => {
     expect(renderRosterBlock(withAppend, 'codex')).not.toContain('Use your built-in subagents for implementation.')
     expect(renderRosterBlock(withAppend, 'grok')).not.toContain('Use your built-in subagents for implementation.')
   })
+
+  test("renders a caller's useWhen override in the <agent> element, base for others", () => {
+    const withDescOverride: DianjiangConfig = {
+      ...config,
+      callers: {
+        claude: { agents: { explore: { harness: 'grok', useWhen: 'caller-relative search note' } } },
+      },
+    }
+    // claude sees the caller-relative description in explore's element.
+    const claudeBlock = renderRosterBlock(withDescOverride, 'claude')
+    expect(claudeBlock).toContain('<agent name="explore">\n  <use-when>caller-relative search note</use-when>\n</agent>')
+    expect(claudeBlock).not.toContain('<use-when>search fast</use-when>')
+    // Another caller (and the caller-less render) show the base description.
+    const codexBlock = renderRosterBlock(withDescOverride, 'codex')
+    expect(codexBlock).toContain('<agent name="explore">\n  <use-when>search fast</use-when>\n</agent>')
+    expect(renderRosterBlock(withDescOverride)).toContain('<use-when>search fast</use-when>')
+  })
 })
 
 describe('injectBlock', () => {

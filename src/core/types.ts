@@ -30,10 +30,15 @@ export interface AgentConfig {
 }
 
 /**
- * A per-caller override of an agent's binding. An override REPLACES the whole
- * binding: there is no field merging, so a cross-vendor override never inherits
- * another vendor's model name. An omitted `model`/`effort` means "harness
- * default", NOT the base agent's value.
+ * A per-caller override of an agent's binding. The harness/model/effort trio
+ * REPLACES the whole binding: there is no field merging, so a cross-vendor
+ * override never inherits another vendor's model name, and an omitted
+ * `model`/`effort` means "harness default", NOT the base agent's value.
+ *
+ * `useWhen`/`dontUseWhen` are the exception: each independently overrides the
+ * base agent's description for this caller only, falling back to the base agent
+ * when omitted. Use them for caller-relative wording (e.g. model-strength notes
+ * that only make sense relative to the caller's own model).
  */
 export interface AgentBinding {
   harness: HarnessName
@@ -41,6 +46,17 @@ export interface AgentBinding {
   model?: string
   /** Harness-native effort value; validated per harness by the registry. */
   effort?: string
+  /**
+   * Caller-relative override of the base agent's `useWhen`; falls back to the
+   * base agent when omitted. For descriptions that only make sense relative to
+   * this caller (e.g. model-strength notes).
+   */
+  useWhen?: string
+  /**
+   * Caller-relative override of the base agent's `dontUseWhen`; falls back to
+   * the base agent when omitted.
+   */
+  dontUseWhen?: string
 }
 
 /**
