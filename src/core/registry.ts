@@ -238,7 +238,7 @@ export function defaultConfigJsonc(): string {
       "name": "search-twitter",
       // grok has native live X search tools; verified working headless.
       "useWhen": "live X/Twitter lookups: find tweets, threads, account activity, or what people say about a topic right now — grok's native X search is real-time and extremely fast",
-      "dontUseWhen": "general web research or anything needing code changes",
+      "dontUseWhen": "general web research (use your own web/search tools) or anything needing code changes",
       "harness": "grok",
       "model": "grok-4.5",
       "effort": "high",
@@ -282,7 +282,7 @@ export function defaultConfigJsonc(): string {
       // design-frontend is claude/fable itself — the claude caller gains nothing over its own subagents.
       "exclude": ["design-frontend"],
       // Caller-behavior guidance rendered at the top of this caller's injected block.
-      "prepend": "If your session model is fable, act as an orchestrator to preserve fable tokens: delegate execution work (implementation, mechanical edits, running tests/builds) to your built-in subagents with \`model: opus\`, keeping only planning, task decomposition, tricky debugging, and verification of subagent output for yourself. For cross-vendor perspectives or capabilities your subagents lack, use the dianjiang roster below."
+      "prepend": "If your session model is fable, act as an orchestrator to preserve fable tokens: delegate execution work (implementation, mechanical edits, running tests/builds) to your built-in subagents with \`model: opus\`, keeping only planning, task decomposition, tricky debugging, and verification of subagent output for yourself. Delegate coherent, independently verifiable chunks (a new file, a test suite, a bulk edit); keep small in-context edits yourself — the cost of writing the brief must not exceed the task. For cross-vendor perspectives or capabilities your subagents lack, use the dianjiang roster below."
     },
     "codex": {
       "agents": {

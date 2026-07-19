@@ -169,10 +169,12 @@ the body format:
 
 `dianjiang` is a CLI on this machine that dispatches self-contained tasks to
 other coding-agent CLIs (Claude Code / Codex / Grok). Each <agent> below is a
-preset the human already compiled — harness, model, and effort are decided;
-pick by task shape only, never by your own harness/model judgment. dianjiang
-agents are separate from your built-in subagents: default to your own tools
-and subagents, and reach for dianjiang only when an agent below clearly fits.
+preset the human already compiled — its harness, model, and effort are fixed;
+never override or re-route them. Pick an agent by task shape. Model notes
+inside <use-when> only calibrate whether a dispatch is worth making — they are
+not an invitation to second-guess the binding. dianjiang agents are separate
+from your built-in subagents: default to your own tools and subagents, and
+reach for dianjiang only when an agent below clearly fits.
 
 <agent name="review">
   <use-when>…rendered from the agent's useWhen…</use-when>
@@ -194,7 +196,8 @@ and subagents, and reach for dianjiang only when an agent below clearly fits.
 - Write tasks self-contained (background, file paths, acceptance criteria,
   expected output): the delegate starts fresh in your cwd — it sees your files,
   not your conversation.
-- Follow up in the same session with `dianjiang resume <runId> "<message>"`.
+- Follow up in the same session with `dianjiang resume <runId> "<message>"` —
+  it takes `--detach` too; use the same detach-and-wait flow.
 - If the human explicitly names a vendor, harness, or model, relay their choice:
   `dianjiang run --harness <claude|codex|grok> [-m <model>] [--effort <level>] "<task>"`,
   or override an agent preset with `-m`/`--effort`. Relay only — the choice stays the human's.
@@ -312,7 +315,10 @@ should vary per caller.
   decomposition, tricky debugging, and verification; delegate execution to
   opus subagents), mirroring ai-rules' "Model Delegation" section. The
   model qualifier matters because the steer exists to offload the expensive
-  fable, not to escalate an opus/sonnet session's subagents. Don't open with
+  fable, not to escalate an opus/sonnet session's subagents. The steer also
+  states a delegation granularity threshold (delegate coherent, independently
+  verifiable chunks; keep small in-context edits) so the orchestrator doesn't
+  re-litigate "is this too small to delegate" every session. Don't open with
   prohibitions against non-options (e.g. "do not route implementation through
   dianjiang" — the roster has no implement agent; prohibiting a non-option is
   noise that implies the option exists).

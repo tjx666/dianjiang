@@ -97,10 +97,12 @@ export function renderRosterBlock(config: DianjiangConfig, caller?: HarnessName)
 
 ${prependSection}\`dianjiang\` is a CLI on this machine that dispatches self-contained tasks to
 other coding-agent CLIs (Claude Code / Codex / Grok). Each <agent> below is a
-preset the human already compiled — harness, model, and effort are decided;
-pick by task shape only, never by your own harness/model judgment. dianjiang
-agents are separate from your built-in subagents: default to your own tools
-and subagents, and reach for dianjiang only when an agent below clearly fits.
+preset the human already compiled — its harness, model, and effort are fixed;
+never override or re-route them. Pick an agent by task shape. Model notes
+inside <use-when> only calibrate whether a dispatch is worth making — they are
+not an invitation to second-guess the binding. dianjiang agents are separate
+from your built-in subagents: default to your own tools and subagents, and
+reach for dianjiang only when an agent below clearly fits.
 
 ${agents}
 
@@ -119,7 +121,8 @@ ${agents}
 - Write tasks self-contained (background, file paths, acceptance criteria,
   expected output): the delegate starts fresh in your cwd — it sees your files,
   not your conversation.
-- Follow up in the same session with \`dianjiang resume <runId> "<message>"\`.
+- Follow up in the same session with \`dianjiang resume <runId> "<message>"\` —
+  it takes \`--detach\` too; use the same detach-and-wait flow.
 - If the human explicitly names a vendor, harness, or model, relay their choice:
   \`dianjiang run --harness <claude|codex|grok> [-m <model>] [--effort <level>] "<task>"\`,
   or override an agent preset with \`-m\`/\`--effort\`. Relay only — the choice stays the human's.
