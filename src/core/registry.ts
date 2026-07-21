@@ -218,7 +218,7 @@ export function defaultConfigJsonc(): string {
       "name": "review",
       // Base is codex; the callers section rebinds it to a different vendor for
       // the codex caller so review is never same-model as the code under review.
-      "useWhen": "you want an independent cross-vendor code review of a diff; runs gpt-5.6-sol at xhigh — stronger reasoning than opus, slightly below fable",
+      "useWhen": "you want an independent cross-vendor code review of a diff; in the task, explicitly state the depth you want — a deep comprehensive review (slow on large diffs) or a quick single-pass scan; runs gpt-5.6-sol at xhigh — stronger reasoning than opus, slightly below fable",
       "dontUseWhen": "a quick lint/style pass your own subagents already cover",
       "harness": "codex",
       "model": "gpt-5.6-sol",
@@ -294,7 +294,7 @@ export function defaultConfigJsonc(): string {
           "harness": "claude",
           "model": "opus",
           "effort": "xhigh",
-          "useWhen": "you want an independent cross-vendor code review of a diff; runs claude opus at xhigh"
+          "useWhen": "you want an independent cross-vendor code review of a diff; in the task, explicitly state the depth you want — a deep comprehensive review (slow on large diffs) or a quick single-pass scan; runs claude opus at xhigh"
         }
       }
       // The codex wait discipline (waiter subagent via spawn_agent) is no longer

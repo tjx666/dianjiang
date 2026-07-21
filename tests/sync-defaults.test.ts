@@ -17,6 +17,8 @@ const FORMATTING: FormattingOptions = { tabSize: 2, insertSpaces: true }
  */
 const V050_REVIEW_USEWHEN =
   'you want an independent cross-vendor code review of a diff; runs gpt-5.6-sol at xhigh — stronger reasoning than opus, slightly below fable'
+const CURRENT_REVIEW_USEWHEN =
+  'you want an independent cross-vendor code review of a diff; in the task, explicitly state the depth you want — a deep comprehensive review (slow on large diffs) or a quick single-pass scan; runs gpt-5.6-sol at xhigh — stronger reasoning than opus, slightly below fable'
 const V050_CODEX_REVIEW_USEWHEN = 'you want an independent cross-vendor code review of a diff; runs claude opus at xhigh'
 const V050_CODEX_APPEND =
   'Your shell sessions do NOT wake you when a background command finishes, and polling is easy to forget. To collect a dianjiang run without blocking, use your subagent notification channel: `spawn_agent` with `fork_turns: "none"` and the message "Run `dianjiang result <runId> --wait --timeout 300`. If it prints status \'running\', run it again. When the status is terminal, return the full JSON verbatim." — its completion notification wakes you with the result while you keep working. If you have nothing else to do, just run `dianjiang result <runId> --wait --timeout 300` in the foreground. Either way, never end your turn with a dispatched run uncollected.'
@@ -76,9 +78,16 @@ describe('planSyncDefaults / applySyncDefaults', () => {
     expect(() => parseConfig(fixture)).not.toThrow()
 
     const plan = planSyncDefaults(fixture)
-    // Review's useWhen/instructions reverted to the v0.5.0 shape in 2026-07,
-    // so the only drift left in this fixture is the legacy codex append.
-    expect(actions(plan)).toEqual(new Set(['remove callers.codex.append']))
+    // The v0.5.0 review useWhen values are known historical defaults, so they
+    // migrate to the current wording (depth guidance added 2026-07-22); the
+    // remaining drift is the legacy codex append.
+    expect(actions(plan)).toEqual(
+      new Set([
+        'set agents.review.useWhen',
+        'set callers.codex.agents.review.useWhen',
+        'remove callers.codex.append',
+      ]),
+    )
     // No customizations to keep — every managed field is a recognized default.
     expect(plan.filter((c) => c.action === 'keep-custom')).toHaveLength(0)
 
@@ -223,7 +232,7 @@ describe('config sync-defaults CLI', () => {
     expect(() => parseConfig(onDisk)).not.toThrow()
     const review = parseConfig(onDisk).agents.find((a) => a.name === 'review')
     expect(review?.instructions).toBeUndefined()
-    expect(review?.useWhen).toBe(V050_REVIEW_USEWHEN)
+    expect(review?.useWhen).toBe(CURRENT_REVIEW_USEWHEN)
 
     // Running again is a no-op.
     const second = runCli('config', 'sync-defaults')

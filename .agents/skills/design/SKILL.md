@@ -122,7 +122,13 @@ resolves to is frozen into the RunRecord at dispatch, so a config edit
 mid-run or before a resume cannot change a run's execution contract. If
 delegates ignore task-stated scope again, fix it caller-side (task-writing
 guidance), not by re-growing delegate injection. Still no CLI mode flag —
-the agent/task boundary is where such routing belongs.
+the agent/task boundary is where such routing belongs. First such caller-side
+fix (2026-07-22): `review`'s `useWhen` tells the caller to explicitly state
+the review depth in the task — a deep comprehensive review (slow on large
+diffs) or a quick single-pass scan — after depth-unstated dispatches on large
+repos defaulted into slow full reviews. This lives in the roster description
+(caller guidance), not in `instructions` (delegate injection), so the
+no-instructions decision stands.
 
 Removed: `explore` (was fixed cheap+fast grok) — every caller harness ships a
 built-in explore/search subagent, so cross-vendor dispatch added only a
