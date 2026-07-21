@@ -50,6 +50,16 @@ test('insert + get roundtrip', () => {
   expect(got?.harnessSessionId).toBeUndefined()
 })
 
+test('instructions roundtrip', () => {
+  insertRun({ ...record(), instructions: 'You are terse. Output only a diff.' })
+  expect(getRun('r1')?.instructions).toBe('You are terse. Output only a diff.')
+})
+
+test('a run with no instructions reads back with instructions undefined', () => {
+  insertRun(record())
+  expect(getRun('r1')?.instructions).toBeUndefined()
+})
+
 test('update patches only the given fields', () => {
   insertRun(record())
   updateRun('r1', {
@@ -136,10 +146,15 @@ test('lazy migration: an OLD-schema DB gains usage columns and old rows survive'
   expect(legacy?.result).toBeUndefined()
   // Old row reads fine with usage null (undefined).
   expect(legacy?.usage).toBeUndefined()
+  // The old schema also predates `instructions`; the added column reads null.
+  expect(legacy?.instructions).toBeUndefined()
 
   // The added columns are usable: a fresh usage write roundtrips.
   updateRun('old1', { usage: { inputTokens: 5, turns: 1 } })
   expect(getRun('old1')?.usage).toEqual({ inputTokens: 5, turns: 1 })
+  // The migrated `instructions` column is writable too.
+  updateRun('old1', { instructions: 'freeze me' })
+  expect(getRun('old1')?.instructions).toBe('freeze me')
 })
 
 test('listRuns returns every run oldest-first', () => {

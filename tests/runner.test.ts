@@ -3,7 +3,7 @@ import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import type { RunRecord } from '../src/core/types.ts'
-import { waitForRun } from '../src/core/runner.ts'
+import { specFromRecord, waitForRun } from '../src/core/runner.ts'
 import { insertRun, updateRun } from '../src/core/store.ts'
 
 let home: string
@@ -29,6 +29,30 @@ function record(overrides: Partial<RunRecord> = {}): RunRecord {
     ...overrides,
   }
 }
+
+test('specFromRecord freezes the record instructions, independent of config', () => {
+  // DIANJIANG_HOME points at an empty temp dir (beforeEach) — there is NO config
+  // file here, proving specFromRecord never reads the live config.
+  const spec = specFromRecord(
+    record({ instructions: 'be terse', model: 'grok-4', effort: 'high' }),
+  )
+  expect(spec.instructions).toBe('be terse')
+  expect(spec.runId).toBe('r1')
+  expect(spec.prompt).toBe('do the thing')
+  expect(spec.model).toBe('grok-4')
+  expect(spec.effort).toBe('high')
+  expect(spec.resumeSessionId).toBeUndefined()
+})
+
+test('specFromRecord passes a resumeSessionId through', () => {
+  const spec = specFromRecord(record(), 'session-abc')
+  expect(spec.resumeSessionId).toBe('session-abc')
+})
+
+test('specFromRecord leaves instructions undefined when the record has none', () => {
+  const spec = specFromRecord(record())
+  expect(spec.instructions).toBeUndefined()
+})
 
 test('waitForRun returns a terminal run immediately', async () => {
   insertRun(record({ status: 'completed', result: 'done' }))

@@ -15,6 +15,45 @@ import { resolveAgent } from './registry.ts'
 const BEGIN = '<!-- dianjiang:begin -->'
 const END = '<!-- dianjiang:end -->'
 
+/**
+ * Per-caller collection strategy: how THIS caller waits for a detached run
+ * without stalling its loop. This is harness-intrinsic capability knowledge
+ * (see the design skill's capability matrix), so it lives in code — not in
+ * config free-text — and renders as the ONE authoritative wait rule inside
+ * <rules>. Structural rationale (2026-07 dogfood): a generic "block on result
+ * --wait" rule plus a codex-only append produced conflicting guidance, and
+ * codex blocked 300s in the foreground before spawning its waiter. claude and
+ * grok shells push completion notifications for background commands; codex
+ * shells never do, but its spawn_agent completion notifies the parent, so
+ * codex routes the wait through a waiter subagent instead.
+ */
+const COLLECTION_STRATEGY: Record<HarnessName, string> = {
+  claude: `Start that command in a background shell (\`run_in_background: true\`)
+  immediately after dispatching — its completion notification delivers the
+  result while you keep working. Run it in the foreground only when the result
+  is the last thing you need before you can proceed.`,
+  codex: `The moment you hold a runId, spawn a waiter subagent — \`spawn_agent\`
+  with \`fork_turns: "none"\` and the message: "Run \`dianjiang result <runId>
+  --wait --timeout 300\`. If it prints status 'running', run it again. When the
+  status is terminal, return the full JSON verbatim." Its completion
+  notification wakes you with the result; your shell sessions do NOT push
+  completion events, so a background-shell wait WILL be forgotten. Do not wait
+  in the foreground first, do not poll by hand, and do not gate the waiter on
+  how long you expect the run to take. runIds you already hold can share one
+  waiter, but never delay the first waiter for runs you might dispatch later.
+  Fall back to a foreground wait ONLY if subagents are unavailable or no slot
+  is free. Every dispatched run must be collected before your turn ends.`,
+  grok: `Start that command as a background task (\`background: true\`)
+  immediately after dispatching — its completion notification delivers the
+  result while you keep working. Run it in the foreground only when the result
+  is the last thing you need before you can proceed.`,
+}
+
+/** Caller-less renders can't assume shell capabilities; stay neutral. */
+const DEFAULT_COLLECTION = `Run it in the foreground (\`--timeout\` keeps it
+  bounded), or in a background shell if your environment pushes completion
+  notifications.`
+
 export type SetupAction = 'written' | 'updated' | 'removed' | 'skipped'
 
 export interface SetupResult {
@@ -107,25 +146,24 @@ reach for dianjiang only when an agent below clearly fits.
 ${agents}
 
 <rules>
-- \`${runCmd} --detach\` prints one JSON object immediately — save \`.runId\`, then
-  block on \`dianjiang result <runId> --wait --timeout 300\`: it exits with the
-  final JSON the moment the run finishes; on timeout it prints \`status: "running"\`,
-  just re-run it. Always dispatch detached — don't try to predict how long a
-  task will take, and never wait with \`sleep N\`. If your shell tool can run
-  commands in the background (or detach into a session you can check on later),
-  run the wait command there and collect it once it exits — you stay free to
-  work while it blocks. The run survives even if the wait command is killed —
-  \`dianjiang result <runId>\` recovers it any time.
+- \`${runCmd} --detach\` prints one JSON object immediately — save \`.runId\`.
+  Always dispatch detached: never try to predict how long a task will take, and
+  never wait with \`sleep N\`. The run survives even if you or the wait command
+  die — \`dianjiang result <runId>\` recovers it any time.
+- Collect every run with \`dianjiang result <runId> --wait --timeout 300\`: it
+  exits with the final JSON the moment the run finishes; on timeout it prints
+  \`status: "running"\` — just re-run it. ${caller ? COLLECTION_STRATEGY[caller] : DEFAULT_COLLECTION}
 - Check \`.status\` first: read \`.result\` when it is "completed" — on "failed"
   \`.result\` is the stderr tail, not an answer.
 - Write tasks self-contained (background, file paths, acceptance criteria,
   expected output): the delegate starts fresh in your cwd — it sees your files,
   not your conversation.
 - Follow up in the same session with \`dianjiang resume <runId> "<message>"\` —
-  it takes \`--detach\` too; use the same detach-and-wait flow.
-- If the human explicitly names a vendor, harness, or model, relay their choice:
-  \`dianjiang run --harness <claude|codex|grok> [-m <model>] [--effort <level>] "<task>"\`,
-  or override an agent preset with \`-m\`/\`--effort\`. Relay only — the choice stays the human's.
+  it takes \`--detach\` too; use the same detach-and-collect flow.
+- Overriding a preset is allowed ONLY to relay the human's explicit choice in
+  their current request: if they name a vendor, harness, model, or effort, pass
+  it through — \`dianjiang run --harness <claude|codex|grok> [-m <model>] [--effort <level>] "<task>"\`,
+  or \`-m\`/\`--effort\` on an agent dispatch. Never override on your own judgment.
 - If \`DIANJIANG_DEPTH\` is set in your environment, you ARE a delegate — never call dianjiang.
 </rules>${appendSection}
 

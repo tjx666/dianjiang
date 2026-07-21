@@ -25,6 +25,7 @@ interface Row {
   finished_at: string | null
   pid: number | null
   parent_run_id: string | null
+  instructions: string | null
   input_tokens: number | null
   output_tokens: number | null
   cache_read_tokens: number | null
@@ -54,6 +55,7 @@ const FIELD_TO_COLUMN: Record<Exclude<keyof RunRecord, 'usage'>, string> = {
   finishedAt: 'finished_at',
   pid: 'pid',
   parentRunId: 'parent_run_id',
+  instructions: 'instructions',
 }
 
 /** RunUsage field -> flat nullable column on `runs`. */
@@ -67,18 +69,25 @@ const USAGE_COLUMNS: Record<keyof RunUsage, string> = {
 }
 
 /**
- * Add any usage columns that a pre-existing DB is missing. Lazy migration: a
- * real populated `~/.dianjiang/runs.sqlite` predates the usage columns, so on
- * every open we reconcile the schema. Old rows read back with usage null.
+ * Add any columns that a pre-existing DB is missing. Lazy migration: a real
+ * populated `~/.dianjiang/runs.sqlite` predates later columns (the usage columns,
+ * then `instructions`), so on every open we reconcile the schema. Old rows read
+ * back with the added columns null.
  */
-function ensureUsageColumns(db: Database): void {
+function ensureColumns(db: Database): void {
   const existing = new Set(
     (db.query('PRAGMA table_info(runs)').all() as { name: string }[]).map((c) => c.name),
   )
-  for (const column of Object.values(USAGE_COLUMNS)) {
-    if (existing.has(column)) continue
+  // column -> SQLite type for every lazily-migrated column.
+  const migrated: Record<string, string> = {
     // Only cost is fractional; the token/turn counts are integers.
-    const type = column === 'cost_usd' ? 'REAL' : 'INTEGER'
+    ...Object.fromEntries(
+      Object.values(USAGE_COLUMNS).map((column) => [column, column === 'cost_usd' ? 'REAL' : 'INTEGER']),
+    ),
+    instructions: 'TEXT',
+  }
+  for (const [column, type] of Object.entries(migrated)) {
+    if (existing.has(column)) continue
     db.exec(`ALTER TABLE runs ADD COLUMN ${column} ${type};`)
   }
 }
@@ -103,6 +112,7 @@ function openStore(path: string): Database {
     finished_at TEXT,
     pid INTEGER,
     parent_run_id TEXT,
+    instructions TEXT,
     input_tokens INTEGER,
     output_tokens INTEGER,
     cache_read_tokens INTEGER,
@@ -110,8 +120,8 @@ function openStore(path: string): Database {
     turns INTEGER,
     cost_usd REAL
   );`)
-  // Bring DBs created before the usage columns up to the current schema.
-  ensureUsageColumns(db)
+  // Bring DBs created before later columns (usage, instructions) up to schema.
+  ensureColumns(db)
   return db
 }
 
@@ -155,6 +165,7 @@ function rowToRecord(row: Row): RunRecord {
     finishedAt: row.finished_at ?? undefined,
     pid: row.pid ?? undefined,
     parentRunId: row.parent_run_id ?? undefined,
+    instructions: row.instructions ?? undefined,
     usage: rowToUsage(row),
   }
 }
@@ -165,8 +176,9 @@ export function insertRun(record: RunRecord, db = getStore()): void {
     `INSERT INTO runs (
       run_id, agent, harness, model, effort, status, exit_code, result,
       harness_session_id, cwd, task, started_at, finished_at, pid, parent_run_id,
+      instructions,
       input_tokens, output_tokens, cache_read_tokens, total_tokens, turns, cost_usd
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
   ).run(
     record.runId,
     record.agent ?? null,
@@ -183,6 +195,7 @@ export function insertRun(record: RunRecord, db = getStore()): void {
     record.finishedAt ?? null,
     record.pid ?? null,
     record.parentRunId ?? null,
+    record.instructions ?? null,
     u?.inputTokens ?? null,
     u?.outputTokens ?? null,
     u?.cacheReadTokens ?? null,

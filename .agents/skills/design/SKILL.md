@@ -38,7 +38,9 @@ the caller (usually another AI) picks an **agent**, not a model.
 | Recursion guard | `DIANJIANG_DEPTH` env var; refuse beyond depth limit. Injected prompt also states "when you are the delegate, do not re-delegate." |
 | Attribution | Credit agent-mux in README |
 | Config | Single `~/.dianjiang/config.jsonc` (JSONC over JSON5: VS Code-native tsconfig-style editing, parse with `jsonc-parser`). Agents inline; split into `agents/*.md` only if instructions grow long. Project-level override deferred to phase 2. |
-| Background runs | Every run executes in a detached `_exec` worker; sync mode just waits for it ("job done is holy", credit agent-mux — the job survives caller timeout/death, and callers are AI agents whose shell tools cap at ~10 min). `--detach` returns immediately; block on `result --wait [--timeout <sec>]` (store-polling, since the worker isn't waitpid-able; bounded, so it never reintroduces the caller-shell-timeout problem that motivated `--detach` — never teach callers to sleep-and-poll), instant snapshot via `status`. Artifact path: full harness stdout/stderr tees to `logs/<runId>.log` progressively. Injected rules teach AI callers to ALWAYS dispatch detached: the earlier "detach if likely >5 min" branch was removed (2026-07) because LLM duration estimates are unreliable, so any rule keyed on them mis-routes; detach costs one extra command and covers every case. Sync run remains for human use. |
+| Background runs | Every run executes in a detached `_exec` worker; sync mode just waits for it ("job done is holy", credit agent-mux — the job survives caller timeout/death, and callers are AI agents whose shell tools cap at ~10 min). `--detach` returns immediately; block on `result --wait [--timeout <sec>]` (store-polling, since the worker isn't waitpid-able; bounded, so it never reintroduces the caller-shell-timeout problem that motivated `--detach` — never teach callers to sleep-and-poll), instant snapshot via `status`. Artifact path: full harness stdout/stderr tees to `logs/<runId>.log` progressively. Injected rules teach AI callers to ALWAYS dispatch detached: the earlier "detach if likely >5 min" branch was removed (2026-07) because LLM duration estimates are unreliable, so any rule keyed on them mis-routes; detach costs one extra command and covers every case. Sync run remains for human use. How each caller WAITS is a per-caller collection strategy rendered from setup.ts's `COLLECTION_STRATEGY` map — see "Injected roster template". |
+| Execution contract freeze | Resolved agent `instructions` are stamped into the RunRecord at dispatch; the detached worker and every `resume` read the record, never the live config — a config edit or removal can no longer mutate an in-flight or resumable run's contract (2026-07) |
+| Defaults upgrade | `config sync-defaults` — exact-match migration: a managed field upgrades only when its current value equals a known historical default (anything else is a user customization and is kept); removed defaults are dropped under the same rule; `--dry-run` previews. Never a blind overwrite; `config init --force` remains the nuke-and-regenerate escape hatch |
 | CLI framework | citty (TS-first, lightweight); core stays dependency-light (`bun:sqlite` built-in) |
 | Extension point | `adapter`, not `provider`. Ecosystem rule: "provider" = another chat/completions endpoint (AI SDK, LiteLLM, opencode); "adapter" = a full external runtime with its own event stream and session lifecycle (agent-mux "harness adapters", terminal-bench adapters, LobeHub agent adaptor). Custom harness support later = public `HarnessAdapter` interface. |
 | Caller-relative bindings | `callers.<harness>.agents.<name>` sparse binding overrides; `setup` stamps `--caller <harness>` into each vendor's file (see "Caller-relative agents") |
@@ -91,6 +93,36 @@ bindings + sparse `callers` overrides/excludes:
   (avoid same-model blind spots); review runs xhigh, second-opinion runs the
   other vendor's flagship with effort graded per model — fable stays at high
   (expensive; high already delivers), gpt-5.6-sol goes to xhigh.
+
+`review` deliberately ships **no `instructions`** (decided 2026-07-21 after
+three dogfood rounds of injected review contracts, each corrected by the
+human). The arc, kept so it is not re-attempted: Round 1 (~$18): a task
+saying "focused review, only actionable findings" still expanded into the
+delegate harness's native review culture, so a scope + output contract moved
+into `instructions`. Round 2 (run 741f0350, $24): a "Deep review…" task ran
+the target repo's `deep-review` skill; successive fixes — a blanket
+prohibition on review skills, an artificial `review-mode: comprehensive`
+marker, then telling the delegate to read project review skills first — were
+each rejected: a repo's review skill speaks for the repo (a deep-review
+request landing on it is expected, not a collision), and hunting `.claude/`/
+`.agents/` layouts over-fits a generic dispatch tool to one repo. Round 3:
+even the slimmed project-agnostic contract (focused-by-default, findings-only
+output, snapshot, resume discipline) was judged redundant — every clause is
+something the CALLER should author in the task for its specific situation,
+and the roster rules already demand self-contained tasks with acceptance
+criteria and expected output. The settled **division of authority**: the
+CALLER owns the project's review standards (it reads the repo's review
+guidance/skills and encodes what matters into the task — or runs the
+project's review process itself and dispatches its subagent-shaped chunks
+through dianjiang); the TASK is the delegate's entire briefing: scope,
+process, output shape. dianjiang adds no review-specific words of its own.
+`instructions` stays a supported per-agent field (search-twitter and
+rewrite-prompt ship one-liners; users may add their own), and whatever it
+resolves to is frozen into the RunRecord at dispatch, so a config edit
+mid-run or before a resume cannot change a run's execution contract. If
+delegates ignore task-stated scope again, fix it caller-side (task-writing
+guidance), not by re-growing delegate injection. Still no CLI mode flag —
+the agent/task boundary is where such routing belongs.
 
 Removed: `explore` (was fixed cheap+fast grok) — every caller harness ships a
 built-in explore/search subagent, so cross-vendor dispatch added only a
@@ -147,70 +179,45 @@ Locally verified model/effort space:
 
 ## Injected roster template
 
-`setup` renders this managed block from config into all three global
+`setup` renders the managed block from config into all three global
 instruction files. Each target is rendered with its own caller stamped into
 the documented commands (`dianjiang run --caller codex <agent> "<task>"` in
 `~/.codex/AGENTS.md`, etc.) so per-caller binding overrides resolve without
-env sniffing; the base template below shows the caller-less form.
+env sniffing.
 
 The block body is **XML**, not a markdown heading + table: a column-padded
 table is unreadable as raw text (these files are edited in plain editors, not
 previewed); an injected heading interferes with the host file's own outline (a
 wrapper element removes the problem entirely); and XML sectioning is what LLM
-prompting guides recommend anyway. One `<agent>` element per agent; optional
-`dontUseWhen` omits its element instead of rendering a placeholder dash. The
-HTML-comment begin/end markers are the inject/remove contract, independent of
-the body format:
+prompting guides recommend anyway. The HTML-comment begin/end markers are the
+inject/remove contract, independent of the body format.
 
-```markdown
-<!-- dianjiang:begin -->
-<dianjiang-roster>
+**Single source of truth is `renderRosterBlock()` in `src/core/setup.ts`** —
+this document deliberately carries no verbatim template copy (it drifted from
+the code twice); the full per-caller renders are pinned by snapshot tests in
+`tests/setup.test.ts`. Structure, in order:
 
-`dianjiang` is a CLI on this machine that dispatches self-contained tasks to
-other coding-agent CLIs (Claude Code / Codex / Grok). Each <agent> below is a
-preset the human already compiled — its harness, model, and effort are fixed;
-never override or re-route them. Pick an agent by task shape. Model notes
-inside <use-when> only calibrate whether a dispatch is worth making — they are
-not an invitation to second-guess the binding. dianjiang agents are separate
-from your built-in subagents: default to your own tools and subagents, and
-reach for dianjiang only when an agent below clearly fits.
-
-<agent name="review">
-  <use-when>…rendered from the agent's useWhen…</use-when>
-  <dont-use-when>…dontUseWhen (element omitted when unset)…</dont-use-when>
-</agent>
-
-<rules>
-- `dianjiang run <agent> "<task>" --detach` prints one JSON object immediately — save `.runId`, then
-  block on `dianjiang result <runId> --wait --timeout 300`: it exits with the
-  final JSON the moment the run finishes; on timeout it prints `status: "running"`,
-  just re-run it. Always dispatch detached — don't try to predict how long a
-  task will take, and never wait with `sleep N`. If your shell tool can run
-  commands in the background (or detach into a session you can check on later),
-  run the wait command there and collect it once it exits — you stay free to
-  work while it blocks. The run survives even if the wait command is killed —
-  `dianjiang result <runId>` recovers it any time.
-- Check `.status` first: read `.result` when it is "completed" — on "failed"
-  `.result` is the stderr tail, not an answer.
-- Write tasks self-contained (background, file paths, acceptance criteria,
-  expected output): the delegate starts fresh in your cwd — it sees your files,
-  not your conversation.
-- Follow up in the same session with `dianjiang resume <runId> "<message>"` —
-  it takes `--detach` too; use the same detach-and-wait flow.
-- If the human explicitly names a vendor, harness, or model, relay their choice:
-  `dianjiang run --harness <claude|codex|grok> [-m <model>] [--effort <level>] "<task>"`,
-  or override an agent preset with `-m`/`--effort`. Relay only — the choice stays the human's.
-- If `DIANJIANG_DEPTH` is set in your environment, you ARE a delegate — never call dianjiang.
-</rules>
-
-</dianjiang-roster>
-<!-- dianjiang:end -->
-```
-
-A caller's `prepend` renders right after `<dianjiang-roster>`, before the
-intro, wrapped in a `<caller-guidance>` element so caller-behavior guidance is
-not read as a dianjiang usage rule; its `append` renders after `</rules>`,
-before `</dianjiang-roster>`.
+1. `<caller-guidance>` — the caller's `prepend`, when set (wrapped so
+   caller-behavior guidance is not read as a dianjiang usage rule).
+2. Intro — presets are fixed, model notes in `<use-when>` only calibrate
+   dispatch-worthiness, dianjiang agents are separate from built-in subagents.
+3. One `<agent>` element per non-excluded agent: `<use-when>` +
+   `<dont-use-when>` (element omitted when unset), caller-relative
+   description overrides applied via `resolveAgent`.
+4. `<rules>` — always-dispatch-detached; ONE collect rule that embeds the
+   caller-specific collection strategy from the hardcoded
+   `COLLECTION_STRATEGY` map (claude: background shell + push notification;
+   codex: immediate `spawn_agent` waiter, foreground only as capability
+   fallback; grok: background task + push notification; caller-less renders a
+   neutral bounded-foreground line). Wait behavior is harness-intrinsic
+   capability knowledge, so it lives in code, not config — and each caller
+   gets exactly one authoritative strategy (restructured 2026-07 after the
+   generic "block on result --wait" rule + codex-append-exception layout made
+   codex block 300s in the foreground before spawning its waiter). Then:
+   `.status` discipline, self-contained tasks, resume, preset overrides only
+   relay the human's explicit in-request choice, `DIANJIANG_DEPTH` guard.
+5. The caller's `append`, when set (user extension point; no built-in default
+   uses it anymore).
 
 ## `run` JSON output
 
@@ -325,15 +332,13 @@ should vary per caller.
   prohibitions against non-options (e.g. "do not route implementation through
   dianjiang" — the roster has no implement agent; prohibiting a non-option is
   noise that implies the option exists).
-- `callers.<h>.append: string` — same, but rendered after the rules, for
-  guidance that reads best after the roster. Used by codex: its shell
-  sessions never push a completion event (background waits get forgotten —
-  observed in dogfood), but `spawn_agent` completion DOES notify the parent
-  (verified 2026-07: spawn returns immediately, final answer arrives as an
-  event with no polling). The append teaches a waiter-subagent pattern —
-  `spawn_agent` + `fork_turns: "none"` (minimal context, no model override
-  available) running `result --wait` — as codex's push channel, with
-  foreground blocking as the nothing-else-to-do fallback.
+- `callers.<h>.append: string` — same, but rendered after the rules. Today a
+  pure user extension point: the codex waiter-subagent guidance that shipped
+  here first moved into setup.ts's structural `COLLECTION_STRATEGY` (2026-07)
+  after dogfood showed the free-text append losing to the generic wait rule —
+  the caller followed the earlier, more prominent "block on result --wait"
+  bullet, sat 300s in the foreground, and only then remembered the waiter.
+  Operative wait rules must be structural and singular, not appended prose.
 - Not persisted: RunRecord stores the resolved harness/model/effort, not the
   caller; `resume` inherits the resolved binding from the original run.
 
@@ -461,3 +466,17 @@ Crowded space; two camps, each missing half of this idea:
   distinguishes narration). Observed in first dogfood dispatch.
 - Config schema validation: zod vs hand-rolled checks (minor).
 - Project-level config override — deferred to phase 2.
+- Run-level git snapshot (evaluated 2026-07 after a 26-min review raced a
+  changing worktree): recording HEAD + staged/unstaged diff hashes at dispatch
+  and re-checking at completion would let dianjiang flag review-target drift
+  mechanically in the RunReport. Deferred for now: the CLI could only report
+  drift, not prevent it; non-git cwds and non-code agents (search-twitter)
+  don't want the git calls; and the delegate already has a shell — so the
+  review `instructions` make the delegate self-report the reviewed SHA and any
+  mid-review drift. Promote to a RunRecord field if self-report proves
+  unreliable in dogfood.
+- Run lifecycle commands, proposed from codex dogfood feedback, awaiting the
+  human's go-ahead: `dianjiang logs <runId>` (snapshot of the existing
+  `logs/<runId>.log` stream; `--follow` human-only — codex never detaches from
+  streaming commands, openai/codex#5948) and `dianjiang cancel <runId>` (kill
+  the worker's process group via the stored pid).

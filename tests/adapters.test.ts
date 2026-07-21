@@ -49,6 +49,24 @@ describe('claude adapter', () => {
     ])
   })
 
+  test('resume + instructions keeps --resume AND re-injects --append-system-prompt', () => {
+    // Resume dispatches must still carry the agent contract so the delegate
+    // re-reads its review/output rules on every turn, not just the first.
+    const { cmd } = adapters.claude.buildCommand(spec({ resumeSessionId: RESUME, instructions: 'INSTR' }))
+    expect(cmd).toEqual([
+      'claude',
+      '-p',
+      '--output-format',
+      'json',
+      '--resume',
+      RESUME,
+      '--dangerously-skip-permissions',
+      '--append-system-prompt',
+      'INSTR',
+      'PROMPT',
+    ])
+  })
+
   test('parseResult reads .result; session id equals runId', () => {
     const r = adapters.claude.parseResult(spec(), JSON.stringify({ result: 'hello' }))
     expect(r).toEqual({ result: 'hello', harnessSessionId: RID })
@@ -129,6 +147,23 @@ describe('codex adapter', () => {
       outputFile,
       '--dangerously-bypass-approvals-and-sandbox',
       'PROMPT',
+    ])
+  })
+
+  test('resume + instructions still prepends instructions to the prompt', () => {
+    // codex has no system-prompt flag, so the contract rides in the prompt even
+    // on resume — otherwise the delegate loses its review/output rules mid-thread.
+    const { cmd } = adapters.codex.buildCommand(spec({ resumeSessionId: RESUME, instructions: 'INSTR' }))
+    expect(cmd).toEqual([
+      'codex',
+      'exec',
+      'resume',
+      RESUME,
+      '--json',
+      '-o',
+      outputFile,
+      '--dangerously-bypass-approvals-and-sandbox',
+      'INSTR\n\n---\n\nPROMPT',
     ])
   })
 

@@ -79,14 +79,22 @@ dianjiang run --caller codex review "Review the diff in src/parser.ts"
 # Raw escape hatch — bypass the registry
 dianjiang run --harness codex -m gpt-5.6-sol "Refactor the parser"
 
-# Recommended for AI callers (any task length): dispatch detached, then block
-# until it finishes — event-driven, no sleep-polling, survives caller death
+# Recommended for AI callers (any task length): dispatch detached, then collect
+# — event-driven, no sleep-polling, survives caller death. The injected roster
+# tells each caller HOW to run the collect command without stalling its loop
+# (claude/grok: background shell; codex: waiter subagent).
 dianjiang run --caller claude review "review a large multi-file diff" --detach
 dianjiang result <runId> --wait --timeout 300   # on timeout: status "running", re-run to keep waiting
 dianjiang status <runId>                        # instant snapshot, never blocks
 
 # Follow up in the same harness session
 dianjiang resume <runId> "also handle the error case"
+
+# Upgrade an existing config to the current defaults without losing your edits:
+# only fields still equal to a KNOWN historical default are rewritten (exact-match
+# migration); anything you customized is kept and reported. --dry-run previews.
+dianjiang config sync-defaults --dry-run
+dianjiang config sync-defaults
 
 # Inspect
 dianjiang config agents

@@ -204,6 +204,12 @@ export interface RunRecord {
   pid?: number
   /** For `resume` runs: the run this one follows up on. */
   parentRunId?: string
+  /**
+   * Resolved agent instructions frozen at dispatch. The detached worker and
+   * resumes use this, never the live config — a config edit or deletion after
+   * dispatch cannot change or drop the run's original execution contract.
+   */
+  instructions?: string
   /** Harness-reported usage; stored as flat nullable columns (see store.ts). */
   usage?: RunUsage
 }

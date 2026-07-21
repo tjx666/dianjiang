@@ -1,0 +1,274 @@
+// Bun Snapshot v1, https://bun.sh/docs/test/snapshots
+
+exports[`renderRosterBlock default-config snapshots caller-less render 1`] = `
+"<!-- dianjiang:begin -->
+<dianjiang-roster>
+
+\`dianjiang\` is a CLI on this machine that dispatches self-contained tasks to
+other coding-agent CLIs (Claude Code / Codex / Grok). Each <agent> below is a
+preset the human already compiled — its harness, model, and effort are fixed;
+never override or re-route them. Pick an agent by task shape. Model notes
+inside <use-when> only calibrate whether a dispatch is worth making — they are
+not an invitation to second-guess the binding. dianjiang agents are separate
+from your built-in subagents: default to your own tools and subagents, and
+reach for dianjiang only when an agent below clearly fits.
+
+<agent name="review">
+  <use-when>you want an independent cross-vendor code review of a diff; runs gpt-5.6-sol at xhigh — stronger reasoning than opus, slightly below fable</use-when>
+  <dont-use-when>a quick lint/style pass your own subagents already cover</dont-use-when>
+</agent>
+
+<agent name="second-opinion">
+  <use-when>consult-only: a hard debugging hypothesis or an architecture/design decision where you're stuck or the call is expensive to reverse; runs fable — Anthropic's strongest reasoning model</use-when>
+  <dont-use-when>the task requires editing code (this agent must not make changes)</dont-use-when>
+</agent>
+
+<agent name="search-twitter">
+  <use-when>live X/Twitter lookups: find tweets, threads, account activity, or what people say about a topic right now — grok's native X search is real-time and extremely fast</use-when>
+  <dont-use-when>general web research (use your own web/search tools) or anything needing code changes</dont-use-when>
+</agent>
+
+<agent name="design-frontend">
+  <use-when>UI/UX work needing visual taste: components, layouts, styling, interaction polish, or design review of front-end code</use-when>
+  <dont-use-when>backend logic or refactors with no visual/UX judgment involved</dont-use-when>
+</agent>
+
+<agent name="rewrite-prompt">
+  <use-when>rewriting, compressing, or restructuring prompts and agent instructions, especially when a large corpus must be read first; runs opus 4.6 with 1M context — better prose style (文风) than later opus generations</use-when>
+  <dont-use-when>ordinary coding tasks</dont-use-when>
+</agent>
+
+<rules>
+- \`dianjiang run <agent> "<task>" --detach\` prints one JSON object immediately — save \`.runId\`.
+  Always dispatch detached: never try to predict how long a task will take, and
+  never wait with \`sleep N\`. The run survives even if you or the wait command
+  die — \`dianjiang result <runId>\` recovers it any time.
+- Collect every run with \`dianjiang result <runId> --wait --timeout 300\`: it
+  exits with the final JSON the moment the run finishes; on timeout it prints
+  \`status: "running"\` — just re-run it. Run it in the foreground (\`--timeout\` keeps it
+  bounded), or in a background shell if your environment pushes completion
+  notifications.
+- Check \`.status\` first: read \`.result\` when it is "completed" — on "failed"
+  \`.result\` is the stderr tail, not an answer.
+- Write tasks self-contained (background, file paths, acceptance criteria,
+  expected output): the delegate starts fresh in your cwd — it sees your files,
+  not your conversation.
+- Follow up in the same session with \`dianjiang resume <runId> "<message>"\` —
+  it takes \`--detach\` too; use the same detach-and-collect flow.
+- Overriding a preset is allowed ONLY to relay the human's explicit choice in
+  their current request: if they name a vendor, harness, model, or effort, pass
+  it through — \`dianjiang run --harness <claude|codex|grok> [-m <model>] [--effort <level>] "<task>"\`,
+  or \`-m\`/\`--effort\` on an agent dispatch. Never override on your own judgment.
+- If \`DIANJIANG_DEPTH\` is set in your environment, you ARE a delegate — never call dianjiang.
+</rules>
+
+</dianjiang-roster>
+<!-- dianjiang:end -->"
+`;
+
+exports[`renderRosterBlock default-config snapshots claude render 1`] = `
+"<!-- dianjiang:begin -->
+<dianjiang-roster>
+
+<caller-guidance>
+If your session model is fable, act as an orchestrator to preserve fable tokens: delegate execution work (implementation, mechanical edits, running tests/builds) to your built-in subagents with \`model: opus\`, keeping only planning, task decomposition, tricky debugging, and verification of subagent output for yourself. Delegate coherent, independently verifiable chunks (a new file, a test suite, a bulk edit); keep small in-context edits yourself — the cost of writing the brief must not exceed the task. For cross-vendor perspectives or capabilities your subagents lack, use the dianjiang roster below.
+</caller-guidance>
+
+\`dianjiang\` is a CLI on this machine that dispatches self-contained tasks to
+other coding-agent CLIs (Claude Code / Codex / Grok). Each <agent> below is a
+preset the human already compiled — its harness, model, and effort are fixed;
+never override or re-route them. Pick an agent by task shape. Model notes
+inside <use-when> only calibrate whether a dispatch is worth making — they are
+not an invitation to second-guess the binding. dianjiang agents are separate
+from your built-in subagents: default to your own tools and subagents, and
+reach for dianjiang only when an agent below clearly fits.
+
+<agent name="review">
+  <use-when>you want an independent cross-vendor code review of a diff; runs gpt-5.6-sol at xhigh — stronger reasoning than opus, slightly below fable</use-when>
+  <dont-use-when>a quick lint/style pass your own subagents already cover</dont-use-when>
+</agent>
+
+<agent name="second-opinion">
+  <use-when>consult-only: a hard debugging hypothesis or an architecture/design decision where you're stuck or the call is expensive to reverse; runs gpt-5.6-sol at xhigh — stronger reasoning than opus, slightly below fable</use-when>
+  <dont-use-when>the task requires editing code (this agent must not make changes)</dont-use-when>
+</agent>
+
+<agent name="search-twitter">
+  <use-when>live X/Twitter lookups: find tweets, threads, account activity, or what people say about a topic right now — grok's native X search is real-time and extremely fast</use-when>
+  <dont-use-when>general web research (use your own web/search tools) or anything needing code changes</dont-use-when>
+</agent>
+
+<agent name="rewrite-prompt">
+  <use-when>rewriting, compressing, or restructuring prompts and agent instructions, especially when a large corpus must be read first; runs opus 4.6 with 1M context — better prose style (文风) than later opus generations</use-when>
+  <dont-use-when>ordinary coding tasks</dont-use-when>
+</agent>
+
+<rules>
+- \`dianjiang run --caller claude <agent> "<task>" --detach\` prints one JSON object immediately — save \`.runId\`.
+  Always dispatch detached: never try to predict how long a task will take, and
+  never wait with \`sleep N\`. The run survives even if you or the wait command
+  die — \`dianjiang result <runId>\` recovers it any time.
+- Collect every run with \`dianjiang result <runId> --wait --timeout 300\`: it
+  exits with the final JSON the moment the run finishes; on timeout it prints
+  \`status: "running"\` — just re-run it. Start that command in a background shell (\`run_in_background: true\`)
+  immediately after dispatching — its completion notification delivers the
+  result while you keep working. Run it in the foreground only when the result
+  is the last thing you need before you can proceed.
+- Check \`.status\` first: read \`.result\` when it is "completed" — on "failed"
+  \`.result\` is the stderr tail, not an answer.
+- Write tasks self-contained (background, file paths, acceptance criteria,
+  expected output): the delegate starts fresh in your cwd — it sees your files,
+  not your conversation.
+- Follow up in the same session with \`dianjiang resume <runId> "<message>"\` —
+  it takes \`--detach\` too; use the same detach-and-collect flow.
+- Overriding a preset is allowed ONLY to relay the human's explicit choice in
+  their current request: if they name a vendor, harness, model, or effort, pass
+  it through — \`dianjiang run --harness <claude|codex|grok> [-m <model>] [--effort <level>] "<task>"\`,
+  or \`-m\`/\`--effort\` on an agent dispatch. Never override on your own judgment.
+- If \`DIANJIANG_DEPTH\` is set in your environment, you ARE a delegate — never call dianjiang.
+</rules>
+
+</dianjiang-roster>
+<!-- dianjiang:end -->"
+`;
+
+exports[`renderRosterBlock default-config snapshots codex render 1`] = `
+"<!-- dianjiang:begin -->
+<dianjiang-roster>
+
+\`dianjiang\` is a CLI on this machine that dispatches self-contained tasks to
+other coding-agent CLIs (Claude Code / Codex / Grok). Each <agent> below is a
+preset the human already compiled — its harness, model, and effort are fixed;
+never override or re-route them. Pick an agent by task shape. Model notes
+inside <use-when> only calibrate whether a dispatch is worth making — they are
+not an invitation to second-guess the binding. dianjiang agents are separate
+from your built-in subagents: default to your own tools and subagents, and
+reach for dianjiang only when an agent below clearly fits.
+
+<agent name="review">
+  <use-when>you want an independent cross-vendor code review of a diff; runs claude opus at xhigh</use-when>
+  <dont-use-when>a quick lint/style pass your own subagents already cover</dont-use-when>
+</agent>
+
+<agent name="second-opinion">
+  <use-when>consult-only: a hard debugging hypothesis or an architecture/design decision where you're stuck or the call is expensive to reverse; runs fable — Anthropic's strongest reasoning model</use-when>
+  <dont-use-when>the task requires editing code (this agent must not make changes)</dont-use-when>
+</agent>
+
+<agent name="search-twitter">
+  <use-when>live X/Twitter lookups: find tweets, threads, account activity, or what people say about a topic right now — grok's native X search is real-time and extremely fast</use-when>
+  <dont-use-when>general web research (use your own web/search tools) or anything needing code changes</dont-use-when>
+</agent>
+
+<agent name="design-frontend">
+  <use-when>UI/UX work needing visual taste: components, layouts, styling, interaction polish, or design review of front-end code</use-when>
+  <dont-use-when>backend logic or refactors with no visual/UX judgment involved</dont-use-when>
+</agent>
+
+<agent name="rewrite-prompt">
+  <use-when>rewriting, compressing, or restructuring prompts and agent instructions, especially when a large corpus must be read first; runs opus 4.6 with 1M context — better prose style (文风) than later opus generations</use-when>
+  <dont-use-when>ordinary coding tasks</dont-use-when>
+</agent>
+
+<rules>
+- \`dianjiang run --caller codex <agent> "<task>" --detach\` prints one JSON object immediately — save \`.runId\`.
+  Always dispatch detached: never try to predict how long a task will take, and
+  never wait with \`sleep N\`. The run survives even if you or the wait command
+  die — \`dianjiang result <runId>\` recovers it any time.
+- Collect every run with \`dianjiang result <runId> --wait --timeout 300\`: it
+  exits with the final JSON the moment the run finishes; on timeout it prints
+  \`status: "running"\` — just re-run it. The moment you hold a runId, spawn a waiter subagent — \`spawn_agent\`
+  with \`fork_turns: "none"\` and the message: "Run \`dianjiang result <runId>
+  --wait --timeout 300\`. If it prints status 'running', run it again. When the
+  status is terminal, return the full JSON verbatim." Its completion
+  notification wakes you with the result; your shell sessions do NOT push
+  completion events, so a background-shell wait WILL be forgotten. Do not wait
+  in the foreground first, do not poll by hand, and do not gate the waiter on
+  how long you expect the run to take. runIds you already hold can share one
+  waiter, but never delay the first waiter for runs you might dispatch later.
+  Fall back to a foreground wait ONLY if subagents are unavailable or no slot
+  is free. Every dispatched run must be collected before your turn ends.
+- Check \`.status\` first: read \`.result\` when it is "completed" — on "failed"
+  \`.result\` is the stderr tail, not an answer.
+- Write tasks self-contained (background, file paths, acceptance criteria,
+  expected output): the delegate starts fresh in your cwd — it sees your files,
+  not your conversation.
+- Follow up in the same session with \`dianjiang resume <runId> "<message>"\` —
+  it takes \`--detach\` too; use the same detach-and-collect flow.
+- Overriding a preset is allowed ONLY to relay the human's explicit choice in
+  their current request: if they name a vendor, harness, model, or effort, pass
+  it through — \`dianjiang run --harness <claude|codex|grok> [-m <model>] [--effort <level>] "<task>"\`,
+  or \`-m\`/\`--effort\` on an agent dispatch. Never override on your own judgment.
+- If \`DIANJIANG_DEPTH\` is set in your environment, you ARE a delegate — never call dianjiang.
+</rules>
+
+</dianjiang-roster>
+<!-- dianjiang:end -->"
+`;
+
+exports[`renderRosterBlock default-config snapshots grok render 1`] = `
+"<!-- dianjiang:begin -->
+<dianjiang-roster>
+
+\`dianjiang\` is a CLI on this machine that dispatches self-contained tasks to
+other coding-agent CLIs (Claude Code / Codex / Grok). Each <agent> below is a
+preset the human already compiled — its harness, model, and effort are fixed;
+never override or re-route them. Pick an agent by task shape. Model notes
+inside <use-when> only calibrate whether a dispatch is worth making — they are
+not an invitation to second-guess the binding. dianjiang agents are separate
+from your built-in subagents: default to your own tools and subagents, and
+reach for dianjiang only when an agent below clearly fits.
+
+<agent name="review">
+  <use-when>you want an independent cross-vendor code review of a diff; runs gpt-5.6-sol at xhigh — stronger reasoning than opus, slightly below fable</use-when>
+  <dont-use-when>a quick lint/style pass your own subagents already cover</dont-use-when>
+</agent>
+
+<agent name="second-opinion">
+  <use-when>consult-only: a hard debugging hypothesis or an architecture/design decision where you're stuck or the call is expensive to reverse; runs fable — Anthropic's strongest reasoning model</use-when>
+  <dont-use-when>the task requires editing code (this agent must not make changes)</dont-use-when>
+</agent>
+
+<agent name="search-twitter">
+  <use-when>live X/Twitter lookups: find tweets, threads, account activity, or what people say about a topic right now — grok's native X search is real-time and extremely fast</use-when>
+  <dont-use-when>general web research (use your own web/search tools) or anything needing code changes</dont-use-when>
+</agent>
+
+<agent name="design-frontend">
+  <use-when>UI/UX work needing visual taste: components, layouts, styling, interaction polish, or design review of front-end code</use-when>
+  <dont-use-when>backend logic or refactors with no visual/UX judgment involved</dont-use-when>
+</agent>
+
+<agent name="rewrite-prompt">
+  <use-when>rewriting, compressing, or restructuring prompts and agent instructions, especially when a large corpus must be read first; runs opus 4.6 with 1M context — better prose style (文风) than later opus generations</use-when>
+  <dont-use-when>ordinary coding tasks</dont-use-when>
+</agent>
+
+<rules>
+- \`dianjiang run --caller grok <agent> "<task>" --detach\` prints one JSON object immediately — save \`.runId\`.
+  Always dispatch detached: never try to predict how long a task will take, and
+  never wait with \`sleep N\`. The run survives even if you or the wait command
+  die — \`dianjiang result <runId>\` recovers it any time.
+- Collect every run with \`dianjiang result <runId> --wait --timeout 300\`: it
+  exits with the final JSON the moment the run finishes; on timeout it prints
+  \`status: "running"\` — just re-run it. Start that command as a background task (\`background: true\`)
+  immediately after dispatching — its completion notification delivers the
+  result while you keep working. Run it in the foreground only when the result
+  is the last thing you need before you can proceed.
+- Check \`.status\` first: read \`.result\` when it is "completed" — on "failed"
+  \`.result\` is the stderr tail, not an answer.
+- Write tasks self-contained (background, file paths, acceptance criteria,
+  expected output): the delegate starts fresh in your cwd — it sees your files,
+  not your conversation.
+- Follow up in the same session with \`dianjiang resume <runId> "<message>"\` —
+  it takes \`--detach\` too; use the same detach-and-collect flow.
+- Overriding a preset is allowed ONLY to relay the human's explicit choice in
+  their current request: if they name a vendor, harness, model, or effort, pass
+  it through — \`dianjiang run --harness <claude|codex|grok> [-m <model>] [--effort <level>] "<task>"\`,
+  or \`-m\`/\`--effort\` on an agent dispatch. Never override on your own judgment.
+- If \`DIANJIANG_DEPTH\` is set in your environment, you ARE a delegate — never call dianjiang.
+</rules>
+
+</dianjiang-roster>
+<!-- dianjiang:end -->"
+`;

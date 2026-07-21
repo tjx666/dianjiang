@@ -15,7 +15,6 @@ import { spawn, type ChildProcess } from 'node:child_process'
 import { closeSync, openSync, readFileSync, unlinkSync } from 'node:fs'
 import { fileURLToPath } from 'node:url'
 import type {
-  AgentConfig,
   DianjiangConfig,
   DispatchSpec,
   HarnessName,
@@ -23,7 +22,6 @@ import type {
   RunReport,
 } from './types.ts'
 import { adapters } from './adapters/index.ts'
-import { loadConfig } from './registry.ts'
 import { logEvent } from './log.ts'
 import { logFilePath } from './paths.ts'
 import { getRun, insertRun, updateRun } from './store.ts'
@@ -39,8 +37,14 @@ export class DepthLimitError extends Error {
 }
 
 export interface DispatchOptions {
-  /** Resolved agent (raw `--harness` dispatches omit it). */
-  agent?: AgentConfig
+  /** Agent name to record (raw `--harness` dispatches omit it). */
+  agent?: string
+  /**
+   * Resolved agent instructions to freeze onto the run. Frozen at dispatch so
+   * the worker and later resumes use this run's original contract, never the
+   * live config (which may change or be deleted after dispatch).
+   */
+  instructions?: string
   harness: HarnessName
   model?: string
   effort?: string
@@ -262,7 +266,7 @@ export async function dispatch(opts: DispatchOptions, config: DianjiangConfig): 
   const runId = crypto.randomUUID()
   const record: RunRecord = {
     runId,
-    agent: opts.agent?.name,
+    agent: opts.agent,
     harness: opts.harness,
     model: opts.model,
     effort: opts.effort,
@@ -271,11 +275,12 @@ export async function dispatch(opts: DispatchOptions, config: DianjiangConfig): 
     task: opts.task,
     startedAt: new Date().toISOString(),
     parentRunId: opts.parentRunId,
+    instructions: opts.instructions,
   }
   insertRun(record)
   logEvent('dispatch', {
     runId,
-    agent: opts.agent?.name,
+    agent: opts.agent,
     harness: opts.harness,
     model: opts.model,
     detach: opts.detach,
@@ -300,37 +305,35 @@ export async function dispatch(opts: DispatchOptions, config: DianjiangConfig): 
 }
 
 /**
+ * Build the DispatchSpec purely from a persisted run record. Instructions come
+ * from the record's frozen `instructions` — never the live config — so a config
+ * edit or deletion after dispatch cannot change the run's execution contract.
+ */
+export function specFromRecord(record: RunRecord, resumeSessionId?: string): DispatchSpec {
+  return {
+    runId: record.runId,
+    prompt: record.task,
+    model: record.model,
+    effort: record.effort,
+    instructions: record.instructions,
+    resumeSessionId,
+  }
+}
+
+/**
  * Detached-worker entry: rebuild the DispatchSpec from the persisted row (plus
- * config for agent instructions, and the parent row for a resume session id)
- * and run it to completion.
+ * the parent row for a resume session id) and run it to completion.
  */
 export async function executeRun(runId: string): Promise<RunReport> {
   logEvent('exec.start', { runId })
   const record = getRun(runId)
   if (!record) throw new Error(`Run ${runId} not found`)
 
-  let instructions: string | undefined
-  if (record.agent) {
-    try {
-      const config = loadConfig()
-      instructions = config.agents.find((a) => a.name === record.agent)?.instructions
-    } catch {
-      // Config changed/removed since dispatch; proceed without instructions.
-    }
-  }
-
   // resume + detach: the follow-up session lives on the parent run's row.
   let resumeSessionId: string | undefined
   if (record.parentRunId) resumeSessionId = getRun(record.parentRunId)?.harnessSessionId
 
-  const spec: DispatchSpec = {
-    runId: record.runId,
-    prompt: record.task,
-    model: record.model,
-    effort: record.effort,
-    instructions,
-    resumeSessionId,
-  }
+  const spec = specFromRecord(record, resumeSessionId)
   try {
     const report = await runToCompletion(record, spec)
     logEvent('exec.done', { runId, exitCode: report.exitCode, status: report.status })

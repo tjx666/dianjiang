@@ -3,6 +3,7 @@ import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import type { DianjiangConfig, HarnessName } from '../src/core/types.ts'
+import { defaultConfigJsonc, parseConfig } from '../src/core/registry.ts'
 import {
   defaultTargets,
   filterTargets,
@@ -119,6 +120,85 @@ describe('renderRosterBlock', () => {
     const codexBlock = renderRosterBlock(withDescOverride, 'codex')
     expect(codexBlock).toContain('<agent name="explore">\n  <use-when>search fast</use-when>\n</agent>')
     expect(renderRosterBlock(withDescOverride)).toContain('<use-when>search fast</use-when>')
+  })
+
+  test('override rule allows relay only and drops the old "Relay only" phrasing', () => {
+    const block = renderRosterBlock(config, 'claude')
+    expect(block).toContain('Never override on your own judgment')
+    expect(block).not.toContain('Relay only')
+  })
+
+  test("the default roster's claude render keeps review's focused use-when", () => {
+    const block = renderRosterBlock(parseConfig(defaultConfigJsonc()), 'claude')
+    // review is not excluded for the claude caller, so its base use-when renders.
+    expect(block).toContain('<agent name="review">')
+    expect(block).toContain('independent cross-vendor code review')
+  })
+})
+
+describe('renderRosterBlock default-config snapshots', () => {
+  const defaultConfig = parseConfig(defaultConfigJsonc())
+
+  // Full-text snapshots pin the entire rendered roster for every caller shape,
+  // not substrings — so any wording drift in the block (intro, rules,
+  // per-caller collection strategy) surfaces as a snapshot diff.
+  test('caller-less render', () => {
+    expect(renderRosterBlock(defaultConfig)).toMatchSnapshot()
+  })
+
+  test('claude render', () => {
+    expect(renderRosterBlock(defaultConfig, 'claude')).toMatchSnapshot()
+  })
+
+  test('codex render', () => {
+    expect(renderRosterBlock(defaultConfig, 'codex')).toMatchSnapshot()
+  })
+
+  test('grok render', () => {
+    expect(renderRosterBlock(defaultConfig, 'grok')).toMatchSnapshot()
+  })
+})
+
+describe('renderRosterBlock collection-strategy conflict freedom', () => {
+  // These encode the 2026-07 bug fix: exactly ONE authoritative wait strategy
+  // per caller, with no leftover generic/contradictory phrasing.
+  const defaultConfig = parseConfig(defaultConfigJsonc())
+  const callers: (HarnessName | undefined)[] = [undefined, 'claude', 'codex', 'grok']
+
+  for (const caller of callers) {
+    test(`${caller ?? 'caller-less'} render has a single authoritative wait rule`, () => {
+      const block = renderRosterBlock(defaultConfig, caller)
+      // exactly one collection rule, no leftover generic phrasing
+      expect(block.split('Collect every run with').length - 1).toBe(1)
+      expect(block).not.toContain('then block')
+      expect(block).not.toMatch(/[Ii]f you have nothing else/)
+    })
+  }
+
+  test('codex render routes the wait through a waiter subagent', () => {
+    const block = renderRosterBlock(defaultConfig, 'codex')
+    expect(block).toContain('spawn_agent')
+    expect(block).toContain('Do not wait\n  in the foreground first')
+    expect(block).not.toContain('run_in_background')
+  })
+
+  test('claude render waits in a background shell', () => {
+    const block = renderRosterBlock(defaultConfig, 'claude')
+    expect(block).toContain('run_in_background')
+    expect(block).not.toContain('spawn_agent')
+  })
+
+  test('grok render waits as a background task', () => {
+    const block = renderRosterBlock(defaultConfig, 'grok')
+    expect(block).toContain('background: true')
+    expect(block).not.toContain('spawn_agent')
+    expect(block).not.toContain('run_in_background')
+  })
+
+  test('caller-less render names no caller-specific wait mechanism', () => {
+    const block = renderRosterBlock(defaultConfig)
+    expect(block).not.toContain('spawn_agent')
+    expect(block).not.toContain('run_in_background')
   })
 })
 

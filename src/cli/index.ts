@@ -22,7 +22,8 @@ import {
 } from '../core/config-edit.ts'
 import { logEvent } from '../core/log.ts'
 import { configPath } from '../core/paths.ts'
-import { defaultConfigJsonc, findAgent, loadConfig, resolveAgent } from '../core/registry.ts'
+import { defaultConfigJsonc, findAgent, loadConfig, parseConfig, resolveAgent } from '../core/registry.ts'
+import { applySyncDefaults, planSyncDefaults } from '../core/sync-defaults.ts'
 import {
   buildReport,
   dispatch,
@@ -159,7 +160,10 @@ const run = defineCommand({
     }
     await runDispatch(
       {
-        agent,
+        agent: agent.name,
+        // Freeze the resolved instructions onto the run so the worker/resumes
+        // use this contract, not a config that may change after dispatch.
+        instructions: agent.instructions,
         harness: agent.harness,
         // Flags override the agent preset when given.
         model: args.model ?? agent.model,
@@ -190,18 +194,16 @@ const resume = defineCommand({
         `Run ${args.runId} has no harness session to resume (status: ${original.status}). Only completed runs can be resumed.`,
       )
     }
+    // Config is still loaded for dispatch()'s maxDepth guard.
     const config = tryLoadConfig()
     if (!config) return
 
-    // Reuse the original agent's config (for instructions) if still present.
-    let agent
-    if (original.agent) {
-      agent = config.agents.find((a) => a.name === original.agent)
-    }
-
     await runDispatch(
       {
-        agent,
+        // Inherit the frozen contract from the original run — never re-read the
+        // live config, which may have changed since the original dispatch.
+        agent: original.agent,
+        instructions: original.instructions,
         harness: original.harness,
         model: original.model,
         effort: original.effort,
@@ -640,9 +642,56 @@ const configHarnesses = defineCommand({
   },
 })
 
+const configSyncDefaults = defineCommand({
+  meta: {
+    name: 'sync-defaults',
+    description: 'Upgrade an existing config to the current shipped defaults (keeps your customizations).',
+  },
+  args: {
+    'dry-run': { type: 'boolean', default: false, description: 'Print the plan without touching the file' },
+  },
+  run({ args }) {
+    const path = configPath()
+    if (!existsSync(path)) {
+      return fail(`Config not found at ${path}. Run \`dianjiang config init\` to create it.`)
+    }
+    let text: string
+    try {
+      text = readFileSync(path, 'utf8')
+      // Validate the current on-disk config up front so a broken file fails
+      // cleanly rather than producing a confusing partial plan.
+      parseConfig(text, path)
+    } catch (err) {
+      return fail(errorMessage(err))
+    }
+    const changes = planSyncDefaults(text)
+    const actionable = changes.filter((c) => c.action !== 'keep-custom')
+    if (args['dry-run'] || actionable.length === 0) {
+      // Dry-run, and the no-op case, both leave the file untouched.
+      emit({ file: path, applied: false, changes })
+      return
+    }
+    let next: string
+    try {
+      next = applySyncDefaults(text, changes)
+      // Re-validate before writing; a rejected result leaves the file untouched.
+      writeConfigText(next)
+    } catch (err) {
+      return fail(errorMessage(err))
+    }
+    process.stderr.write(`Synced ${actionable.length} change(s) to ${path}\n`)
+    emit({ file: path, applied: true, changes })
+  },
+})
+
 const configCmd = defineCommand({
   meta: { name: 'config', description: 'Manage config and inspect harnesses.' },
-  subCommands: { init: configInit, agents: configAgents, harnesses: configHarnesses },
+  subCommands: {
+    init: configInit,
+    agents: configAgents,
+    harnesses: configHarnesses,
+    'sync-defaults': configSyncDefaults,
+  },
 })
 
 const stats = defineCommand({

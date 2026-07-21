@@ -35,6 +35,20 @@ describe('defaultConfigJsonc', () => {
     // subagents), taking the grok caller entry with it.
     expect(config.callers?.grok).toBeUndefined()
   })
+
+  test('review ships no instructions — the caller authors the briefing in the task', () => {
+    const config = parseConfig(defaultConfigJsonc(), 'default')
+    const review = config.agents.find((a) => a.name === 'review')
+    // Three dogfood rounds of injected review contracts (2026-07) each
+    // over-fit; scope, process, and output shape live in the task the caller
+    // writes. Guard against a contract creeping back into the default roster.
+    expect(review?.instructions).toBeUndefined()
+    expect(review?.useWhen).toContain('independent cross-vendor code review')
+    expect(config.callers?.codex?.agents?.review?.useWhen).toContain('claude opus at xhigh')
+    // The codex wait discipline moved into setup.ts's structural collection
+    // strategies; the default config no longer ships a codex append.
+    expect(config.callers?.codex?.append).toBeUndefined()
+  })
 })
 
 describe('validateConfig', () => {
