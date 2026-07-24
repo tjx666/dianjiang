@@ -25,24 +25,35 @@ const END = '<!-- dianjiang:end -->'
  * codex blocked 300s in the foreground before spawning its waiter. claude and
  * grok shells push completion notifications for background commands; codex
  * shells never do, but its spawn_agent completion notifies the parent, so
- * codex routes the wait through a waiter subagent instead.
+ * codex routes the wait through a waiter subagent instead. A second incident
+ * (2026-07): the generic "on timeout, re-run it" rule was misread as license
+ * for the ROOT agent to poll `wait_agent` every 30s — codex renders each short
+ * wait as visible "Waiting for agents" noise — so the codex strategy now pins
+ * the re-run loop to the waiter and bans short-poll waits on the parent.
  */
 const COLLECTION_STRATEGY: Record<HarnessName, string> = {
   claude: `Start that command in a background shell (\`run_in_background: true\`)
   immediately after dispatching — its completion notification delivers the
   result while you keep working. Run it in the foreground only when the result
   is the last thing you need before you can proceed.`,
-  codex: `The moment you hold a runId, spawn a waiter subagent — \`spawn_agent\`
-  with \`fork_turns: "none"\` and the message: "Run \`dianjiang result <runId>
-  --wait --timeout 300\`. If it prints status 'running', run it again. When the
-  status is terminal, return the full JSON verbatim." Its completion
-  notification wakes you with the result; your shell sessions do NOT push
-  completion events, so a background-shell wait WILL be forgotten. Do not wait
-  in the foreground first, do not poll by hand, and do not gate the waiter on
-  how long you expect the run to take. runIds you already hold can share one
-  waiter, but never delay the first waiter for runs you might dispatch later.
-  Fall back to a foreground wait ONLY if subagents are unavailable or no slot
-  is free. Every dispatched run must be collected before your turn ends.`,
+  codex: `That re-run-on-"running" loop belongs INSIDE a waiter subagent —
+  never in your own turn. The moment you hold a runId, spawn a waiter —
+  \`spawn_agent\` with \`fork_turns: "none"\` and the message: "Run
+  \`dianjiang result <runId> --wait --timeout 300\`. If it prints status
+  'running', run it again. Stop only on a terminal status, return that full
+  JSON verbatim, and emit no progress narration." One waiter per runId; runIds
+  you already hold may share a single waiter, but never delay the first waiter
+  for runs you might dispatch later. The waiter's completion notification
+  wakes you with the result; your shell sessions do NOT push completion
+  events, so a background-shell wait WILL be forgotten. NEVER poll the waiter
+  with repeated short \`wait_agent\` (or equivalent) calls — each one renders
+  "Waiting for agents" noise. If you must wait explicitly, issue ONE long
+  interruptible wait, wait again only if that single wait itself times out,
+  and print no "still waiting" updates in between. Do not wait in the
+  foreground first, and do not gate the waiter on how long you expect the run
+  to take. Fall back to a foreground wait ONLY if subagents are unavailable or
+  no slot is free. Every dispatched run must be collected before your turn
+  ends.`,
   grok: `Start that command as a background task (\`background: true\`)
   immediately after dispatching — its completion notification delivers the
   result while you keep working. Run it in the foreground only when the result

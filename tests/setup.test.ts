@@ -178,8 +178,31 @@ describe('renderRosterBlock collection-strategy conflict freedom', () => {
   test('codex render routes the wait through a waiter subagent', () => {
     const block = renderRosterBlock(defaultConfig, 'codex')
     expect(block).toContain('spawn_agent')
-    expect(block).toContain('Do not wait\n  in the foreground first')
+    expect(block).toContain('Do not wait in the\n  foreground first')
     expect(block).not.toContain('run_in_background')
+  })
+
+  // Regression (2026-07): an agent generalized the waiter's internal 300s
+  // re-run loop into root-agent `wait_agent` polling every 30s, spamming
+  // "Waiting for agents" UI noise. The codex strategy must pin loop ownership
+  // to the waiter and explicitly forbid repeated short main-agent waits.
+  test('codex render pins the re-run loop to the waiter, not the root agent', () => {
+    const block = renderRosterBlock(defaultConfig, 'codex')
+    expect(block).toContain('belongs INSIDE a waiter subagent')
+    expect(block).toContain('never in your own turn')
+    // waiter contract: terminal-only stop, verbatim JSON, silent progress
+    expect(block).toContain('Stop only on a terminal status')
+    expect(block).toContain('emit no progress narration')
+    // one waiter per runId, shareable across already-known runIds
+    expect(block).toContain('One waiter per runId')
+  })
+
+  test('codex render forbids repeated short main-agent waits', () => {
+    const block = renderRosterBlock(defaultConfig, 'codex')
+    expect(block).toContain('NEVER poll the waiter\n  with repeated short `wait_agent` (or equivalent) calls')
+    expect(block).toContain('ONE long\n  interruptible wait')
+    expect(block).toContain('wait again only if that single wait itself times out')
+    expect(block).toContain('print no "still waiting" updates')
   })
 
   test('claude render waits in a background shell', () => {

@@ -177,17 +177,24 @@ reach for dianjiang only when an agent below clearly fits.
   die — \`dianjiang result <runId>\` recovers it any time.
 - Collect every run with \`dianjiang result <runId> --wait --timeout 300\`: it
   exits with the final JSON the moment the run finishes; on timeout it prints
-  \`status: "running"\` — just re-run it. The moment you hold a runId, spawn a waiter subagent — \`spawn_agent\`
-  with \`fork_turns: "none"\` and the message: "Run \`dianjiang result <runId>
-  --wait --timeout 300\`. If it prints status 'running', run it again. When the
-  status is terminal, return the full JSON verbatim." Its completion
-  notification wakes you with the result; your shell sessions do NOT push
-  completion events, so a background-shell wait WILL be forgotten. Do not wait
-  in the foreground first, do not poll by hand, and do not gate the waiter on
-  how long you expect the run to take. runIds you already hold can share one
-  waiter, but never delay the first waiter for runs you might dispatch later.
-  Fall back to a foreground wait ONLY if subagents are unavailable or no slot
-  is free. Every dispatched run must be collected before your turn ends.
+  \`status: "running"\` — just re-run it. That re-run-on-"running" loop belongs INSIDE a waiter subagent —
+  never in your own turn. The moment you hold a runId, spawn a waiter —
+  \`spawn_agent\` with \`fork_turns: "none"\` and the message: "Run
+  \`dianjiang result <runId> --wait --timeout 300\`. If it prints status
+  'running', run it again. Stop only on a terminal status, return that full
+  JSON verbatim, and emit no progress narration." One waiter per runId; runIds
+  you already hold may share a single waiter, but never delay the first waiter
+  for runs you might dispatch later. The waiter's completion notification
+  wakes you with the result; your shell sessions do NOT push completion
+  events, so a background-shell wait WILL be forgotten. NEVER poll the waiter
+  with repeated short \`wait_agent\` (or equivalent) calls — each one renders
+  "Waiting for agents" noise. If you must wait explicitly, issue ONE long
+  interruptible wait, wait again only if that single wait itself times out,
+  and print no "still waiting" updates in between. Do not wait in the
+  foreground first, and do not gate the waiter on how long you expect the run
+  to take. Fall back to a foreground wait ONLY if subagents are unavailable or
+  no slot is free. Every dispatched run must be collected before your turn
+  ends.
 - Check \`.status\` first: read \`.result\` when it is "completed" — on "failed"
   \`.result\` is the stderr tail, not an answer.
 - Write tasks self-contained (background, file paths, acceptance criteria,
