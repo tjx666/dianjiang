@@ -19,32 +19,31 @@ bun run src/cli/index.ts <command>
 ## Isolation — ALWAYS
 
 - `DIANJIANG_HOME=$(mktemp -d)/home` on every command — never touch `~/.dianjiang`.
-- `setup` writes to `$HOME/.claude/CLAUDE.md`, `$HOME/.codex/AGENTS.md`,
-  `$HOME/.grok/AGENTS.md` — only ever run it with `HOME=<tempdir>`.
 
 ## Cost rules for live calls
 
 Prompt is always a single sentence like `"Reply with exactly: OK"`. Cheapest
 paths per harness:
 
-- grok: `run --harness grok -m grok-composer-2.5-fast "..."` (no effort support)
+- grok: `run --harness grok -m grok-4.5 --effort low "..."` (composer-fast was
+  delisted 2026-07-28; check `grok models` if this fails)
 - claude: `run --harness claude --model sonnet --effort low "..."`
 - codex: `run --harness codex --model gpt-5.4-mini "..."`
 
 ## Standard flow (copy-paste base)
 
 ```bash
-T=$(mktemp -d) && mkdir -p $T/home $T/work $T/fakehome
+T=$(mktemp -d) && mkdir -p $T/home $T/work
 DJ="bun run src/cli/index.ts"
 DIANJIANG_HOME=$T/home $DJ config init
 DIANJIANG_HOME=$T/home $DJ config harnesses          # 3x installed:true expected
-DIANJIANG_HOME=$T/home $DJ run --harness grok -m grok-composer-2.5-fast "Reply with exactly: OK" --cwd $T/work
+DIANJIANG_HOME=$T/home $DJ run --harness grok -m grok-4.5 --effort low "Reply with exactly: OK" --cwd $T/work
 DIANJIANG_HOME=$T/home $DJ resume <runId> "What word did I ask for? Just that word."
-DIANJIANG_HOME=$T/home $DJ run --harness grok -m grok-composer-2.5-fast "Reply with exactly: D-OK" --cwd $T/work --detach
+DIANJIANG_HOME=$T/home $DJ run --harness grok -m grok-4.5 --effort low "Reply with exactly: D-OK" --cwd $T/work --detach
 DIANJIANG_HOME=$T/home $DJ status <runId>            # poll until != running
 DIANJIANG_HOME=$T/home $DJ result <runId>
-DIANJIANG_DEPTH=2 DIANJIANG_HOME=$T/home $DJ run --harness grok -m grok-composer-2.5-fast "hi"   # expect exit 2
-HOME=$T/fakehome DIANJIANG_HOME=$T/home $DJ setup    # run twice; diff = idempotent
+DIANJIANG_DEPTH=2 DIANJIANG_HOME=$T/home $DJ run --harness grok -m grok-4.5 --effort low "hi"   # expect exit 2
+DIANJIANG_HOME=$T/home $DJ skill --caller codex      # plain-text doc; codex waiter strategy + stamped --caller codex
 ```
 
 ## Worth probing

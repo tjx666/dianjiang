@@ -346,8 +346,8 @@ describe('knownModels invariants', () => {
         expect(adapter.knownModels.filter((m) => m.isDefault === true)).toHaveLength(1)
       })
 
-      test('modelsVerifiedAt is set', () => {
-        expect(adapter.modelsVerifiedAt).toBe('2026-07-16')
+      test('modelsVerifiedAt is a date stamp', () => {
+        expect(adapter.modelsVerifiedAt).toMatch(/^\d{4}-\d{2}-\d{2}$/)
       })
     })
   }
@@ -389,6 +389,9 @@ describe('describeHarness / mergeLiveModels', () => {
     expect(liveNames).toEqual(['grok-4.5', 'grok-composer-2.5-fast'])
     const list = mergeLiveModels(liveNames ?? [], stubbed.grok)
     expect(list.map((m) => m.name)).toEqual(['grok-4.5', 'grok-composer-2.5-fast'])
-    expect(list[1]?.efforts).toEqual([])
+    // composer was delisted from the curated snapshot (2026-07-28), so a live
+    // listing that still carries it gets the unmatched-name fallback.
+    expect(list[1]?.efforts).toEqual(adapters.grok.efforts)
+    expect(list[1]?.note).toBe('not in curated set — efforts unverified')
   })
 })

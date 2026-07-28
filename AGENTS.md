@@ -23,11 +23,12 @@ bun run src/cli/index.ts <command>   # run the CLI without linking
   - `runner.ts` — dispatch; every run (sync included) executes in a detached
     `_exec` worker so a dying caller never kills the job
   - `store.ts` — bun:sqlite run store; `registry.ts` — JSONC config;
-    `setup.ts` — roster injection into vendor global instruction files
+    `skill.ts` — renders the on-demand usage doc printed by `dianjiang skill`
     (per-caller collection strategies live here, in code, not config);
     `sync-defaults.ts` — exact-match config upgrade to current defaults
 - `src/cli/` — citty frontend; every machine-readable command prints exactly
-  one JSON value on stdout. Exit codes: 0 ok, 1 error, 2 recursion guard.
+  one JSON value on stdout (`skill` prints its doc as plain text — the one
+  deliberate exception). Exit codes: 0 ok, 1 error, 2 recursion guard.
 
 ## Rules
 
@@ -35,8 +36,8 @@ bun run src/cli/index.ts <command>   # run the CLI without linking
   CLI-surface changes — terminology (agent/roster/harness/adapter) is frozen
   and trade-offs are recorded there.
 - Verify changes end-to-end with `.agents/skills/verify/SKILL.md`. Hard
-  isolation rules: always set `DIANJIANG_HOME=<tempdir>`; only run `setup`
-  under a fake `HOME`; live AI calls must use the cheapest paths listed there.
+  isolation rules: always set `DIANJIANG_HOME=<tempdir>`; live AI calls must
+  use the cheapest paths listed there.
 - Adapter quirks are documented in-code (grok's `-p` takes the prompt as its
   value; codex parses sessionId from JSONL events). Don't "unify" them.
 - Comments in English, JSDoc preferred over line comments.

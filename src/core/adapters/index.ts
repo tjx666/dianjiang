@@ -32,8 +32,8 @@ function probeVersion(adapter: HarnessAdapter): { installed: boolean; version: s
 }
 
 /**
- * Probe each harness CLI's `--version`. Backs the `setup` installed-scan and
- * the smoke script — vendor CLIs break often, so this is our early warning.
+ * Probe each harness CLI's `--version`. Backs the smoke script — vendor CLIs
+ * break often, so this is our early warning.
  */
 export function harnessVersions(): HarnessVersion[] {
   return HARNESS_NAMES.map((name) => ({ name, ...probeVersion(adapters[name]) }))

@@ -23,7 +23,8 @@ way; loops, fan-out, and judgment stay with the calling agent.
 
 An agent's binding can be overridden per caller via the `callers` namespace in
 `config.jsonc` — e.g. `review` rebinds to a different vendor depending on which
-harness is calling. `setup` stamps `--caller <harness>` into each vendor's file.
+harness is calling. `dianjiang skill --caller <harness>` renders the usage doc
+with `--caller` stamped into every documented command.
 
 ## Install
 
@@ -44,13 +45,31 @@ bun link          # exposes `dianjiang` on your PATH
 State lives in `~/.dianjiang/` (`config.jsonc` + `runs.sqlite`); override the
 directory with `DIANJIANG_HOME`.
 
-## Read before `setup` (what dianjiang touches)
+## Hooking dianjiang into a harness
 
-- `setup` writes a managed block (`<!-- dianjiang:begin/end -->`) into the
-  global instruction files of the harnesses you select: `~/.claude/CLAUDE.md`,
-  `~/.codex/AGENTS.md`, `~/.grok/AGENTS.md`. It never edits anything outside
-  the markers, re-runs idempotently, and `dianjiang setup --remove` strips the
-  block cleanly.
+dianjiang deliberately injects nothing into global instruction files — an
+always-on roster block weighs on every session's behavior. Instead, give each
+harness a thin, on-demand skill whose only job is to run
+`dianjiang skill --caller <harness>` and follow the printed doc. The doc — the
+roster, dispatch rules, and that caller's collection strategy — is rendered
+fresh from config on every call, so roster edits never need a re-sync.
+
+Example `~/.claude/skills/dianjiang/SKILL.md`:
+
+```markdown
+---
+name: dianjiang
+description: Dispatch a self-contained task to another coding-agent CLI (Claude Code / Codex / Grok) behind a named agent preset. Use on 点将, "delegate this to codex/grok", or when a cross-vendor opinion/capability is wanted.
+---
+
+Run `dianjiang skill --caller claude` and follow the doc it prints.
+```
+
+For codex/grok, reference the same command (with their own `--caller`) from
+their skill/instruction mechanism of choice.
+
+## Safety notes
+
 - Dispatched harnesses run in **YOLO mode**: dianjiang passes each CLI's
   permission-bypass flag (`--dangerously-skip-permissions`,
   `--dangerously-bypass-approvals-and-sandbox`, `--always-approve`). A
@@ -63,13 +82,17 @@ directory with `DIANJIANG_HOME`.
 ## Usage
 
 ```sh
-# One-time: write a starter roster, then inject it into the global
-# instruction files of all three vendors (~/.claude, ~/.codex, ~/.grok).
+# One-time: write a starter roster.
 dianjiang config init
-dianjiang setup
+
+# Print the usage doc for a caller harness (what an AI caller reads on demand —
+# roster, rules, and that caller's collection strategy, rendered from config).
+dianjiang skill --caller claude
 
 # Dispatch by agent (primary path) — blocks, prints one JSON object; read .result.
-# --caller names the dispatching harness (required: bindings resolve per caller)
+# --caller names the dispatching harness (bindings resolve per caller); when
+# omitted, dianjiang detects it from process ancestry (nearest harness ancestor)
+# and errors only if none is found
 dianjiang run --caller claude search-twitter "What are people saying about bun 1.3 this week?"
 
 # Resolve an agent's binding relative to the caller (see `callers` in config).
@@ -80,7 +103,7 @@ dianjiang run --caller codex review "Review the diff in src/parser.ts"
 dianjiang run --harness codex -m gpt-5.6-sol "Refactor the parser"
 
 # Recommended for AI callers (any task length): dispatch detached, then collect
-# — event-driven, no sleep-polling, survives caller death. The injected roster
+# — event-driven, no sleep-polling, survives caller death. The skill doc
 # tells each caller HOW to run the collect command without stalling its loop
 # (claude/grok: background shell; codex: waiter subagent).
 dianjiang run --caller claude review "review a large multi-file diff" --detach

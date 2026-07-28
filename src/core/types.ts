@@ -60,21 +60,21 @@ export interface AgentBinding {
 }
 
 /**
- * Per-caller configuration. Future per-caller fields (e.g. inject `target`) are
- * anticipated; `agents` and `exclude` exist today.
+ * Per-caller configuration. Future per-caller fields (e.g. per-caller
+ * `maxDepth`) are anticipated; `agents` and `exclude` exist today.
  */
 export interface CallerConfig {
   /** Sparse per-caller binding overrides, keyed by base agent name. */
   agents?: Record<string, AgentBinding>
-  /** Agent names hidden from this caller: not injected into its roster and rejected at dispatch. */
+  /** Agent names hidden from this caller: omitted from its skill doc and rejected at dispatch. */
   exclude?: string[]
   /**
-   * Free-form markdown rendered at the TOP of this caller's injected roster
-   * block, before the intro. For scoping rules the caller should read before
-   * the roster (e.g. "implementation stays native").
+   * Free-form markdown rendered at the TOP of this caller's skill doc, before
+   * the intro. For scoping rules the caller should read before the roster
+   * (e.g. "implementation stays native").
    */
   prepend?: string
-  /** Free-form markdown appended to this caller's injected roster block, after the rules. */
+  /** Free-form markdown appended to this caller's skill doc, after the rules. */
   append?: string
 }
 

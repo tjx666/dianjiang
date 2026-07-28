@@ -271,8 +271,8 @@ export function defaultConfigJsonc(): string {
   //   review, second-opinion — always a different vendor than the caller (avoid same-model blind spots)
   //   implementation         — not a dianjiang agent at all: callers build with their own subagents (see claude's \`prepend\`)
   // Base bindings are just the compiled view for the most common callers; \`exclude\`
-  // hides an agent from a caller entirely. \`setup\` stamps \`--caller <harness>\`
-  // into each vendor's instruction file so these resolve without env sniffing.
+  // hides an agent from a caller entirely. \`dianjiang skill --caller <harness>\`
+  // stamps \`--caller\` into its rendered doc so these resolve without env sniffing.
   "callers": {
     "claude": {
       "agents": {
@@ -285,7 +285,7 @@ export function defaultConfigJsonc(): string {
       },
       // design-frontend is claude/fable itself — the claude caller gains nothing over its own subagents.
       "exclude": ["design-frontend"],
-      // Caller-behavior guidance rendered at the top of this caller's injected block.
+      // Caller-behavior guidance rendered at the top of this caller's skill doc.
       "prepend": "If your session model is fable, act as an orchestrator to preserve fable tokens: delegate execution work (implementation, mechanical edits, running tests/builds) to your built-in subagents with \`model: opus\`, keeping only planning, task decomposition, tricky debugging, and verification of subagent output for yourself. Delegate coherent, independently verifiable chunks (a new file, a test suite, a bulk edit); keep small in-context edits yourself — the cost of writing the brief must not exceed the task. For cross-vendor perspectives or capabilities your subagents lack, use the dianjiang roster below."
     },
     "codex": {
@@ -299,7 +299,7 @@ export function defaultConfigJsonc(): string {
       }
       // The codex wait discipline (waiter subagent via spawn_agent) is no longer
       // config text: per-caller collection strategies render structurally inside
-      // <rules> (see setup.ts COLLECTION_STRATEGY). \`append\` stays available as
+      // <rules> (see skill.ts COLLECTION_STRATEGY). \`append\` stays available as
       // a user extension point.
     }
   }

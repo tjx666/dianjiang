@@ -38,14 +38,12 @@ function extractUsage(obj: Record<string, unknown>): RunUsage | undefined {
 export const GROK_EFFORTS = ['low', 'medium', 'high'] as const
 
 /**
- * Locally-verified grok models (2026-07-16). grok-composer-2.5-fast takes no
- * reasoning-effort flag at all (efforts: []). grok also supports live
- * enumeration via `grok models`, so this snapshot is a fallback only.
+ * Locally-verified grok models (2026-07-28). grok-composer-2.5-fast was
+ * delisted by the vendor between 2026-07-16 and 2026-07-28 (dispatching it now
+ * fails with "unknown model id"). grok also supports live enumeration via
+ * `grok models`, so this snapshot is a fallback only.
  */
-export const GROK_MODELS: readonly KnownModel[] = [
-  { name: 'grok-4.5', efforts: GROK_EFFORTS, isDefault: true },
-  { name: 'grok-composer-2.5-fast', efforts: [] },
-]
+export const GROK_MODELS: readonly KnownModel[] = [{ name: 'grok-4.5', efforts: GROK_EFFORTS, isDefault: true }]
 
 /**
  * Parse the output of `grok models` into model names. The command works even
@@ -77,7 +75,7 @@ export const grokAdapter: HarnessAdapter = {
   name: 'grok',
   efforts: GROK_EFFORTS,
   knownModels: GROK_MODELS,
-  modelsVerifiedAt: '2026-07-16',
+  modelsVerifiedAt: '2026-07-28',
   versionArgs: ['--version'],
 
   listModels(): string[] | undefined {

@@ -45,7 +45,7 @@ describe('defaultConfigJsonc', () => {
     expect(review?.instructions).toBeUndefined()
     expect(review?.useWhen).toContain('independent cross-vendor code review')
     expect(config.callers?.codex?.agents?.review?.useWhen).toContain('claude opus at xhigh')
-    // The codex wait discipline moved into setup.ts's structural collection
+    // The codex wait discipline moved into skill.ts's structural collection
     // strategies; the default config no longer ships a codex append.
     expect(config.callers?.codex?.append).toBeUndefined()
   })
@@ -102,13 +102,16 @@ describe('validateConfig', () => {
     expect(() => validateConfig(cfg)).not.toThrow()
   })
 
-  test('rejects any effort on the no-effort grok-composer model', () => {
-    // The curated knownModels entry (efforts: []) subsumes the old special case.
+  test('delisted grok-composer is now an unknown model: permissive pass-through', () => {
+    // composer left the curated snapshot when the vendor delisted it
+    // (2026-07-28). It previously exercised the empty-efforts rejection
+    // (efforts: [] rejects any effort); as an unknown model it now falls back
+    // to the harness-level whitelist, where "high" is valid.
     const cfg: DianjiangConfig = {
       maxDepth: 2,
       agents: [{ name: 'a', useWhen: 'x', harness: 'grok', model: 'grok-composer-2.5-fast', effort: 'high' }],
     }
-    expect(() => validateConfig(cfg)).toThrow(/does not support effort/)
+    expect(() => validateConfig(cfg)).not.toThrow()
   })
 })
 

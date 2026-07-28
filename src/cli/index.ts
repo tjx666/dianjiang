@@ -8,11 +8,12 @@
 import { existsSync, readFileSync, unlinkSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
-import { confirm, isCancel, multiselect, select, text as textPrompt } from '@clack/prompts'
+import { confirm, isCancel, select, text as textPrompt } from '@clack/prompts'
 import { defineCommand, runMain } from 'citty'
 import type { AgentConfig, DianjiangConfig, HarnessName } from '../core/types.ts'
 import { HARNESS_NAMES } from '../core/types.ts'
-import { adapters, describeHarness, harnessVersions } from '../core/adapters/index.ts'
+import { adapters, describeHarness } from '../core/adapters/index.ts'
+import { detectCaller } from '../core/caller.ts'
 import {
   appendAgent,
   readConfigText,
@@ -33,7 +34,7 @@ import {
   waitForRun,
   type DispatchOptions,
 } from '../core/runner.ts'
-import { defaultTargets, filterTargets, runRemove, runSetup, type SetupTargets } from '../core/setup.ts'
+import { renderSkillDoc } from '../core/skill.ts'
 import { computeStats } from '../core/stats.ts'
 import { getRun, listRuns } from '../core/store.ts'
 
@@ -104,7 +105,8 @@ const run = defineCommand({
     cwd: { type: 'string', default: process.cwd(), description: 'Working directory for the harness' },
     caller: {
       type: 'string',
-      description: 'Which harness is calling (stamped by setup); resolves per-caller agent bindings',
+      description:
+        'Which harness is calling; resolves per-caller agent bindings (auto-detected from process ancestry when omitted)',
     },
   },
   async run({ args }) {
@@ -143,13 +145,20 @@ const run = defineCommand({
     if (!args.agent || !args.task) {
       return fail('Usage: dianjiang run --caller <name> <agent> "<task>"  (or: run --harness <name> "<task>").')
     }
-    // dianjiang is AI-caller-only: agent dispatch REQUIRES --caller so
+    // dianjiang is AI-caller-only: agent dispatch REQUIRES a known caller so
     // per-caller bindings always resolve (a silently-degraded base binding
-    // defeats caller-relative agents like review). Raw --harness runs don't
-    // take it — they bypass the registry entirely.
+    // defeats caller-relative agents like review). An explicit --caller wins;
+    // when omitted, fall back to process-ancestry detection (nearest harness
+    // ancestor — correct even for nested dispatch). Only when detection also
+    // fails is dispatch a hard error. Raw --harness runs take neither — they
+    // bypass the registry entirely.
+    if (!caller) {
+      caller = detectCaller()
+      if (caller) process.stderr.write(`--caller not given; detected "${caller}" from process ancestry\n`)
+    }
     if (!caller) {
       return fail(
-        `Agent dispatch requires --caller <${HARNESS_NAMES.join('|')}> (your own harness, as stamped by setup).`,
+        `Agent dispatch requires knowing the caller, and no harness was found in this process's ancestry. Pass --caller <${HARNESS_NAMES.join('|')}> (your own harness).`,
       )
     }
     let agent
@@ -259,69 +268,39 @@ const result = defineCommand({
   },
 })
 
-const setup = defineCommand({
+// Exception to the one-JSON stdout contract: the output IS the document the
+// calling AI reads (like --help), so it prints as plain text. Errors still go
+// through fail() with the standard JSON shape.
+const skill = defineCommand({
   meta: {
-    name: 'setup',
-    description: 'Inject (or remove, with --remove) the delegation roster in the global instruction files.',
+    name: 'skill',
+    description: 'Print the dianjiang usage doc (roster + rules) rendered for a caller harness.',
   },
   args: {
-    all: { type: 'boolean', default: false, description: 'Target every installed harness without prompting' },
-    harness: {
+    caller: {
       type: 'string',
-      description: 'Comma-separated subset of harnesses to target (e.g. claude,codex)',
+      description:
+        'Render for this caller harness (per-caller bindings + its collection strategy); auto-detected from process ancestry when omitted',
     },
-    remove: { type: 'boolean', default: false, description: 'Remove the managed block instead of injecting it' },
   },
-  async run({ args }) {
-    const installed = harnessVersions().filter((v) => v.installed)
-    const installedNames = installed.map((v) => v.name)
-
-    let selected: HarnessName[]
-    if (args.harness) {
-      // Explicit subset: every name must be a known harness AND installed.
-      const names = args.harness
-        .split(',')
-        .map((s) => s.trim())
-        .filter(Boolean)
-      for (const n of names) {
-        const harness = parseHarnessArg(n, 'harness')
-        if (!harness) return
-        if (!installedNames.includes(harness)) {
-          return fail(`Harness "${n}" is not installed.`)
-        }
-      }
-      selected = names as HarnessName[]
-    } else if (args.all || !process.stdin.isTTY) {
-      // --all, or a non-interactive stdin (piped/CI): every installed harness,
-      // no prompt — keeps the one-JSON machine-readable contract.
-      selected = installedNames
+  run({ args }) {
+    let caller: HarnessName | undefined
+    if (args.caller) {
+      caller = parseHarnessArg(args.caller, 'caller')
+      if (!caller) return
     } else {
-      // Interactive TTY: multiselect over installed harnesses (all pre-checked,
-      // version shown as a hint). clack writes its UI to stdout by default, so
-      // we redirect it to stderr to keep stdout a single JSON value.
-      if (installedNames.length === 0) return fail('No installed harnesses to set up.')
-      const picked = await multiselect<HarnessName>({
-        message: args.remove ? 'Remove the roster from which harnesses?' : 'Inject the roster into which harnesses?',
-        options: installed.map((v) => ({ value: v.name, label: v.name, hint: v.version ?? undefined })),
-        initialValues: installedNames,
-        required: false,
-        ...CLACK_OUT,
-      })
-      if (isCancel(picked)) return fail('Setup cancelled.')
-      selected = picked
+      // Undetectable is fine here (e.g. a human in a terminal): render the
+      // neutral caller-less doc instead of erroring.
+      caller = detectCaller()
+      process.stderr.write(
+        caller
+          ? `--caller not given; detected "${caller}" from process ancestry\n`
+          : '--caller not given and no harness ancestor found; rendering the caller-less doc\n',
+      )
     }
-
-    const targets: Partial<SetupTargets> = filterTargets(selected, defaultTargets())
-    let results
-    if (args.remove) {
-      results = runRemove(targets)
-    } else {
-      const config = tryLoadConfig()
-      if (!config) return
-      results = runSetup(config, targets)
-    }
-    for (const r of results) process.stderr.write(`${r.action}: ${r.file}\n`)
-    emit(results)
+    const config = tryLoadConfig()
+    if (!config) return
+    process.stdout.write(`${renderSkillDoc(config, caller)}\n`)
   },
 })
 
@@ -726,7 +705,7 @@ const main = defineCommand({
     resume,
     status,
     result,
-    setup,
+    skill,
     stats,
     config: configCmd,
     _exec: exec,

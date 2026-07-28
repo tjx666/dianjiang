@@ -34,16 +34,16 @@ the caller (usually another AI) picks an **agent**, not a model.
 | Architecture | Core as a library; CLI is a thin frontend (GUI-ready later) |
 | Run storage | Structured local store (SQLite): run id → agent, harness, model, session id, duration, exit code, final message |
 | Session strategy | dianjiang generates the UUID; injects via `--session-id` for claude/grok; parses `thread.started.thread_id` from `--json` for codex. External API exposes one unified run id. |
-| Prompt injection | `setup` command writes a managed block (`<!-- dianjiang:begin/end -->`) into all three global instruction files |
-| Recursion guard | `DIANJIANG_DEPTH` env var; refuse beyond depth limit. Injected prompt also states "when you are the delegate, do not re-delegate." |
+| Roster delivery | `dianjiang skill --caller <harness>` prints the usage doc (roster + rules) on demand; each vendor ships a thin skill file that runs it. Replaces the removed `setup` global-file injection (2026-07): an always-on injected block weighed on every session's behavior, and the human judged that influence too heavy for a tool used occasionally. On-demand rendering also kills the re-inject-after-config-edit chore. |
+| Recursion guard | `DIANJIANG_DEPTH` env var; refuse beyond depth limit. The skill doc also states "when you are the delegate, do not re-delegate." |
 | Attribution | Credit agent-mux in README |
 | Config | Single `~/.dianjiang/config.jsonc` (JSONC over JSON5: VS Code-native tsconfig-style editing, parse with `jsonc-parser`). Agents inline; split into `agents/*.md` only if instructions grow long. Project-level override deferred to phase 2. |
-| Background runs | Every run executes in a detached `_exec` worker; sync mode just waits for it ("job done is holy", credit agent-mux — the job survives caller timeout/death, and callers are AI agents whose shell tools cap at ~10 min). `--detach` returns immediately; block on `result --wait [--timeout <sec>]` (store-polling, since the worker isn't waitpid-able; bounded, so it never reintroduces the caller-shell-timeout problem that motivated `--detach` — never teach callers to sleep-and-poll), instant snapshot via `status`. Artifact path: full harness stdout/stderr tees to `logs/<runId>.log` progressively. Injected rules teach AI callers to ALWAYS dispatch detached: the earlier "detach if likely >5 min" branch was removed (2026-07) because LLM duration estimates are unreliable, so any rule keyed on them mis-routes; detach costs one extra command and covers every case. Sync run remains for human use. How each caller WAITS is a per-caller collection strategy rendered from setup.ts's `COLLECTION_STRATEGY` map — see "Injected roster template". |
+| Background runs | Every run executes in a detached `_exec` worker; sync mode just waits for it ("job done is holy", credit agent-mux — the job survives caller timeout/death, and callers are AI agents whose shell tools cap at ~10 min). `--detach` returns immediately; block on `result --wait [--timeout <sec>]` (store-polling, since the worker isn't waitpid-able; bounded, so it never reintroduces the caller-shell-timeout problem that motivated `--detach` — never teach callers to sleep-and-poll), instant snapshot via `status`. Artifact path: full harness stdout/stderr tees to `logs/<runId>.log` progressively. The skill doc's rules teach AI callers to ALWAYS dispatch detached: the earlier "detach if likely >5 min" branch was removed (2026-07) because LLM duration estimates are unreliable, so any rule keyed on them mis-routes; detach costs one extra command and covers every case. Sync run remains for human use. How each caller WAITS is a per-caller collection strategy rendered from skill.ts's `COLLECTION_STRATEGY` map — see "Skill doc". |
 | Execution contract freeze | Resolved agent `instructions` are stamped into the RunRecord at dispatch; the detached worker and every `resume` read the record, never the live config — a config edit or removal can no longer mutate an in-flight or resumable run's contract (2026-07) |
 | Defaults upgrade | `config sync-defaults` — exact-match migration: a managed field upgrades only when its current value equals a known historical default (anything else is a user customization and is kept); removed defaults are dropped under the same rule; `--dry-run` previews. Never a blind overwrite; `config init --force` remains the nuke-and-regenerate escape hatch |
 | CLI framework | citty (TS-first, lightweight); core stays dependency-light (`bun:sqlite` built-in) |
 | Extension point | `adapter`, not `provider`. Ecosystem rule: "provider" = another chat/completions endpoint (AI SDK, LiteLLM, opencode); "adapter" = a full external runtime with its own event stream and session lifecycle (agent-mux "harness adapters", terminal-bench adapters, LobeHub agent adaptor). Custom harness support later = public `HarnessAdapter` interface. |
-| Caller-relative bindings | `callers.<harness>.agents.<name>` sparse binding overrides; `setup` stamps `--caller <harness>` into each vendor's file (see "Caller-relative agents") |
+| Caller-relative bindings | `callers.<harness>.agents.<name>` sparse binding overrides; `dianjiang skill --caller <harness>` stamps `--caller` into its rendered doc (see "Caller-relative agents") |
 
 ## Command surface
 
@@ -53,7 +53,7 @@ dianjiang run --harness codex -m gpt-5.5 "task"  # raw escape hatch
 dianjiang resume <run-id> "follow-up"
 dianjiang status <run-id>                # instant snapshot of a run (never blocks)
 dianjiang result <run-id> [--wait [--timeout <sec>]]  # fetch final JSON; --wait blocks until done
-dianjiang setup                          # inject agent roster into global instruction files
+dianjiang skill [--caller <harness>]     # print the usage doc for a caller (plain text, not JSON)
 dianjiang stats                          # per-agent usage aggregation
 dianjiang config ...                     # agent CRUD + harnesses self-check (config harnesses --json)
 ```
@@ -180,28 +180,35 @@ Locally verified model/effort space:
 - codex: `gpt-5.6-sol/-terra/-luna`, `gpt-5.5`, `gpt-5.4(-mini)`,
   `gpt-5.3-codex-spark`; effort superset `low…ultra`, but `max`/`ultra` only on
   the 5.6 series and `ultra` only on sol/terra (adapters must validate per model)
-- grok: `grok-4.5` (effort `low | medium | high`), `grok-composer-2.5-fast`
-  (no effort flag)
+- grok: `grok-4.5` only (effort `low | medium | high`).
+  `grok-composer-2.5-fast` was delisted by the vendor (2026-07-28: "unknown
+  model id"; `grok models` now lists a single model)
 
-## Injected roster template
+## Skill doc (`dianjiang skill`)
 
-`setup` renders the managed block from config into all three global
-instruction files. Each target is rendered with its own caller stamped into
-the documented commands (`dianjiang run --caller codex <agent> "<task>"` in
-`~/.codex/AGENTS.md`, etc.) so per-caller binding overrides resolve without
-env sniffing.
+`dianjiang skill --caller <harness>` prints the caller's usage doc on demand.
+This replaced `setup`'s global-instruction-file injection (2026-07): an
+always-on injected roster block influenced every session's behavior, which the
+human judged too heavy for a tool used occasionally, and every config edit
+needed a re-inject. Delivery is now a thin per-vendor skill file (claude:
+`~/.claude/skills/dianjiang/SKILL.md`; codex/grok: their skill/instruction
+mechanism of choice) whose only job is to run the command and follow the
+printed doc — the human maintains those thin files, dianjiang maintains the
+doc. The doc stamps `--caller <harness>` into every documented command
+(`dianjiang run --caller codex <agent> "<task>"`, etc.) so per-caller binding
+overrides resolve without env sniffing.
 
-The block body is **XML**, not a markdown heading + table: a column-padded
-table is unreadable as raw text (these files are edited in plain editors, not
-previewed); an injected heading interferes with the host file's own outline (a
-wrapper element removes the problem entirely); and XML sectioning is what LLM
-prompting guides recommend anyway. The HTML-comment begin/end markers are the
-inject/remove contract, independent of the body format.
+The roster/rules body is **XML** (`<agent>` elements + `<rules>`): a
+column-padded markdown table is unreadable as raw terminal output, and XML
+sectioning is what LLM prompting guides recommend anyway. The command prints
+plain text — the one deliberate exception to the one-JSON stdout contract,
+because the output IS the document the caller reads (like `--help`); errors
+still emit the standard JSON failure shape.
 
-**Single source of truth is `renderRosterBlock()` in `src/core/setup.ts`** —
+**Single source of truth is `renderSkillDoc()` in `src/core/skill.ts`** —
 this document deliberately carries no verbatim template copy (it drifted from
 the code twice); the full per-caller renders are pinned by snapshot tests in
-`tests/setup.test.ts`. Structure, in order:
+`tests/skill.test.ts`. Structure, in order:
 
 1. `<caller-guidance>` — the caller's `prepend`, when set (wrapped so
    caller-behavior guidance is not read as a dianjiang usage rule).
@@ -221,7 +228,9 @@ the code twice); the full per-caller renders are pinned by snapshot tests in
    generic "block on result --wait" rule + codex-append-exception layout made
    codex block 300s in the foreground before spawning its waiter). Then:
    `.status` discipline, self-contained tasks, resume, preset overrides only
-   relay the human's explicit in-request choice, `DIANJIANG_DEPTH` guard.
+   relay the human's explicit in-request choice, YOLO-mode caution, the
+   one-JSON/exit-code/log-path contract (operational notes formerly kept in
+   the hand-written static skill file), `DIANJIANG_DEPTH` guard.
 5. The caller's `append`, when set (user extension point; no built-in default
    uses it anymore).
 
@@ -302,30 +311,37 @@ should vary per caller.
   be overridden per caller for caller-relative descriptions (model-strength
   notes only make sense relative to the caller's own model), each falling back
   to the base agent when omitted; `name`/`instructions` stay single-source.
-- Caller identification: no env sniffing (no stable cross-vendor contract;
-  breaks on vendor upgrades). `setup` already writes one file per vendor, so
-  it stamps `--caller <harness>` into each file's documented run command; the
-  AI relays it verbatim. Agent dispatch without `--caller` is a hard ERROR
-  (changed 2026-07 from graceful degradation): dianjiang is AI-caller-only —
-  there is no human dispatch path to protect — and a dropped flag silently
-  produced a same-vendor `review`, defeating the agent's purpose. Dogfood
-  evidence: codex omitted the stamped flag on its first real dispatch. Raw
-  `--harness` runs still take no `--caller` (they bypass the registry).
+- Caller identification: explicit `--caller` first, process-ancestry detection
+  as fallback, hard error only when both fail. Each vendor's thin skill file
+  runs `dianjiang skill --caller <harness>` with its own name, and the printed
+  doc stamps `--caller <harness>` into every documented run command; the AI
+  relays it verbatim. When the flag is dropped (dogfood evidence: codex
+  omitted the stamped flag on its first real dispatch, silently producing a
+  same-vendor `review`), `detectCaller()` in `src/core/caller.ts` walks the
+  ppid chain via `ps` and takes the NEAREST harness ancestor — nearest-wins is
+  correct even for nested dispatch (verified 2026-07-28 with live probes: a
+  codex delegate under a claude session sees codex before the outer claude).
+  Matching anchors on argv0 basename (plus `@openai/codex` package paths for
+  pnpm shims) so vendor names in task text or `~/.claude/...` paths never
+  match. Undetectable (e.g. a human terminal) → agent dispatch is still a hard
+  ERROR (dianjiang is AI-caller-only); `skill` renders the neutral caller-less
+  doc instead. Raw `--harness` runs take no `--caller` (they bypass the
+  registry). ENV-VAR sniffing stays rejected — see Rejected below.
 - Deliberately named `callers`, not `callerOverrides`: per-caller settings
-  beyond bindings are anticipated — inject path (`target`), extra template
-  rules, per-caller `maxDepth`/`disabled`. Containers named "override" always
-  grow non-override siblings.
+  beyond bindings are anticipated — extra template rules, per-caller
+  `maxDepth`/`disabled`. Containers named "override" always grow non-override
+  siblings.
 - `callers.<h>.exclude: string[]` hides an agent from that caller entirely —
-  omitted from its injected roster and from `config agents --caller <h>`,
+  omitted from its rendered skill doc and from `config agents --caller <h>`,
   rejected at dispatch with a clear error. A name in both `exclude` and that
   caller's `agents` overrides is a validation error. User: claude excludes
   `design-frontend` (it IS claude/fable — the claude caller gains nothing
   over its own subagents).
 - `callers.<h>.prepend: string` — free-form markdown rendered at the TOP of
-  that caller's block (right after the wrapper tag, before the intro), wrapped
-  in `<caller-guidance>` so it reads as caller behavior, not a dianjiang rule.
-  For scoping rules the caller should read before pattern-matching the roster;
-  block-start position also gets higher LLM attention. User: claude's
+  that caller's skill doc (before the intro), wrapped in `<caller-guidance>`
+  so it reads as caller behavior, not a dianjiang rule. For scoping rules the
+  caller should read before pattern-matching the roster; doc-start position
+  also gets higher LLM attention. User: claude's
   fable steer — a **role statement**, not just a model binding: when the
   session model is fable, act as an orchestrator (keep planning,
   decomposition, tricky debugging, and verification; delegate execution to
@@ -340,7 +356,7 @@ should vary per caller.
   noise that implies the option exists).
 - `callers.<h>.append: string` — same, but rendered after the rules. Today a
   pure user extension point: the codex waiter-subagent guidance that shipped
-  here first moved into setup.ts's structural `COLLECTION_STRATEGY` (2026-07)
+  here first moved into skill.ts's structural `COLLECTION_STRATEGY` (2026-07)
   after dogfood showed the free-text append losing to the generic wait rule —
   the caller followed the earlier, more prominent "block on result --wait"
   bullet, sat 300s in the foreground, and only then remembered the waiter.
@@ -354,16 +370,18 @@ Rejected:
   duplicates useWhen prose ×3, breaks single-source.
 - Relative semantics in config (`harness: "not-caller"` + fallback chains) —
   moves runtime decisions back into the machine; violates human-compiles.
-- Env sniffing (`CLAUDECODE=1` and friends) — undocumented vendor behavior.
+- Env sniffing (`CLAUDECODE=1` and friends) — undocumented vendor behavior,
+  and measured ambiguous (2026-07-28 live probes): markers inherit through
+  dispatch, so a codex delegate under claude carries BOTH `CLAUDECODE=1` and
+  `CODEX_THREAD_ID` (claude's `AI_AGENT` is not overwritten either), and the
+  reverse direction inverts any static priority. Process-ancestry detection
+  (adopted as the `--caller` fallback) has no such ambiguity: nearest
+  ancestor wins. Observed marker inventory, for reference: claude
+  `CLAUDECODE`/`CLAUDE_*`/`AI_AGENT`; codex `CODEX_CI`/`CODEX_THREAD_ID`;
+  grok `GROK_AGENT`.
 
 ## Ops & UX
 
-- **setup selection**: `setup` scans installed harnesses (`harnessVersions()`)
-  and interactively multi-selects targets (@clack/prompts) when stdin is a
-  TTY; non-TTY or explicit flags (`--all`, `--harness a,b`) keep the
-  machine-readable one-JSON contract. Default selection = installed only.
-- **setup --remove**: strips the managed block from selected targets;
-  files without a block report `skipped`.
 - **Interactive agent editor**: `config agents --edit` — pick an agent, edit
   harness/model/effort via validated select prompts, add/delete agents; prose
   fields (useWhen/dontUseWhen/instructions) open `$EDITOR`. Writes back with
@@ -392,7 +410,7 @@ accepts the `claude-opus-4-6[1m]` spelling. Layered sources:
    works even unauthenticated). Adapters expose optional `listModels()`.
 2. **Curated in-adapter snapshot** (`knownModels` + `modelsVerifiedAt`) for
    claude/codex, refreshed alongside smoke/dogfooding. Per-model effort sets
-   live here (codex `ultra` only on 5.6-sol/terra; grok-composer none) and
+   live here (e.g. codex `ultra` only on 5.6-sol/terra) and
    drive validation: known model → validate against its effort set; unknown
    model → permissive pass-through (new models ship weekly; never hard-reject).
 3. **Third-party registries** (models.dev — opencode's registry; LiteLLM's
@@ -424,7 +442,7 @@ layer 2 retires for codex.
 
 Notes:
 - Grok's claude-compat is OFF in local config — it will not read `~/.claude/*`;
-  `setup` must write all three files.
+  each harness needs its own thin skill/instruction hook for the skill doc.
 - Codex renamed `session.created`/`session_id` → `thread.started`/`thread_id`
   across versions. Adapters must version-sniff. Vendor CLIs break things often —
   this is the moat **only if** we detect breakage first: per-adapter smoke tests
@@ -445,7 +463,7 @@ Crowded space; two camps, each missing half of this idea:
   external CLI harnesses (Claude Code / Codex) as first-class agents behind one
   shared interface, one adapter per harness. Same concept, GUI-embedded; their
   terminology stack (agent / harness / adapter) matches ours exactly. dianjiang
-  is the neutral-CLI + injected-roster take on the same idea.
+  is the neutral-CLI + on-demand-skill-doc take on the same idea.
 - **Protocol watch**: ACP (Agent Client Protocol) is becoming the standard for
   this layer (opencode, AgentMux, LobeHub roadmaps). If claude/codex/grok ship
   ACP support, a single ACP adapter could replace per-CLI version-sniffing.
@@ -453,8 +471,8 @@ Crowded space; two camps, each missing half of this idea:
   (35★, Go) — neutral CLI, grok as first-class adapter, resumable sessions with
   predeclared UUIDs, `config engines --json` self-check, markdown worker
   profiles (their half-step toward named agents). Steal the design, not the code.
-- **Unoccupied**: agent registry + setup-injected roster across all three
-  vendors' global instruction files.
+- **Unoccupied**: agent registry + a caller-aware on-demand usage doc
+  (`dianjiang skill --caller <harness>`) across all three vendors.
 
 ## Open questions
 
@@ -466,10 +484,11 @@ Crowded space; two camps, each missing half of this idea:
   read-a-human-table variant works: theo's CLAUDE.md scorecard
   (x.com/theo/status/2072482460122964067, agent-PR discard rate 50%→0).
   Revisit once dogfooding shows how often raw mode is actually needed.
-- grok-composer includes narration in `result` (e.g. "Reading runner.ts to
-  find why…" before the answer). Fix candidates: instructions-level ("output
-  only the answer") or adapter-level (take last message if the event stream
-  distinguishes narration). Observed in first dogfood dispatch.
+- Narration mixed into `result` (first observed on grok-composer: "Reading
+  runner.ts to find why…" before the answer; grok-4.5 shows a milder version).
+  Fix candidates: instructions-level ("output only the answer") or
+  adapter-level (take last message if the event stream distinguishes
+  narration). grok-composer itself was delisted 2026-07-28, lowering urgency.
 - Config schema validation: zod vs hand-rolled checks (minor).
 - Project-level config override — deferred to phase 2.
 - Run-level git snapshot (evaluated 2026-07 after a 26-min review raced a

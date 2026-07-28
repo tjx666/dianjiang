@@ -1,10 +1,7 @@
 // Bun Snapshot v1, https://bun.sh/docs/test/snapshots
 
-exports[`renderRosterBlock default-config snapshots caller-less render 1`] = `
-"<!-- dianjiang:begin -->
-<dianjiang-roster>
-
-\`dianjiang\` is a CLI on this machine that dispatches self-contained tasks to
+exports[`renderSkillDoc default-config snapshots caller-less render 1`] = `
+"\`dianjiang\` is a CLI on this machine that dispatches self-contained tasks to
 other coding-agent CLIs (Claude Code / Codex / Grok). Each <agent> below is a
 preset the human already compiled — its harness, model, and effort are fixed;
 never override or re-route them. Pick an agent by task shape. Model notes
@@ -59,18 +56,18 @@ reach for dianjiang only when an agent below clearly fits.
   their current request: if they name a vendor, harness, model, or effort, pass
   it through — \`dianjiang run --harness <claude|codex|grok> [-m <model>] [--effort <level>] "<task>"\`,
   or \`-m\`/\`--effort\` on an agent dispatch. Never override on your own judgment.
+- Dispatched harnesses run in YOLO mode (permission-bypass flags) — only
+  dispatch tasks safe for an unattended agent in that working directory.
+- Machine-readable commands print exactly one JSON value on stdout; harness
+  logs go to stderr, and the full stream tees to
+  \`~/.dianjiang/logs/<runId>.log\`. Exit codes: 0 ok, 1 error/failed run, 2
+  recursion-depth limit.
 - If \`DIANJIANG_DEPTH\` is set in your environment, you ARE a delegate — never call dianjiang.
-</rules>
-
-</dianjiang-roster>
-<!-- dianjiang:end -->"
+</rules>"
 `;
 
-exports[`renderRosterBlock default-config snapshots claude render 1`] = `
-"<!-- dianjiang:begin -->
-<dianjiang-roster>
-
-<caller-guidance>
+exports[`renderSkillDoc default-config snapshots claude render 1`] = `
+"<caller-guidance>
 If your session model is fable, act as an orchestrator to preserve fable tokens: delegate execution work (implementation, mechanical edits, running tests/builds) to your built-in subagents with \`model: opus\`, keeping only planning, task decomposition, tricky debugging, and verification of subagent output for yourself. Delegate coherent, independently verifiable chunks (a new file, a test suite, a bulk edit); keep small in-context edits yourself — the cost of writing the brief must not exceed the task. For cross-vendor perspectives or capabilities your subagents lack, use the dianjiang roster below.
 </caller-guidance>
 
@@ -125,18 +122,18 @@ reach for dianjiang only when an agent below clearly fits.
   their current request: if they name a vendor, harness, model, or effort, pass
   it through — \`dianjiang run --harness <claude|codex|grok> [-m <model>] [--effort <level>] "<task>"\`,
   or \`-m\`/\`--effort\` on an agent dispatch. Never override on your own judgment.
+- Dispatched harnesses run in YOLO mode (permission-bypass flags) — only
+  dispatch tasks safe for an unattended agent in that working directory.
+- Machine-readable commands print exactly one JSON value on stdout; harness
+  logs go to stderr, and the full stream tees to
+  \`~/.dianjiang/logs/<runId>.log\`. Exit codes: 0 ok, 1 error/failed run, 2
+  recursion-depth limit.
 - If \`DIANJIANG_DEPTH\` is set in your environment, you ARE a delegate — never call dianjiang.
-</rules>
-
-</dianjiang-roster>
-<!-- dianjiang:end -->"
+</rules>"
 `;
 
-exports[`renderRosterBlock default-config snapshots codex render 1`] = `
-"<!-- dianjiang:begin -->
-<dianjiang-roster>
-
-\`dianjiang\` is a CLI on this machine that dispatches self-contained tasks to
+exports[`renderSkillDoc default-config snapshots codex render 1`] = `
+"\`dianjiang\` is a CLI on this machine that dispatches self-contained tasks to
 other coding-agent CLIs (Claude Code / Codex / Grok). Each <agent> below is a
 preset the human already compiled — its harness, model, and effort are fixed;
 never override or re-route them. Pick an agent by task shape. Model notes
@@ -206,18 +203,18 @@ reach for dianjiang only when an agent below clearly fits.
   their current request: if they name a vendor, harness, model, or effort, pass
   it through — \`dianjiang run --harness <claude|codex|grok> [-m <model>] [--effort <level>] "<task>"\`,
   or \`-m\`/\`--effort\` on an agent dispatch. Never override on your own judgment.
+- Dispatched harnesses run in YOLO mode (permission-bypass flags) — only
+  dispatch tasks safe for an unattended agent in that working directory.
+- Machine-readable commands print exactly one JSON value on stdout; harness
+  logs go to stderr, and the full stream tees to
+  \`~/.dianjiang/logs/<runId>.log\`. Exit codes: 0 ok, 1 error/failed run, 2
+  recursion-depth limit.
 - If \`DIANJIANG_DEPTH\` is set in your environment, you ARE a delegate — never call dianjiang.
-</rules>
-
-</dianjiang-roster>
-<!-- dianjiang:end -->"
+</rules>"
 `;
 
-exports[`renderRosterBlock default-config snapshots grok render 1`] = `
-"<!-- dianjiang:begin -->
-<dianjiang-roster>
-
-\`dianjiang\` is a CLI on this machine that dispatches self-contained tasks to
+exports[`renderSkillDoc default-config snapshots grok render 1`] = `
+"\`dianjiang\` is a CLI on this machine that dispatches self-contained tasks to
 other coding-agent CLIs (Claude Code / Codex / Grok). Each <agent> below is a
 preset the human already compiled — its harness, model, and effort are fixed;
 never override or re-route them. Pick an agent by task shape. Model notes
@@ -273,9 +270,12 @@ reach for dianjiang only when an agent below clearly fits.
   their current request: if they name a vendor, harness, model, or effort, pass
   it through — \`dianjiang run --harness <claude|codex|grok> [-m <model>] [--effort <level>] "<task>"\`,
   or \`-m\`/\`--effort\` on an agent dispatch. Never override on your own judgment.
+- Dispatched harnesses run in YOLO mode (permission-bypass flags) — only
+  dispatch tasks safe for an unattended agent in that working directory.
+- Machine-readable commands print exactly one JSON value on stdout; harness
+  logs go to stderr, and the full stream tees to
+  \`~/.dianjiang/logs/<runId>.log\`. Exit codes: 0 ok, 1 error/failed run, 2
+  recursion-depth limit.
 - If \`DIANJIANG_DEPTH\` is set in your environment, you ARE a delegate — never call dianjiang.
-</rules>
-
-</dianjiang-roster>
-<!-- dianjiang:end -->"
+</rules>"
 `;
