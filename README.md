@@ -48,13 +48,14 @@ directory with `DIANJIANG_HOME`.
 ## Hooking dianjiang into a harness
 
 dianjiang deliberately injects nothing into global instruction files — an
-always-on roster block weighs on every session's behavior. Instead, give each
-harness a thin, on-demand skill whose only job is to run
-`dianjiang skill --caller <harness>` and follow the printed doc. The doc — the
-roster, dispatch rules, and that caller's collection strategy — is rendered
+always-on roster block weighs on every session's behavior. Instead, give your
+harnesses a thin, on-demand skill whose only job is to run `dianjiang skill`
+and follow the printed doc. Process ancestry identifies the nearest harness;
+the rendered doc then stamps that caller into every dispatch command. The
+roster, dispatch rules, and caller-specific collection strategy are rendered
 fresh from config on every call, so roster edits never need a re-sync.
 
-Example `~/.claude/skills/dianjiang/SKILL.md`:
+Example shared `~/.agents/skills/dianjiang/SKILL.md`:
 
 ```markdown
 ---
@@ -62,11 +63,13 @@ name: dianjiang
 description: Dispatch a self-contained task to another coding-agent CLI (Claude Code / Codex / Grok) behind a named agent preset. Use on 点将, "delegate this to codex/grok", or when a cross-vendor opinion/capability is wanted.
 ---
 
-Run `dianjiang skill --caller claude` and follow the doc it prints.
+Run `dianjiang skill` and follow the doc it prints.
 ```
 
-For codex/grok, reference the same command (with their own `--caller`) from
-their skill/instruction mechanism of choice.
+If a skill file is private to exactly one harness, it may pass
+`--caller <harness>` explicitly. Never hardcode a caller in a shared directory:
+when process ancestry identifies a different harness, dianjiang rejects the
+mismatch instead of applying the wrong roster or collection strategy.
 
 ## Safety notes
 

@@ -50,6 +50,27 @@ export function detectCallerFromChain(commands: string[]): HarnessName | undefin
 }
 
 /**
+ * Reconcile an optional explicit caller with process-ancestry detection.
+ *
+ * An explicit caller remains useful from a plain terminal where no harness is
+ * detectable. Inside a harness, however, a mismatch means the caller-relative
+ * roster and collection strategy would be resolved for the wrong frontend.
+ * Fail closed instead of silently allowing same-vendor review or incompatible
+ * wait instructions.
+ */
+export function resolveCallerIdentity(
+  explicitCaller: HarnessName | undefined,
+  detectedCaller: HarnessName | undefined,
+): HarnessName | undefined {
+  if (explicitCaller && detectedCaller && explicitCaller !== detectedCaller) {
+    throw new Error(
+      `Caller mismatch: --caller "${explicitCaller}" does not match "${detectedCaller}" detected from process ancestry. Omit --caller or pass your own harness.`,
+    )
+  }
+  return explicitCaller ?? detectedCaller
+}
+
+/**
  * Collect ancestor command lines by walking ppid via `ps` (works on both
  * darwin and procps). Best-effort: stops at the root, an unreadable pid, or
  * `maxDepth` hops (a bounded walk can never hang the CLI on a weird tree).

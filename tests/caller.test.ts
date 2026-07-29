@@ -1,5 +1,10 @@
 import { describe, expect, test } from 'bun:test'
-import { ancestorCommands, detectCallerFromChain, matchHarnessCommand } from '../src/core/caller.ts'
+import {
+  ancestorCommands,
+  detectCallerFromChain,
+  matchHarnessCommand,
+  resolveCallerIdentity,
+} from '../src/core/caller.ts'
 
 describe('matchHarnessCommand', () => {
   test('matches each harness by argv0 basename', () => {
@@ -62,6 +67,27 @@ describe('detectCallerFromChain', () => {
   test('no harness ancestor → undefined', () => {
     expect(detectCallerFromChain(['/bin/zsh -il', 'login', '/sbin/launchd'])).toBeUndefined()
     expect(detectCallerFromChain([])).toBeUndefined()
+  })
+})
+
+describe('resolveCallerIdentity', () => {
+  test('uses the detected caller when the flag is omitted', () => {
+    expect(resolveCallerIdentity(undefined, 'codex')).toBe('codex')
+  })
+
+  test('allows an explicit caller when ancestry is absent or agrees', () => {
+    expect(resolveCallerIdentity('claude', undefined)).toBe('claude')
+    expect(resolveCallerIdentity('claude', 'claude')).toBe('claude')
+  })
+
+  test('rejects an explicit caller that contradicts process ancestry', () => {
+    expect(() => resolveCallerIdentity('claude', 'codex')).toThrow(
+      'Caller mismatch: --caller "claude" does not match "codex" detected from process ancestry.',
+    )
+  })
+
+  test('returns undefined when neither source identifies a caller', () => {
+    expect(resolveCallerIdentity(undefined, undefined)).toBeUndefined()
   })
 })
 

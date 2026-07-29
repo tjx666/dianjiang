@@ -13,7 +13,7 @@ import { defineCommand, runMain } from 'citty'
 import type { AgentConfig, DianjiangConfig, HarnessName } from '../core/types.ts'
 import { HARNESS_NAMES } from '../core/types.ts'
 import { adapters, describeHarness } from '../core/adapters/index.ts'
-import { detectCaller } from '../core/caller.ts'
+import { detectCaller, resolveCallerIdentity } from '../core/caller.ts'
 import {
   appendAgent,
   readConfigText,
@@ -106,7 +106,7 @@ const run = defineCommand({
     caller: {
       type: 'string',
       description:
-        'Which harness is calling; resolves per-caller agent bindings (auto-detected from process ancestry when omitted)',
+        'Which harness is calling; auto-detected when omitted and rejected if it contradicts process ancestry',
     },
   },
   async run({ args }) {
@@ -145,16 +145,18 @@ const run = defineCommand({
     if (!args.agent || !args.task) {
       return fail('Usage: dianjiang run --caller <name> <agent> "<task>"  (or: run --harness <name> "<task>").')
     }
-    // dianjiang is AI-caller-only: agent dispatch REQUIRES a known caller so
-    // per-caller bindings always resolve (a silently-degraded base binding
-    // defeats caller-relative agents like review). An explicit --caller wins;
-    // when omitted, fall back to process-ancestry detection (nearest harness
-    // ancestor — correct even for nested dispatch). Only when detection also
-    // fails is dispatch a hard error. Raw --harness runs take neither — they
-    // bypass the registry entirely.
-    if (!caller) {
-      caller = detectCaller()
-      if (caller) process.stderr.write(`--caller not given; detected "${caller}" from process ancestry\n`)
+    // Agent dispatch requires a known caller so caller-relative bindings never
+    // silently degrade. Process ancestry fills an omitted flag and rejects an
+    // explicit mismatch; raw --harness runs bypass this registry-only rule.
+    const explicitCaller = caller
+    const detectedCaller = detectCaller()
+    try {
+      caller = resolveCallerIdentity(explicitCaller, detectedCaller)
+    } catch (err) {
+      return fail(errorMessage(err))
+    }
+    if (!explicitCaller && caller) {
+      process.stderr.write(`--caller not given; detected "${caller}" from process ancestry\n`)
     }
     if (!caller) {
       return fail(
@@ -280,7 +282,7 @@ const skill = defineCommand({
     caller: {
       type: 'string',
       description:
-        'Render for this caller harness (per-caller bindings + its collection strategy); auto-detected from process ancestry when omitted',
+        'Render for this caller harness; auto-detected when omitted and rejected if it contradicts process ancestry',
     },
   },
   run({ args }) {
@@ -288,10 +290,17 @@ const skill = defineCommand({
     if (args.caller) {
       caller = parseHarnessArg(args.caller, 'caller')
       if (!caller) return
-    } else {
+    }
+    const explicitCaller = caller
+    const detectedCaller = detectCaller()
+    try {
+      caller = resolveCallerIdentity(explicitCaller, detectedCaller)
+    } catch (err) {
+      return fail(errorMessage(err))
+    }
+    if (!explicitCaller) {
       // Undetectable is fine here (e.g. a human in a terminal): render the
       // neutral caller-less doc instead of erroring.
-      caller = detectCaller()
       process.stderr.write(
         caller
           ? `--caller not given; detected "${caller}" from process ancestry\n`

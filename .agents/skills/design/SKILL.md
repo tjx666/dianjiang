@@ -34,7 +34,7 @@ the caller (usually another AI) picks an **agent**, not a model.
 | Architecture | Core as a library; CLI is a thin frontend (GUI-ready later) |
 | Run storage | Structured local store (SQLite): run id → agent, harness, model, session id, duration, exit code, final message |
 | Session strategy | dianjiang generates the UUID; injects via `--session-id` for claude/grok; parses `thread.started.thread_id` from `--json` for codex. External API exposes one unified run id. |
-| Roster delivery | `dianjiang skill --caller <harness>` prints the usage doc (roster + rules) on demand; each vendor ships a thin skill file that runs it. Replaces the removed `setup` global-file injection (2026-07): an always-on injected block weighed on every session's behavior, and the human judged that influence too heavy for a tool used occasionally. On-demand rendering also kills the re-inject-after-config-edit chore. |
+| Roster delivery | `dianjiang skill` prints the usage doc (roster + rules) on demand. A shared thin skill relies on nearest-harness process-ancestry detection; a harness-private skill may pass `--caller <harness>`. Replaces the removed `setup` global-file injection (2026-07): an always-on injected block weighed on every session's behavior, and the human judged that influence too heavy for a tool used occasionally. On-demand rendering also kills the re-inject-after-config-edit chore. |
 | Recursion guard | `DIANJIANG_DEPTH` env var; refuse beyond depth limit. The skill doc also states "when you are the delegate, do not re-delegate." |
 | Attribution | Credit agent-mux in README |
 | Config | Single `~/.dianjiang/config.jsonc` (JSONC over JSON5: VS Code-native tsconfig-style editing, parse with `jsonc-parser`). Agents inline; split into `agents/*.md` only if instructions grow long. Project-level override deferred to phase 2. |
@@ -186,15 +186,18 @@ Locally verified model/effort space:
 
 ## Skill doc (`dianjiang skill`)
 
-`dianjiang skill --caller <harness>` prints the caller's usage doc on demand.
+`dianjiang skill` detects the nearest caller harness and prints its usage doc
+on demand; `--caller <harness>` remains available to harness-private skills
+and plain-terminal inspection.
 This replaced `setup`'s global-instruction-file injection (2026-07): an
 always-on injected roster block influenced every session's behavior, which the
 human judged too heavy for a tool used occasionally, and every config edit
-needed a re-inject. Delivery is now a thin per-vendor skill file (claude:
-`~/.claude/skills/dianjiang/SKILL.md`; codex/grok: their skill/instruction
-mechanism of choice) whose only job is to run the command and follow the
-printed doc — the human maintains those thin files, dianjiang maintains the
-doc. The doc stamps `--caller <harness>` into every documented command
+needed a re-inject. Delivery is now a thin skill file whose only job is to run
+the command and follow the printed doc — the human maintains that file,
+dianjiang maintains the doc. A file shared through `~/.agents/skills` must
+omit `--caller`; process ancestry selects the current harness. A file private
+to one harness may pass its own name explicitly. The doc stamps
+`--caller <harness>` into every documented command
 (`dianjiang run --caller codex <agent> "<task>"`, etc.) so per-caller binding
 overrides resolve without env sniffing.
 
@@ -311,22 +314,26 @@ should vary per caller.
   be overridden per caller for caller-relative descriptions (model-strength
   notes only make sense relative to the caller's own model), each falling back
   to the base agent when omitted; `name`/`instructions` stay single-source.
-- Caller identification: explicit `--caller` first, process-ancestry detection
-  as fallback, hard error only when both fail. Each vendor's thin skill file
-  runs `dianjiang skill --caller <harness>` with its own name, and the printed
-  doc stamps `--caller <harness>` into every documented run command; the AI
-  relays it verbatim. When the flag is dropped (dogfood evidence: codex
-  omitted the stamped flag on its first real dispatch, silently producing a
-  same-vendor `review`), `detectCaller()` in `src/core/caller.ts` walks the
-  ppid chain via `ps` and takes the NEAREST harness ancestor — nearest-wins is
-  correct even for nested dispatch (verified 2026-07-28 with live probes: a
-  codex delegate under a claude session sees codex before the outer claude).
+- Caller identification: reconcile explicit `--caller` with process ancestry.
+  A shared thin skill omits the flag and uses the nearest detected harness; a
+  harness-private skill may name itself. If both sources exist but disagree,
+  fail closed: a 2026-07-29 dogfood run showed Codex loading a Claude-targeted
+  skill through the shared `~/.agents/skills` directory, which applied Claude's
+  caller guidance and wait strategy and would have turned `review` into
+  same-vendor Codex self-review. Earlier dogfood also showed Codex omitting the
+  stamped flag on its first real dispatch, silently producing a same-vendor
+  `review`. `detectCaller()` in `src/core/caller.ts` covers both cases by
+  walking the ppid chain via `ps` and taking the NEAREST harness ancestor —
+  nearest-wins is correct even for nested dispatch (verified 2026-07-28 with
+  live probes: a codex delegate under a claude session sees codex before the
+  outer claude).
   Matching anchors on argv0 basename (plus `@openai/codex` package paths for
   pnpm shims) so vendor names in task text or `~/.claude/...` paths never
-  match. Undetectable (e.g. a human terminal) → agent dispatch is still a hard
-  ERROR (dianjiang is AI-caller-only); `skill` renders the neutral caller-less
-  doc instead. Raw `--harness` runs take no `--caller` (they bypass the
-  registry). ENV-VAR sniffing stays rejected — see Rejected below.
+  match. Undetectable (e.g. a human terminal) → an explicit caller is accepted;
+  without one, agent dispatch is still a hard ERROR (dianjiang is
+  AI-caller-only) while `skill` renders the neutral caller-less doc. Raw
+  `--harness` runs take no `--caller` (they bypass the registry). ENV-VAR
+  sniffing stays rejected — see Rejected below.
 - Deliberately named `callers`, not `callerOverrides`: per-caller settings
   beyond bindings are anticipated — extra template rules, per-caller
   `maxDepth`/`disabled`. Containers named "override" always grow non-override

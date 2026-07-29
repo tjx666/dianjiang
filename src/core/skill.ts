@@ -1,10 +1,12 @@
 /**
  * `skill`: render the on-demand usage doc for a caller harness. Instead of
  * injecting a managed block into vendor global instruction files (the removed
- * `setup` command — always-on injection skewed model behavior too much), each
- * vendor ships a thin skill file whose only job is to run
- * `dianjiang skill --caller <harness>` and follow the printed doc. The doc is
- * rendered fresh from config on every call, so roster edits need no re-inject.
+ * `setup` command — always-on injection skewed model behavior too much), an
+ * installation exposes a thin skill file whose only job is to run
+ * `dianjiang skill` and follow the printed doc. Shared skill files rely on
+ * process ancestry; harness-private files may pass `--caller <harness>`
+ * explicitly. The doc is rendered fresh from config on every call, so roster
+ * edits need no re-inject.
  */
 
 import type { DianjiangConfig, HarnessName } from './types.ts'
