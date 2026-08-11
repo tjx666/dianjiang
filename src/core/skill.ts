@@ -94,7 +94,8 @@ export function renderSkillDoc(config: DianjiangConfig, caller?: HarnessName): s
       return `<agent name="${resolved.name}">\n  <use-when>${resolved.useWhen}</use-when>${dontUse}\n</agent>`
     })
     .join('\n\n')
-  const runCmd = caller ? `dianjiang run --caller ${caller} <agent> "<task>"` : 'dianjiang run <agent> "<task>"'
+  const runPrefix = caller ? `dianjiang run --caller ${caller} <agent>` : 'dianjiang run <agent>'
+  const runCmd = `${runPrefix} "<task>"`
   const callerConfig = caller ? config.callers?.[caller] : undefined
   const prependSection = callerConfig?.prepend
     ? `<caller-guidance>\n${callerConfig.prepend}\n</caller-guidance>\n\n`
@@ -117,6 +118,18 @@ ${agents}
   Always dispatch detached: never try to predict how long a task will take, and
   never wait with \`sleep N\`. The run survives even if you or the wait command
   die — \`dianjiang result <runId>\` recovers it any time.
+- \`"<task>"\` and \`"<message>"\` are placeholders, not shell-quoting recipes.
+  For long, multiline, or quote-containing text, load it from a single-quoted
+  heredoc and pass the variable double-quoted:
+  \`\`\`sh
+  task=$(cat <<'DIANJIANG_TASK'
+  ...task text exactly as written...
+  DIANJIANG_TASK
+  )
+  ${runPrefix} "$task" --detach
+  \`\`\`
+  Choose a delimiter absent from the text. Use the same pattern with a
+  \`message\` variable for \`resume\`; never hand-escape it inside shell quotes.
 - Collect every run with \`dianjiang result <runId> --wait --timeout 300\`: it
   exits with the final JSON the moment the run finishes; on timeout it prints
   \`status: "running"\` — just re-run it. ${caller ? COLLECTION_STRATEGY[caller] : DEFAULT_COLLECTION}

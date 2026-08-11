@@ -220,8 +220,11 @@ the code twice); the full per-caller renders are pinned by snapshot tests in
 3. One `<agent>` element per non-excluded agent: `<use-when>` +
    `<dont-use-when>` (element omitted when unset), caller-relative
    description overrides applied via `resolveAgent`.
-4. `<rules>` — always-dispatch-detached; ONE collect rule that embeds the
-   caller-specific collection strategy from the hardcoded
+4. `<rules>` — always-dispatch-detached; shell-safe task transport (the quoted
+   command arguments are placeholders, while long, multiline, or
+   quote-containing text goes through a single-quoted heredoc and a
+   double-quoted variable); ONE collect rule that embeds the caller-specific
+   collection strategy from the hardcoded
    `COLLECTION_STRATEGY` map (claude: background shell + push notification;
    codex: immediate `spawn_agent` waiter, foreground only as capability
    fallback; grok: background task + push notification; caller-less renders a

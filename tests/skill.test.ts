@@ -108,6 +108,16 @@ describe('renderSkillDoc', () => {
     expect(doc).toContain('DIANJIANG_DEPTH')
   })
 
+  test('documents shell-safe transport for long or quote-containing tasks', () => {
+    for (const caller of [undefined, 'claude', 'codex', 'grok'] as const) {
+      const doc = renderSkillDoc(config, caller)
+      expect(doc).toContain('placeholders, not shell-quoting recipes')
+      expect(doc).toContain("task=$(cat <<'DIANJIANG_TASK'")
+      expect(doc).toContain('"$task"')
+      expect(doc).toContain('never hand-escape it inside shell quotes')
+    }
+  })
+
   test("the default roster's claude render keeps review's focused use-when", () => {
     const doc = renderSkillDoc(parseConfig(defaultConfigJsonc()), 'claude')
     // review is not excluded for the claude caller, so its base use-when renders.
