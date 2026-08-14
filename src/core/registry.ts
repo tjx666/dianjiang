@@ -264,6 +264,15 @@ export function defaultConfigJsonc(): string {
       "harness": "claude",
       "model": "claude-opus-4-6[1m]",
       "instructions": "Output only the rewritten prompt unless asked otherwise."
+    },
+    {
+      "name": "generate-image",
+      "useWhen": "generating or editing raster images such as photos, illustrations, textures, sprites, mockups, or transparent-background cutouts through Codex's built-in image generation, especially when the caller is Claude Code",
+      "dontUseWhen": "the visual should be implemented deterministically as SVG, HTML/CSS, canvas, or another code-native format",
+      "harness": "codex",
+      "model": "gpt-5.6-luna",
+      "effort": "low",
+      "instructions": "Use the imagegen skill, following its built-in image_gen path by default. Complete the requested image generation or edit. For project-bound work, save the final output in the working directory. Return the final artifact path(s), final prompt, and whether built-in or fallback mode was used."
     }
   ],
 
@@ -296,7 +305,10 @@ export function defaultConfigJsonc(): string {
           "effort": "xhigh",
           "useWhen": "you want an independent cross-vendor code review of a diff; in the task, explicitly state the depth you want — a deep comprehensive review (slow on large diffs) or a quick single-pass scan; runs claude opus at xhigh"
         }
-      }
+      },
+      // Codex already exposes imagegen directly — dispatching another Codex
+      // process would add a hop without adding capability.
+      "exclude": ["generate-image"]
       // The codex wait discipline (waiter subagent via spawn_agent) is no longer
       // config text: per-caller collection strategies render structurally inside
       // <rules> (see skill.ts COLLECTION_STRATEGY). \`append\` stays available as

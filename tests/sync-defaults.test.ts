@@ -164,6 +164,22 @@ describe('planSyncDefaults / applySyncDefaults', () => {
     expect(parseConfig(applied).agents.find((a) => a.name === 'my-custom')).toEqual(custom)
   })
 
+  test('a config predating generate-image gains the new managed agent and codex exclusion', () => {
+    const fixture = shape([
+      { path: ['agents', idx('generate-image')], value: undefined },
+      { path: ['callers', 'codex', 'exclude'], value: undefined },
+    ])
+    expect(() => parseConfig(fixture)).not.toThrow()
+
+    const plan = planSyncDefaults(fixture)
+    expect(actions(plan)).toEqual(
+      new Set(['add agents.generate-image', 'add callers.codex.exclude']),
+    )
+
+    const applied = applySyncDefaults(fixture, plan)
+    expectSameConfig(applied, defaultConfigJsonc())
+  })
+
   test('JSONC comments survive an apply', () => {
     const rIdx = idx('review')
     const fixture = shape([{ path: ['agents', rIdx, 'useWhen'], value: V050_REVIEW_USEWHEN }])

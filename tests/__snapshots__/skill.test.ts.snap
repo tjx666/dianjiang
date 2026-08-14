@@ -35,6 +35,11 @@ reach for dianjiang only when an agent below clearly fits.
   <dont-use-when>ordinary coding tasks</dont-use-when>
 </agent>
 
+<agent name="generate-image">
+  <use-when>generating or editing raster images such as photos, illustrations, textures, sprites, mockups, or transparent-background cutouts through Codex's built-in image generation, especially when the caller is Claude Code</use-when>
+  <dont-use-when>the visual should be implemented deterministically as SVG, HTML/CSS, canvas, or another code-native format</dont-use-when>
+</agent>
+
 <rules>
 - \`dianjiang run <agent> "<task>" --detach\` prints one JSON object immediately — save \`.runId\`.
   Always dispatch detached: never try to predict how long a task will take, and
@@ -110,6 +115,11 @@ reach for dianjiang only when an agent below clearly fits.
 <agent name="rewrite-prompt">
   <use-when>rewriting, compressing, or restructuring prompts and agent instructions, especially when a large corpus must be read first; runs opus 4.6 with 1M context — better prose style (文风) than later opus generations</use-when>
   <dont-use-when>ordinary coding tasks</dont-use-when>
+</agent>
+
+<agent name="generate-image">
+  <use-when>generating or editing raster images such as photos, illustrations, textures, sprites, mockups, or transparent-background cutouts through Codex's built-in image generation, especially when the caller is Claude Code</use-when>
+  <dont-use-when>the visual should be implemented deterministically as SVG, HTML/CSS, canvas, or another code-native format</dont-use-when>
 </agent>
 
 <rules>
@@ -282,6 +292,11 @@ reach for dianjiang only when an agent below clearly fits.
 <agent name="rewrite-prompt">
   <use-when>rewriting, compressing, or restructuring prompts and agent instructions, especially when a large corpus must be read first; runs opus 4.6 with 1M context — better prose style (文风) than later opus generations</use-when>
   <dont-use-when>ordinary coding tasks</dont-use-when>
+</agent>
+
+<agent name="generate-image">
+  <use-when>generating or editing raster images such as photos, illustrations, textures, sprites, mockups, or transparent-background cutouts through Codex's built-in image generation, especially when the caller is Claude Code</use-when>
+  <dont-use-when>the visual should be implemented deterministically as SVG, HTML/CSS, canvas, or another code-native format</dont-use-when>
 </agent>
 
 <rules>

@@ -71,7 +71,7 @@ Agents are the product. Config fields per agent:
 - `instructions` — optional agent system prompt, kept short. Cross-vendor
   baseline: prepend to user prompt; claude can use `--append-system-prompt`.
 
-Keep the roster small (currently 5; hard cap ~8). Overlapping agents
+Keep the roster small (currently 6; hard cap ~8). Overlapping agents
 reintroduce the scorecard's selection-paralysis problem in a new costume.
 
 ### Roster
@@ -159,19 +159,21 @@ feel — that is exactly what config-time compilation is for.
 
 Capability agents expose something only one harness can do; they need no
 `callers` binding overrides — they're picked for what they can do, not whose
-opinion they carry (self-vendor dispatch is fine; the one exception is
-`design-frontend`, excluded for the claude caller — it IS claude/fable, so
-that caller's own subagents cover it). All verified live:
+opinion they carry (self-vendor dispatch is fine). A capability agent is
+excluded when the caller already exposes that capability natively:
+`design-frontend` for claude and `generate-image` for codex. All verified live:
 
 | Agent | Harness / model / effort | Capability |
 |---|---|---|
 | `search-twitter` | grok / grok-4.5 / high | grok's native live X/Twitter search tools (verified headless: returns real tweet URLs) |
 | `design-frontend` | claude / fable / high | strongest visual/UX taste for front-end work |
 | `rewrite-prompt` | claude / claude-opus-4-6[1m] / — | 1M-context ingestion before rewriting prompts/instructions |
+| `generate-image` | codex / gpt-5.6-luna / low | codex's built-in `imagegen` skill + `image_gen` tool for raster generation and editing |
 
-Blocked: `generate-image` via codex `gpt-image-2` — codex rejects image models
-under ChatGPT-subscription auth (HTTP 400). Needs API-key auth on codex, or a
-different image-capable harness; parked.
+The earlier direct-model route remains rejected: codex rejects `gpt-image-2`
+as the session model under ChatGPT-subscription auth (HTTP 400). The shipped
+agent instead runs a cheap general Codex model and invokes Codex's built-in
+image-generation tool, which requires no API-key auth.
 
 Locally verified model/effort space:
 
@@ -346,7 +348,8 @@ should vary per caller.
   rejected at dispatch with a clear error. A name in both `exclude` and that
   caller's `agents` overrides is a validation error. User: claude excludes
   `design-frontend` (it IS claude/fable — the claude caller gains nothing
-  over its own subagents).
+  over its own subagents); codex excludes `generate-image` because it exposes
+  the same `imagegen` capability directly.
 - `callers.<h>.prepend: string` — free-form markdown rendered at the TOP of
   that caller's skill doc (before the intro), wrapped in `<caller-guidance>`
   so it reads as caller behavior, not a dianjiang rule. For scoping rules the
