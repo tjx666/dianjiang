@@ -14,6 +14,7 @@
  */
 
 import type { HarnessName } from './types.ts'
+import { runSync } from './exec.ts'
 
 /**
  * Classify one `ps -o command=` line as a harness process, or undefined.
@@ -81,9 +82,9 @@ export function ancestorCommands(startPid = process.ppid, maxDepth = 20): string
   for (let i = 0; i < maxDepth && pid > 1; i++) {
     let stdout: string
     try {
-      const proc = Bun.spawnSync(['ps', '-o', 'ppid=,command=', '-p', String(pid)])
+      const proc = runSync(['ps', '-o', 'ppid=,command=', '-p', String(pid)])
       if (proc.exitCode !== 0) break
-      stdout = proc.stdout.toString()
+      stdout = proc.stdout
     } catch {
       break
     }

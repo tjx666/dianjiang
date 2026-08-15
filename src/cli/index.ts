@@ -1,4 +1,4 @@
-#!/usr/bin/env bun
+#!/usr/bin/env node
 /**
  * dianjiang CLI — a thin frontend over the core library. Every command that
  * produces machine output prints exactly one JSON object/array on stdout; human
@@ -13,6 +13,7 @@ import { defineCommand, runMain } from 'citty'
 import type { AgentConfig, DianjiangConfig, HarnessName } from '../core/types.ts'
 import { HARNESS_NAMES } from '../core/types.ts'
 import { adapters, describeHarness } from '../core/adapters/index.ts'
+import { runSync } from '../core/exec.ts'
 import { detectCaller, resolveCallerIdentity } from '../core/caller.ts'
 import {
   appendAgent,
@@ -367,7 +368,7 @@ function editInEditor(initial: string): string {
   // $EDITOR may carry args (e.g. "code -w"); split it into an argv.
   const editor = (process.env.EDITOR ?? 'vi').trim() || 'vi'
   try {
-    Bun.spawnSync({ cmd: [...editor.split(/\s+/), file], stdio: ['inherit', 'inherit', 'inherit'] })
+    runSync([...editor.split(/\s+/), file], { stdio: 'inherit' })
     return readFileSync(file, 'utf8').trim()
   } finally {
     try {

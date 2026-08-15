@@ -1,12 +1,6 @@
-#!/usr/bin/env bun
+#!/usr/bin/env node
 /**
- * Bin entry: a runtime guard that fails with a helpful message when executed
- * by Node (e.g. Windows npm shims force node; `npx` too) instead of Bun. It
- * must not statically import the CLI — the real entry pulls in `bun:sqlite`,
- * which would crash Node during module resolution before this guard could run.
+ * Published entry. TypeScript on purpose: Node ≥22.18 strips types natively,
+ * and Bun runs `.ts` directly. npm shims invoke this with node; `bunx` with bun.
  */
-if (typeof globalThis.Bun === 'undefined') {
-  console.error('dianjiang requires the Bun runtime (https://bun.sh): install Bun, then retry.')
-  process.exit(1)
-}
 await import('./index.ts')

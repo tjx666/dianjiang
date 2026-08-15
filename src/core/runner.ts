@@ -13,6 +13,7 @@
 
 import { spawn, type ChildProcess } from 'node:child_process'
 import { closeSync, openSync, readFileSync, unlinkSync } from 'node:fs'
+import type { Readable } from 'node:stream'
 import { fileURLToPath } from 'node:url'
 import type {
   DianjiangConfig,
@@ -95,18 +96,14 @@ export function buildReport(record: RunRecord): RunReport {
  * process.stdout/stderr ARE the run's log file, so the harness output is
  * persisted progressively — partial output survives even a killed worker.
  */
-async function tee(
-  stream: ReadableStream<Uint8Array>,
-  sink: { write(chunk: string): unknown },
-): Promise<string> {
-  const decoder = new TextDecoder()
+async function tee(stream: Readable, sink: { write(chunk: string): unknown }): Promise<string> {
   let text = ''
   for await (const chunk of stream) {
-    const part = decoder.decode(chunk, { stream: true })
+    const part = typeof chunk === 'string' ? chunk : Buffer.from(chunk).toString()
     text += part
     sink.write(part)
   }
-  return text + decoder.decode()
+  return text
 }
 
 /**
@@ -120,18 +117,20 @@ async function runToCompletion(record: RunRecord, spec: DispatchSpec): Promise<R
   // The child is one level deeper; its own guard reads this.
   const childDepth = Number(process.env.DIANJIANG_DEPTH ?? 0) + 1
 
-  const proc = Bun.spawn(command.cmd, {
+  const [bin, ...args] = command.cmd
+  if (!bin) throw new Error('adapter returned an empty command')
+  const proc = spawn(bin, args, {
     cwd: record.cwd,
     env: { ...process.env, ...(command.env ?? {}), DIANJIANG_DEPTH: String(childDepth) },
-    stdout: 'pipe',
-    stderr: 'pipe',
+    stdio: ['ignore', 'pipe', 'pipe'],
   })
+  if (!proc.stdout || !proc.stderr) throw new Error('spawn did not provide piped stdio')
 
-  const [stdout, stderr] = await Promise.all([
-    tee(proc.stdout, process.stdout),
-    tee(proc.stderr, process.stderr),
-  ])
-  const exitCode = await proc.exited
+  const [stdout, stderr] = await Promise.all([tee(proc.stdout, process.stdout), tee(proc.stderr, process.stderr)])
+  const exitCode = await new Promise<number>((resolve, reject) => {
+    proc.once('error', reject)
+    proc.once('close', (code) => resolve(code ?? 1))
+  })
   const finishedAt = new Date().toISOString()
 
   // Read then remove the adapter's temp output file, if it declared one.

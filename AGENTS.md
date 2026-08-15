@@ -1,8 +1,9 @@
 # dianjiang — agent instructions
 
-Cross-vendor coding-agent dispatch CLI (bun + TypeScript). It dispatches a
-self-contained task to Claude Code / Codex / Grok behind a named **agent**
-preset.
+Cross-vendor coding-agent dispatch CLI (TypeScript). Develop and test with
+bun; the published CLI runs on Node ≥ 22.18 (type-stripping) and on bun.
+It dispatches a self-contained task to Claude Code / Codex / Grok behind a
+named **agent** preset.
 
 User-facing usage (roster, rules, collection) is `dianjiang skill` — rendered
 from config, do not copy it into README or a static skill file. Design
@@ -27,7 +28,7 @@ bun run src/cli/index.ts <command>   # run the CLI without linking
   - `adapters/` — one module per harness CLI (claude / codex / grok)
   - `runner.ts` — dispatch; every run (sync included) executes in a detached
     `_exec` worker so a dying caller never kills the job
-  - `store.ts` — bun:sqlite run store; `registry.ts` — JSONC config;
+  - `store.ts` — SQLite run store (bun:sqlite or node:sqlite); `registry.ts` — JSONC config;
     `skill.ts` — renders the on-demand usage doc printed by `dianjiang skill`
     (per-caller collection strategies live here, in code, not config);
     `sync-defaults.ts` — exact-match config upgrade to current defaults

@@ -1,10 +1,10 @@
 import { afterEach, beforeEach, expect, test } from 'bun:test'
-import { Database } from 'bun:sqlite'
 import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import type { RunRecord } from '../src/core/types.ts'
+import { openDatabase } from '../src/core/sqlite.ts'
 import { getRun, insertRun, listRuns, updateRun } from '../src/core/store.ts'
+import type { RunRecord } from '../src/core/types.ts'
 
 let home: string
 
@@ -116,7 +116,7 @@ test('lazy migration: an OLD-schema DB gains usage columns and old rows survive'
   // Reproduce the real ~/.dianjiang/runs.sqlite that predates the usage columns:
   // create the table WITHOUT them, insert a row, then reopen through the store.
   const path = join(home, 'runs.sqlite')
-  const old = new Database(path, { create: true })
+  const old = openDatabase(path)
   old.exec(`CREATE TABLE runs (
     run_id TEXT PRIMARY KEY,
     agent TEXT,

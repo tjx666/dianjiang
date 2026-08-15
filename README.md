@@ -18,7 +18,7 @@ you ──► Claude
 
 ## Install
 
-Needs [Bun](https://bun.sh) ≥ 1.2 and the CLIs you want to dispatch: [`claude`](https://docs.anthropic.com/en/docs/claude-code), [`codex`](https://github.com/openai/codex), [`grok`](https://github.com/xai-org/grok-build).
+Needs [Node](https://nodejs.org) ≥ 22.18 and the CLIs you want to dispatch: [`claude`](https://docs.anthropic.com/en/docs/claude-code), [`codex`](https://github.com/openai/codex), [`grok`](https://github.com/xai-org/grok-build).
 
 ```sh
 npm install -g dianjiang

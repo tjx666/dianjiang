@@ -29,7 +29,7 @@ the caller (usually another AI) picks an **agent**, not a model.
 
 | Decision | Choice |
 |---|---|
-| Language | TypeScript (bun runtime; `bun build --compile` for single binary later) |
+| Language | TypeScript. Develop/test on bun. Published CLI is source and runs on Node ≥ 22.18 (native type-stripping) and bun. `bun build --compile` for a single binary still later. |
 | Permissions | All-YOLO, no sandbox/permission management (phase 1) |
 | Architecture | Core as a library; CLI is a thin frontend (GUI-ready later) |
 | Run storage | Structured local store (SQLite): run id → agent, harness, model, session id, duration, exit code, final message |
@@ -41,7 +41,7 @@ the caller (usually another AI) picks an **agent**, not a model.
 | Background runs | Every run executes in a detached `_exec` worker; sync mode just waits for it ("job done is holy", credit agent-mux — the job survives caller timeout/death, and callers are AI agents whose shell tools cap at ~10 min). `--detach` returns immediately; block on `result --wait [--timeout <sec>]` (store-polling, since the worker isn't waitpid-able; bounded, so it never reintroduces the caller-shell-timeout problem that motivated `--detach` — never teach callers to sleep-and-poll), instant snapshot via `status`. Artifact path: full harness stdout/stderr tees to `logs/<runId>.log` progressively. The skill doc's rules teach AI callers to ALWAYS dispatch detached: the earlier "detach if likely >5 min" branch was removed (2026-07) because LLM duration estimates are unreliable, so any rule keyed on them mis-routes; detach costs one extra command and covers every case. Sync run remains for human use. How each caller WAITS is a per-caller collection strategy rendered from skill.ts's `COLLECTION_STRATEGY` map — see "Skill doc". |
 | Execution contract freeze | Resolved agent `instructions` are stamped into the RunRecord at dispatch; the detached worker and every `resume` read the record, never the live config — a config edit or removal can no longer mutate an in-flight or resumable run's contract (2026-07) |
 | Defaults upgrade | `config sync-defaults` — exact-match migration: a managed field upgrades only when its current value equals a known historical default (anything else is a user customization and is kept); removed defaults are dropped under the same rule; `--dry-run` previews. Never a blind overwrite; `config init --force` remains the nuke-and-regenerate escape hatch |
-| CLI framework | citty (TS-first, lightweight); core stays dependency-light (`bun:sqlite` built-in) |
+| CLI framework | citty (TS-first, lightweight); core stays dependency-light (SQLite via `bun:sqlite` or `node:sqlite`, no native addon) |
 | Extension point | `adapter`, not `provider`. Ecosystem rule: "provider" = another chat/completions endpoint (AI SDK, LiteLLM, opencode); "adapter" = a full external runtime with its own event stream and session lifecycle (agent-mux "harness adapters", terminal-bench adapters, LobeHub agent adaptor). Custom harness support later = public `HarnessAdapter` interface. |
 | Caller-relative bindings | `callers.<harness>.agents.<name>` sparse binding overrides; `dianjiang skill --caller <harness>` stamps `--caller` into its rendered doc (see "Caller-relative agents") |
 

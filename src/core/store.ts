@@ -1,12 +1,12 @@
 /**
- * SQLite-backed run store (bun:sqlite). One row per dispatched run; the unified
- * `RunReport` is derived from these rows. Columns are snake_case; the RunRecord
- * fields are camelCase, mapped explicitly below.
+ * SQLite-backed run store. One row per dispatched run; the unified `RunReport`
+ * is derived from these rows. Columns are snake_case; the RunRecord fields are
+ * camelCase, mapped explicitly below.
  */
 
-import { Database } from 'bun:sqlite'
 import type { HarnessName, RunRecord, RunStatus, RunUsage } from './types.ts'
 import { dbPath } from './paths.ts'
+import { openDatabase, type SqliteDatabase } from './sqlite.ts'
 
 /** Raw DB row shape (snake_case, nullable columns). */
 interface Row {
@@ -74,7 +74,7 @@ const USAGE_COLUMNS: Record<keyof RunUsage, string> = {
  * then `instructions`), so on every open we reconcile the schema. Old rows read
  * back with the added columns null.
  */
-function ensureColumns(db: Database): void {
+function ensureColumns(db: SqliteDatabase): void {
   const existing = new Set(
     (db.query('PRAGMA table_info(runs)').all() as { name: string }[]).map((c) => c.name),
   )
@@ -93,8 +93,8 @@ function ensureColumns(db: Database): void {
 }
 
 /** Open (or create) a store at `path`, ensuring schema + WAL. */
-function openStore(path: string): Database {
-  const db = new Database(path, { create: true })
+function openStore(path: string): SqliteDatabase {
+  const db = openDatabase(path)
   db.exec('PRAGMA journal_mode = WAL;')
   db.exec(`CREATE TABLE IF NOT EXISTS runs (
     run_id TEXT PRIMARY KEY,
@@ -126,10 +126,10 @@ function openStore(path: string): Database {
 }
 
 /** Cache one Database per resolved path (tests use per-test temp homes). */
-const cache = new Map<string, Database>()
+const cache = new Map<string, SqliteDatabase>()
 
 /** Get the store for the active home (DIANJIANG_HOME-aware). */
-export function getStore(path = dbPath()): Database {
+export function getStore(path = dbPath()): SqliteDatabase {
   let db = cache.get(path)
   if (!db) {
     db = openStore(path)

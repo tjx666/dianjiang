@@ -16,6 +16,7 @@
  */
 
 import type { DispatchSpec, HarnessAdapter, HarnessResult, KnownModel, RunUsage } from '../types.ts'
+import { runSync } from '../exec.ts'
 import { asRecord, finalizeUsage, num, withInstructions } from './shared.ts'
 
 /**
@@ -80,9 +81,9 @@ export const grokAdapter: HarnessAdapter = {
 
   listModels(): string[] | undefined {
     try {
-      const proc = Bun.spawnSync(['grok', 'models'])
+      const proc = runSync(['grok', 'models'])
       if (proc.exitCode !== 0) return undefined
-      return parseGrokModels(proc.stdout.toString())
+      return parseGrokModels(proc.stdout)
     } catch {
       // Binary not found or not executable.
       return undefined

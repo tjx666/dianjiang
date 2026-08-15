@@ -2,6 +2,7 @@
 
 import type { HarnessAdapter, HarnessName, KnownModel } from '../types.ts'
 import { HARNESS_NAMES } from '../types.ts'
+import { runSync } from '../exec.ts'
 import { claudeAdapter } from './claude.ts'
 import { codexAdapter } from './codex.ts'
 import { grokAdapter } from './grok.ts'
@@ -23,8 +24,8 @@ export interface HarnessVersion {
 /** Probe one harness CLI's `--version`. Missing binary → not installed. */
 function probeVersion(adapter: HarnessAdapter): { installed: boolean; version: string | null } {
   try {
-    const proc = Bun.spawnSync([adapter.name, ...adapter.versionArgs])
-    if (proc.exitCode === 0) return { installed: true, version: proc.stdout.toString().trim() }
+    const proc = runSync([adapter.name, ...adapter.versionArgs])
+    if (proc.exitCode === 0) return { installed: true, version: proc.stdout.trim() }
   } catch {
     // Binary not found or not executable.
   }
