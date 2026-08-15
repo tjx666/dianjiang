@@ -2,7 +2,12 @@
 
 Cross-vendor coding-agent dispatch CLI (bun + TypeScript). It dispatches a
 self-contained task to Claude Code / Codex / Grok behind a named **agent**
-preset. See README.md for the user-facing story.
+preset.
+
+User-facing usage (roster, rules, collection) is `dianjiang skill` — rendered
+from config, do not copy it into README or a static skill file. Design
+decisions live in `.agents/skills/design/SKILL.md`. README is the landing page
+only.
 
 ## Commands
 

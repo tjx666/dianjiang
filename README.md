@@ -1,174 +1,45 @@
 # dianjiang (点将)
 
-> 点将 (diǎn jiàng) — in classical Chinese military drama, the commander reviews
-> the roster and names the general best suited for the mission.
+[![npm](https://img.shields.io/npm/v/dianjiang.svg)](https://www.npmjs.com/package/dianjiang)
+[![license](https://img.shields.io/npm/l/dianjiang.svg)](LICENSE)
 
-`dianjiang` is a neutral, top-level CLI that dispatches a self-contained task to
-the right coding-agent CLI — Claude Code, Codex, or Grok — behind a **named
-agent** you picked at config time. The caller (usually another AI) picks an
-agent by task shape; it never juggles models or effort levels at runtime.
+> Summon the right coding agent.
 
-**A tool, not an orchestrator.** dianjiang dispatches one run and gets out of the
-way; loops, fan-out, and judgment stay with the calling agent.
+You already pay for Claude Code, Codex, and Grok. They still work like strangers.
 
-## Concepts
+`dianjiang` lets one of them dispatch a task to another — behind a **named agent**. The caller picks `review` or `search-twitter`. It never picks a model.
 
-| Term | Meaning |
-|---|---|
-| **agent** | A named, human-compiled preset: harness + model + effort + optional instructions (e.g. `review`, `search-twitter`). The product. |
-| **roster** | The small set of agents in `config.jsonc` (v1: 5, hard cap ~8). |
-| **harness** | An underlying coding-agent CLI: `claude`, `codex`, or `grok`. |
-| **adapter** | The module that adapts one harness (its flags, event stream, session lifecycle) to dianjiang's contracts. |
-| **run** | One dispatched execution, addressed by a unified `runId` and persisted in SQLite. |
-
-An agent's binding can be overridden per caller via the `callers` namespace in
-`config.jsonc` — e.g. `review` rebinds to a different vendor depending on which
-harness is calling. `dianjiang skill --caller <harness>` renders the usage doc
-with `--caller` stamped into every documented command.
+```
+you ──► Claude
+           │  dianjiang run review "…"
+           ▼
+         Codex
+```
 
 ## Install
 
-Requires the [Bun](https://bun.sh) runtime — dianjiang uses `bun:sqlite` and
-Bun process APIs and will not run under Node.
+Needs [Bun](https://bun.sh) ≥ 1.2 and the CLIs you want to dispatch: [`claude`](https://docs.anthropic.com/en/docs/claude-code), [`codex`](https://github.com/openai/codex), [`grok`](https://github.com/xai-org/grok-build).
 
 ```sh
-bun install -g dianjiang
+npm install -g dianjiang
+dianjiang config init
 ```
 
-Or from source:
-
-```sh
-bun install
-bun link          # exposes `dianjiang` on your PATH
-```
-
-State lives in `~/.dianjiang/` (`config.jsonc` + `runs.sqlite`); override the
-directory with `DIANJIANG_HOME`.
-
-## Hooking dianjiang into a harness
-
-dianjiang deliberately injects nothing into global instruction files — an
-always-on roster block weighs on every session's behavior. Instead, give your
-harnesses a thin, on-demand skill whose only job is to run `dianjiang skill`
-and follow the printed doc. Process ancestry identifies the nearest harness;
-the rendered doc then stamps that caller into every dispatch command. The
-roster, dispatch rules, and caller-specific collection strategy are rendered
-fresh from config on every call, so roster edits never need a re-sync.
-
-Example shared `~/.agents/skills/dianjiang/SKILL.md`:
+Drop this skill on every harness (`~/.agents/skills/dianjiang/SKILL.md`):
 
 ```markdown
 ---
 name: dianjiang
-description: Dispatch a self-contained task to another coding-agent CLI (Claude Code / Codex / Grok) behind a named agent preset. Use on 点将, "delegate this to codex/grok", or when a cross-vendor opinion/capability is wanted.
+description: Dispatch a self-contained task to Claude Code / Codex / Grok behind a named agent. Use on 点将, "delegate this to codex", or when a cross-vendor opinion is wanted.
 ---
 
 Run `dianjiang skill` and follow the doc it prints.
 ```
 
-If a skill file is private to exactly one harness, it may pass
-`--caller <harness>` explicitly. Never hardcode a caller in a shared directory:
-when process ancestry identifies a different harness, dianjiang rejects the
-mismatch instead of applying the wrong roster or collection strategy.
+Then, in any of the three:
 
-## Safety notes
+> 点将，让 review 看一下这个 diff。
 
-- Dispatched harnesses run in **YOLO mode**: dianjiang passes each CLI's
-  permission-bypass flag (`--dangerously-skip-permissions`,
-  `--dangerously-bypass-approvals-and-sandbox`, `--always-approve`). A
-  dispatched agent can edit files and run commands unattended — only dispatch
-  tasks you would let an unattended agent do in that working directory.
-- The default roster pins concrete model names, and vendors rotate models
-  quickly; treat `dianjiang config harnesses` as the source of truth for what
-  your installed CLIs actually accept.
+Roster, rules, and how to collect a run live in `dianjiang skill` — not here.
 
-## Usage
-
-```sh
-# One-time: write a starter roster.
-dianjiang config init
-
-# Print the usage doc for a caller harness (what an AI caller reads on demand —
-# roster, rules, and that caller's collection strategy, rendered from config).
-dianjiang skill --caller claude
-
-# Dispatch by agent (primary path) — blocks, prints one JSON object; read .result.
-# --caller names the dispatching harness (bindings resolve per caller); when
-# omitted, dianjiang detects it from process ancestry (nearest harness ancestor)
-# and errors only if none is found
-dianjiang run --caller claude search-twitter "What are people saying about bun 1.3 this week?"
-
-# Resolve an agent's binding relative to the caller (see `callers` in config).
-# From a codex session, `review` rebinds off codex to another vendor.
-dianjiang run --caller codex review "Review the diff in src/parser.ts"
-
-# Raw escape hatch — bypass the registry
-dianjiang run --harness codex -m gpt-5.6-sol "Refactor the parser"
-
-# Recommended for AI callers (any task length): dispatch detached, then collect
-# — event-driven, no sleep-polling, survives caller death. The skill doc
-# tells each caller HOW to run the collect command without stalling its loop
-# (claude/grok: background shell; codex: waiter subagent).
-dianjiang run --caller claude review "review a large multi-file diff" --detach
-dianjiang result <runId> --wait --timeout 300   # on timeout: status "running", re-run to keep waiting
-dianjiang status <runId>                        # instant snapshot, never blocks
-
-# Follow up in the same harness session
-dianjiang resume <runId> "also handle the error case"
-
-# Upgrade an existing config to the current defaults without losing your edits:
-# only fields still equal to a KNOWN historical default are rewritten (exact-match
-# migration); anything you customized is kept and reported. --dry-run previews.
-dianjiang config sync-defaults --dry-run
-dianjiang config sync-defaults
-
-# Inspect
-dianjiang config agents
-dianjiang config harnesses      # self-check: installed CLIs, versions, efforts + accepted models
-dianjiang stats                 # per-agent usage: runs, success, duration, tokens, cost
-dianjiang stats --agent review   # restrict to one agent
-```
-
-### Stats
-
-`dianjiang stats` aggregates the run store per agent (raw `--harness` dispatches
-group per harness), printing one JSON array: runs, completed/failed counts,
-durations, and summed tokens/turns/cost. dianjiang records **only what each
-harness reports** — no price tables, no estimation. Tokens and turns come from
-whatever the harness prints; cost is harness-reported only: claude reports
-`total_cost_usd`, so `costUsd` is populated for claude-backed groups and stays
-`null` for codex and grok (their subscription pricing makes any estimate
-fictional). A `null` token/cost field means "no run in that group reported it",
-never a synthesized zero.
-
-Every machine-readable command prints exactly one JSON value on stdout; harness
-logs and human chatter go to stderr. Exit codes: `0` ok, `1` error/failed run,
-`2` recursion-depth limit reached.
-
-### Job done is holy
-
-Every run — sync or `--detach` — executes in a detached worker (credit
-agent-mux for the principle), so a caller timing out or dying never kills the
-job. Recover any run later with `dianjiang result <runId>`. The full harness
-output streams progressively to `~/.dianjiang/logs/<runId>.log` — every
-dispatch has an artifact path.
-
-### Recursion guard
-
-dianjiang sets `DIANJIANG_DEPTH` in the environment of every harness it spawns
-and refuses to dispatch once it reaches `maxDepth`. If `DIANJIANG_DEPTH` is set
-in your environment, you are already a delegate — don't re-delegate.
-
-## Acknowledgements
-
-- [buildoak/agent-mux](https://github.com/buildoak/agent-mux) — design
-  inspiration: a neutral CLI with predeclared session UUIDs, a `config`
-  harness/engine self-check, and the "a tool, not an orchestrator" framing.
-- LobeHub "Heterogeneous Agents"
-  ([RFC-153](https://github.com/lobehub/lobehub/discussions/13927)) — external
-  CLI harnesses as first-class agents behind one shared interface; the
-  agent / harness / adapter terminology stack.
-
-## License
-
-MIT
+Inspired by [agent-mux](https://github.com/buildoak/agent-mux). MIT.
