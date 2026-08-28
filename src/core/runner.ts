@@ -63,9 +63,14 @@ function errorMessage(err: unknown): string {
   return err instanceof Error ? err.message : String(err)
 }
 
-/** Absolute path to the CLI entry, used to re-spawn as a detached worker. */
+/**
+ * Absolute path to the CLI entry used to re-spawn as a detached worker.
+ * Source runs use TypeScript, while the npm bundle inlines this module into
+ * either dist entrypoint; both bundles resolve the published worker to bin.js.
+ */
 function cliEntryPath(): string {
-  return fileURLToPath(new URL('../cli/index.ts', import.meta.url))
+  const entry = import.meta.url.endsWith('.ts') ? '../cli/bin.ts' : '../cli/bin.js'
+  return fileURLToPath(new URL(entry, import.meta.url))
 }
 
 /** Build the stdout `RunReport` from a persisted record. */

@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Published entry. TypeScript on purpose: Node ≥22.18 strips types natively,
- * and Bun runs `.ts` directly. npm shims invoke this with node; `bunx` with bun.
+ * Source entry for the published CLI. `prepack` bundles it to JavaScript because
+ * Node deliberately refuses to strip TypeScript from packages in node_modules.
  */
 await import('./index.ts')

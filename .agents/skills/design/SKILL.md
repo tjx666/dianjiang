@@ -29,7 +29,7 @@ the caller (usually another AI) picks an **agent**, not a model.
 
 | Decision | Choice |
 |---|---|
-| Language | TypeScript. Develop/test on bun. Published CLI is source and runs on Node ≥ 22.18 (native type-stripping) and bun. `bun build --compile` for a single binary still later. |
+| Language | TypeScript. Develop/test on bun. `prepack` bundles the CLI and library entrypoints to Node-targeted ESM JavaScript with npm dependencies external and emits declarations, because Node refuses TypeScript type stripping under `node_modules`; the installed package runs on Node ≥ 22.18 and bun. `bun build --compile` for a single binary still later. |
 | Permissions | All-YOLO, no sandbox/permission management (phase 1) |
 | Architecture | Core as a library; CLI is a thin frontend (GUI-ready later) |
 | Run storage | Structured local store (SQLite): run id → agent, harness, model, session id, duration, exit code, final message |

@@ -26,21 +26,28 @@
     "registry": "https://registry.npmjs.org/"
   },
   "bin": {
-    "dianjiang": "./src/cli/bin.ts"
+    "dianjiang": "dist/cli/bin.js"
   },
   "engines": {
     "node": ">=22.18.0"
   },
+  "types": "./dist/core/index.d.ts",
   "exports": {
-    ".": "./src/core/index.ts"
+    ".": {
+      "types": "./dist/core/index.d.ts",
+      "default": "./dist/core/index.js"
+    }
   },
   "files": [
-    "src"
+    "dist"
   ],
   "scripts": {
-    "prepublishOnly": "bun run check && bun test",
+    "build": "bun run scripts/build.ts",
+    "prepack": "bun run build",
+    "prepublishOnly": "bun run check && bun test && bun run test:package",
     "check": "tsc --noEmit",
     "test": "bun test",
+    "test:package": "bun run scripts/package-smoke.ts",
     "smoke": "bun run scripts/smoke.ts"
   },
   "dependencies": {

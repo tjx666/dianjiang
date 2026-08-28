@@ -1,7 +1,8 @@
 # dianjiang — agent instructions
 
 Cross-vendor coding-agent dispatch CLI (TypeScript). Develop and test with
-bun; the published CLI runs on Node ≥ 22.18 (type-stripping) and on bun.
+bun; `prepack` bundles the published package to JavaScript so it runs from
+`node_modules` on Node ≥ 22.18 and on bun.
 It dispatches a self-contained task to Claude Code / Codex / Grok behind a
 named **agent** preset.
 

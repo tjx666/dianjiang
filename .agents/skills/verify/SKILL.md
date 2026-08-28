@@ -10,11 +10,18 @@ must (a) isolate all state and (b) keep live AI calls minimal-cost.
 
 ## Handle
 
-No build step. Run the CLI directly:
+Run the CLI directly during source development:
 
 ```bash
 bun run src/cli/index.ts <command>
 ```
+
+Before publishing, run `bun run build`; npm's `prepack` lifecycle builds the
+same JavaScript and declaration artifacts under `dist/`. Always run
+`bun run test:package`, which packs and installs the tarball in a fresh temporary
+npm project, then exercises the npm bin shim, a detached worker, both SQLite
+runtimes, and the public library export. Source-only checks miss packaging
+failures because Node refuses to execute TypeScript inside `node_modules`.
 
 ## Isolation — ALWAYS
 
