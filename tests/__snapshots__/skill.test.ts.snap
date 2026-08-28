@@ -230,14 +230,18 @@ reach for dianjiang only when an agent below clearly fits.
   for runs you might dispatch later. The waiter's completion notification
   wakes you with the result; your shell sessions do NOT push completion
   events, so a background-shell wait WILL be forgotten. NEVER poll the waiter
-  with repeated short \`wait_agent\` (or equivalent) calls — each one renders
-  "Waiting for agents" noise. If you must wait explicitly, issue ONE long
-  interruptible wait, wait again only if that single wait itself times out,
-  and print no "still waiting" updates in between. Do not wait in the
-  foreground first, and do not gate the waiter on how long you expect the run
-  to take. Fall back to a foreground wait ONLY if subagents are unavailable or
-  no slot is free. Every dispatched run must be collected before your turn
-  ends.
+  with repeated \`wait_agent\` calls — each one renders visible "Waiting for
+  agents" noise. When you need the waiter's result and have no other useful
+  work, call \`wait_agent({ timeout_ms: 3600000 })\` ONCE, using the maximum
+  supported one-hour timeout. It returns early when the waiter finishes or new
+  user input arrives; new input does not stop the waiter. If the result is still
+  pending afterward, handle any input or other work first, then use another
+  maximum-timeout wait only when the waiter is again your sole unfinished work.
+  NEVER shorten the timeout to poll, and print no unchanged-status updates
+  between waits. Do not wait in the foreground first, and do not gate the waiter
+  on how long you expect the run to take. Fall back to a foreground wait ONLY if
+  subagents are unavailable or no slot is free. Every dispatched run must be
+  collected before your turn ends.
 - Check \`.status\` first: read \`.result\` when it is "completed" — on "failed"
   \`.result\` is the stderr tail, not an answer.
 - Write tasks self-contained (background, file paths, acceptance criteria,

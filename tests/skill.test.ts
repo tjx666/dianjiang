@@ -168,7 +168,7 @@ describe('renderSkillDoc collection-strategy conflict freedom', () => {
   test('codex render routes the wait through a waiter subagent', () => {
     const doc = renderSkillDoc(defaultConfig, 'codex')
     expect(doc).toContain('spawn_agent')
-    expect(doc).toContain('Do not wait in the\n  foreground first')
+    expect(doc).toMatch(/Do not wait in the\s+foreground first/)
     expect(doc).not.toContain('run_in_background')
   })
 
@@ -189,10 +189,13 @@ describe('renderSkillDoc collection-strategy conflict freedom', () => {
 
   test('codex render forbids repeated short main-agent waits', () => {
     const doc = renderSkillDoc(defaultConfig, 'codex')
-    expect(doc).toContain('NEVER poll the waiter\n  with repeated short `wait_agent` (or equivalent) calls')
-    expect(doc).toContain('ONE long\n  interruptible wait')
-    expect(doc).toContain('wait again only if that single wait itself times out')
-    expect(doc).toContain('print no "still waiting" updates')
+    expect(doc).toMatch(/NEVER poll the waiter\s+with repeated `wait_agent` calls/)
+    expect(doc).toContain('`dianjiang result <runId> --wait --timeout 300`')
+    expect(doc).toContain('`wait_agent({ timeout_ms: 3600000 })`')
+    expect(doc).toMatch(/maximum\s+supported one-hour timeout/)
+    expect(doc).toContain('NEVER shorten the timeout to poll')
+    expect(doc).toMatch(/print no unchanged-status updates\s+between waits/)
+    expect(doc).not.toContain('ONE long')
   })
 
   test('claude render waits in a background shell', () => {

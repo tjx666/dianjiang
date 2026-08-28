@@ -27,6 +27,9 @@ import { resolveAgent } from './registry.ts'
  * for the ROOT agent to poll `wait_agent` every 30s — codex renders each short
  * wait as visible "Waiting for agents" noise — so the codex strategy now pins
  * the re-run loop to the waiter and bans short-poll waits on the parent.
+ * A third incident (2026-08): "one long wait" was still interpreted as a 60s
+ * parent-side poll. The strategy therefore names Codex's maximum supported
+ * one-hour wait explicitly instead of leaving "long" open to interpretation.
  */
 const COLLECTION_STRATEGY: Record<HarnessName, string> = {
   claude: `Start that command in a background shell (\`run_in_background: true\`)
@@ -43,14 +46,18 @@ const COLLECTION_STRATEGY: Record<HarnessName, string> = {
   for runs you might dispatch later. The waiter's completion notification
   wakes you with the result; your shell sessions do NOT push completion
   events, so a background-shell wait WILL be forgotten. NEVER poll the waiter
-  with repeated short \`wait_agent\` (or equivalent) calls — each one renders
-  "Waiting for agents" noise. If you must wait explicitly, issue ONE long
-  interruptible wait, wait again only if that single wait itself times out,
-  and print no "still waiting" updates in between. Do not wait in the
-  foreground first, and do not gate the waiter on how long you expect the run
-  to take. Fall back to a foreground wait ONLY if subagents are unavailable or
-  no slot is free. Every dispatched run must be collected before your turn
-  ends.`,
+  with repeated \`wait_agent\` calls — each one renders visible "Waiting for
+  agents" noise. When you need the waiter's result and have no other useful
+  work, call \`wait_agent({ timeout_ms: 3600000 })\` ONCE, using the maximum
+  supported one-hour timeout. It returns early when the waiter finishes or new
+  user input arrives; new input does not stop the waiter. If the result is still
+  pending afterward, handle any input or other work first, then use another
+  maximum-timeout wait only when the waiter is again your sole unfinished work.
+  NEVER shorten the timeout to poll, and print no unchanged-status updates
+  between waits. Do not wait in the foreground first, and do not gate the waiter
+  on how long you expect the run to take. Fall back to a foreground wait ONLY if
+  subagents are unavailable or no slot is free. Every dispatched run must be
+  collected before your turn ends.`,
   grok: `Start that command as a background task (\`background: true\`)
   immediately after dispatching — its completion notification delivers the
   result while you keep working. Run it in the foreground only when the result

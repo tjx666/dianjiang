@@ -228,13 +228,14 @@ the code twice); the full per-caller renders are pinned by snapshot tests in
    double-quoted variable); ONE collect rule that embeds the caller-specific
    collection strategy from the hardcoded
    `COLLECTION_STRATEGY` map (claude: background shell + push notification;
-   codex: immediate `spawn_agent` waiter, foreground only as capability
-   fallback; grok: background task + push notification; caller-less renders a
-   neutral bounded-foreground line). Wait behavior is harness-intrinsic
-   capability knowledge, so it lives in code, not config — and each caller
-   gets exactly one authoritative strategy (restructured 2026-07 after the
-   generic "block on result --wait" rule + codex-append-exception layout made
-   codex block 300s in the foreground before spawning its waiter). Then:
+   codex: immediate `spawn_agent` waiter, one maximum-timeout parent wait when
+   idle, foreground only as capability fallback; grok: background task + push
+   notification; caller-less renders a neutral bounded-foreground line). Wait
+   behavior is harness-intrinsic capability knowledge, so it lives in code,
+   not config — and each caller gets exactly one authoritative strategy
+   (restructured 2026-07 after the generic "block on result --wait" rule +
+   codex-append-exception layout made codex block 300s in the foreground before
+   spawning its waiter). Then:
    `.status` discipline, self-contained tasks, resume, preset overrides only
    relay the human's explicit in-request choice, YOLO-mode caution, the
    one-JSON/exit-code/log-path contract (operational notes formerly kept in
