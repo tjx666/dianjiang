@@ -110,6 +110,56 @@ describe('claude adapter', () => {
     // Bad input_tokens dropped; num_turns still captured.
     expect(adapters.claude.parseResult(spec(), stdout).usage).toEqual({ turns: 2 })
   })
+
+  test('classifyFailure recognizes the live weekly-quota payload', () => {
+    const stdout = JSON.stringify({
+      is_error: true,
+      terminal_reason: 'api_error',
+      api_error_status: 429,
+      subtype: 'success',
+      result: "You've hit your weekly limit · resets 3pm (Asia/Shanghai)",
+      type: 'result',
+    })
+    expect(adapters.claude.classifyFailure?.(stdout, '', 1)).toEqual({
+      code: 'quota_exhausted',
+      message: 'The selected Claude Code harness has no available quota. Choose another harness.',
+      detail: "You've hit your weekly limit · resets 3pm (Asia/Shanghai)",
+    })
+  })
+
+  test('classifyFailure does not mistake a transient 429 for exhausted quota', () => {
+    const stdout = JSON.stringify({
+      is_error: true,
+      terminal_reason: 'api_error',
+      api_error_status: 429,
+      result: 'Rate limit exceeded. Please retry shortly.',
+    })
+    expect(adapters.claude.classifyFailure?.(stdout, '', 1)).toBeUndefined()
+  })
+
+  test('classifyFailure checks stderr when stdout has only a generic summary', () => {
+    const stdout = JSON.stringify({ is_error: true, result: 'API request failed' })
+    const stderr = 'You have hit your weekly limit · resets 3pm (Asia/Shanghai)'
+    expect(adapters.claude.classifyFailure?.(stdout, stderr, 1)?.detail).toBe(stderr)
+  })
+
+  test('classifyFailure recognizes reached-weekly-limit wording', () => {
+    const stdout = JSON.stringify({
+      is_error: true,
+      result: 'You have reached your weekly limit · resets Monday',
+    })
+    expect(adapters.claude.classifyFailure?.(stdout, '', 1)?.code).toBe('quota_exhausted')
+  })
+
+  test('classifyFailure does not parse a successful answer as quota state', () => {
+    const stdout = JSON.stringify({ result: 'You have run out of credits.' })
+    expect(adapters.claude.classifyFailure?.(stdout, '', 0)).toBeUndefined()
+  })
+
+  test('classifyFailure ignores successful answer prose when the process later exits non-zero', () => {
+    const stdout = JSON.stringify({ result: 'The UI should show when you have hit your weekly limit.' })
+    expect(adapters.claude.classifyFailure?.(stdout, 'Wrapper process failed', 1)).toBeUndefined()
+  })
 })
 
 describe('codex adapter', () => {
@@ -305,6 +355,75 @@ describe('grok adapter', () => {
 
   test('parseResult usage undefined when none reported', () => {
     expect(adapters.grok.parseResult(spec(), JSON.stringify({ result: 'a' })).usage).toBeUndefined()
+  })
+
+  test('classifyFailure recognizes Grok Build spending-limit JSON', () => {
+    const detail =
+      'API error (status 402 Payment Required): personal-team-blocked:spending-limit: You have run out of credits'
+    const stdout = JSON.stringify({ type: 'error', message: detail })
+    expect(adapters.grok.classifyFailure?.(stdout, `Error: ${detail}`, 1)).toEqual({
+      code: 'quota_exhausted',
+      message: 'The selected Grok Build harness has no available quota. Choose another harness.',
+      detail,
+    })
+  })
+
+  test('classifyFailure recognizes spending-limit code even when the provider returns 403', () => {
+    const detail = 'API error (status 403): personal-team-blocked:spending-limit'
+    expect(adapters.grok.classifyFailure?.(JSON.stringify({ type: 'error', message: detail }), '', 1)?.code).toBe(
+      'quota_exhausted',
+    )
+  })
+
+  test('classifyFailure recognizes Grok Build free-usage exhaustion code', () => {
+    const detail = 'subscription:free-usage-exhausted'
+    expect(adapters.grok.classifyFailure?.(JSON.stringify({ type: 'error', message: detail }), '', 1)?.code).toBe(
+      'quota_exhausted',
+    )
+  })
+
+  test('classifyFailure recognizes Grok Build formatted free-usage message', () => {
+    const detail =
+      'You’ve reached your free Grok Build usage limit for now. Get SuperGrok for much higher limits, or try again later.'
+    const stdout = JSON.stringify({ type: 'error', message: detail })
+    expect(adapters.grok.classifyFailure?.(stdout, '', 1)?.code).toBe('quota_exhausted')
+  })
+
+  test('classifyFailure recognizes Grok Build usage-balance exhaustion', () => {
+    const detail = 'Grok Build usage balance exhausted'
+    expect(adapters.grok.classifyFailure?.(JSON.stringify({ type: 'error', message: detail }), '', 1)?.code).toBe(
+      'quota_exhausted',
+    )
+  })
+
+  test('classifyFailure recognizes Grok Build Payment Required payload', () => {
+    const detail = 'API error (status 402 Payment Required)'
+    expect(adapters.grok.classifyFailure?.(JSON.stringify({ type: 'error', message: detail }), '', 1)?.code).toBe(
+      'quota_exhausted',
+    )
+  })
+
+  test('classifyFailure does not mistake a generic Grok 429 for exhausted quota', () => {
+    const stdout = JSON.stringify({
+      type: 'error',
+      message: 'You’ve hit the rate limit for your plan. Try again later.',
+    })
+    expect(adapters.grok.classifyFailure?.(stdout, '', 1)).toBeUndefined()
+  })
+
+  test('classifyFailure does not parse a successful model answer as quota state', () => {
+    const stdout = JSON.stringify({ text: 'You ran out of credits.' })
+    expect(adapters.grok.classifyFailure?.(stdout, '', 0)).toBeUndefined()
+  })
+
+  test('classifyFailure ignores successful model prose when the process later exits non-zero', () => {
+    const stdout = JSON.stringify({ text: 'The UI should say you ran out of credits.' })
+    expect(adapters.grok.classifyFailure?.(stdout, 'Wrapper process failed', 1)).toBeUndefined()
+  })
+
+  test('classifyFailure does not mistake a Grok 403 content-policy error for exhausted quota', () => {
+    const stdout = JSON.stringify({ type: 'error', message: 'API error (status 403): content safety policy' })
+    expect(adapters.grok.classifyFailure?.(stdout, '', 1)).toBeUndefined()
   })
 })
 

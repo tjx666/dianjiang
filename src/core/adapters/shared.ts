@@ -1,6 +1,36 @@
 /** Helpers shared across harness adapters. */
 
-import type { DispatchSpec, RunUsage } from '../types.ts'
+import type { DispatchSpec, HarnessName, RunFailure, RunUsage } from '../types.ts'
+
+const QUOTA_EXHAUSTED_PATTERNS = [
+  /\byou(?:['’]ve| have) (?:hit|reached|exceeded) your (?:daily|weekly|monthly|usage|spend(?:ing)?) limit\b/i,
+  /\byou(?:['’]ve| have) reached your .*\busage limit\b/i,
+  /\b(?:daily|weekly|monthly|usage|spend(?:ing)?) (?:limit|quota) (?:has been )?(?:reached|exceeded|exhausted)\b/i,
+  /\b(?:credit balance|credits?|quota) (?:is |are )?(?:too low|insufficient|exhausted|depleted|empty)\b/i,
+  /\b(?:insufficient|not enough|out of) (?:credits?|quota)\b/i,
+  /\bquota (?:has been )?(?:exceeded|exhausted)\b/i,
+  /\bno (?:available )?(?:credits?|quota) remaining\b/i,
+  /\busage balance exhausted\b/i,
+]
+
+/** High-confidence prose fallback; deliberately excludes generic/rate-limit 429s. */
+export function isQuotaExhaustedMessage(message: string): boolean {
+  return QUOTA_EXHAUSTED_PATTERNS.some((pattern) => pattern.test(message))
+}
+
+/** Build the stable caller-facing failure while retaining the vendor's detail. */
+export function quotaExhaustedFailure(harness: HarnessName, detail: string): RunFailure {
+  const harnessLabel: Record<HarnessName, string> = {
+    claude: 'Claude Code',
+    codex: 'Codex',
+    grok: 'Grok Build',
+  }
+  return {
+    code: 'quota_exhausted',
+    message: `The selected ${harnessLabel[harness]} harness has no available quota. Choose another harness.`,
+    ...(detail ? { detail } : {}),
+  }
+}
 
 /** Narrow an unknown value to a plain object for keyed access. */
 export function asRecord(value: unknown): Record<string, unknown> | undefined {

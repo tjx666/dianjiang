@@ -17,7 +17,16 @@
 
 import type { DispatchSpec, HarnessAdapter, HarnessResult, KnownModel, RunUsage } from '../types.ts'
 import { runSync } from '../exec.ts'
-import { asRecord, finalizeUsage, num, withInstructions } from './shared.ts'
+import {
+  asRecord,
+  finalizeUsage,
+  isQuotaExhaustedMessage,
+  num,
+  quotaExhaustedFailure,
+  withInstructions,
+} from './shared.ts'
+
+const GROK_QUOTA_CODES = ['personal-team-blocked:spending-limit', 'subscription:free-usage-exhausted']
 
 /**
  * Extract grok's usage. Verified live, stdout carries:
@@ -101,6 +110,49 @@ export const grokAdapter: HarnessAdapter = {
     if (spec.model) cmd.push('-m', spec.model)
     if (spec.effort) cmd.push('--reasoning-effort', spec.effort)
     return { cmd }
+  },
+
+  classifyFailure(stdout: string, stderr: string, exitCode: number) {
+    let detail = ''
+    let hasErrorEnvelope = false
+    let parsedJson = false
+    try {
+      const obj = JSON.parse(stdout) as Record<string, unknown>
+      parsedJson = true
+      const nestedError = asRecord(obj['error'])
+      hasErrorEnvelope =
+        obj['type'] === 'error' || typeof obj['error'] === 'string' || nestedError !== undefined
+      for (const value of [
+        obj['result'],
+        obj['response'],
+        obj['text'],
+        obj['message'],
+        obj['error'],
+        nestedError?.['message'],
+      ]) {
+        if (typeof value === 'string' && value.trim()) {
+          detail = value.trim()
+          break
+        }
+      }
+    } catch {
+      // Grok Build has emitted both JSON and plain-text failures across versions.
+    }
+    if (exitCode === 0 && !hasErrorEnvelope) return undefined
+    if (!detail) detail = (stderr.trim() || stdout.trim()).slice(-2000)
+    // Grok's successful `text`/`result` fields are model prose, even if a
+    // wrapper later exits non-zero; only an error envelope may classify them.
+    const evidenceParts = parsedJson && !hasErrorEnvelope ? [stderr.trim()] : [detail, stderr.trim(), stdout.trim()]
+    const quotaDetail = evidenceParts.find(
+      (part) =>
+        GROK_QUOTA_CODES.some((code) => part.includes(code)) ||
+        /\bstatus 402 Payment Required\b|["']?http_status["']?\s*[:=]\s*402\b/i.test(part) ||
+        isQuotaExhaustedMessage(part),
+    )
+    if (quotaDetail) {
+      return quotaExhaustedFailure('grok', quotaDetail.slice(-2000))
+    }
+    return undefined
   },
 
   parseResult(spec: DispatchSpec, stdout: string): HarnessResult {

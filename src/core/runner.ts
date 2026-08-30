@@ -24,6 +24,7 @@ import type {
 } from './types.ts'
 import { adapters } from './adapters/index.ts'
 import { logEvent } from './log.ts'
+import { resolveHarnessOutcome } from './outcome.ts'
 import { logFilePath } from './paths.ts'
 import { getRun, insertRun, updateRun } from './store.ts'
 
@@ -93,6 +94,7 @@ export function buildReport(record: RunRecord): RunReport {
     startedAt: record.startedAt,
     finishedAt: record.finishedAt ?? null,
     usage: record.usage ?? null,
+    failure: record.failure ?? null,
   }
 }
 
@@ -153,26 +155,15 @@ async function runToCompletion(record: RunRecord, spec: DispatchSpec): Promise<R
     }
   }
 
-  let patch: Partial<RunRecord>
-  if (exitCode === 0) {
-    try {
-      const parsed = adapter.parseResult(spec, stdout, outputFileContents)
-      patch = {
-        status: 'completed',
-        exitCode,
-        result: parsed.result,
-        harnessSessionId: parsed.harnessSessionId,
-        usage: parsed.usage,
-        finishedAt,
-      }
-    } catch (err) {
-      // A clean exit but unparseable output is still a failure for us.
-      patch = { status: 'failed', exitCode, result: `parseResult failed: ${errorMessage(err)}`, finishedAt }
-    }
-  } else {
-    // Non-zero: keep the tail of stderr as the surfaced result.
-    patch = { status: 'failed', exitCode, result: stderr.slice(-2000), finishedAt }
-  }
+  const patch = resolveHarnessOutcome({
+    adapter,
+    spec,
+    exitCode,
+    stdout,
+    stderr,
+    outputFileContents,
+    finishedAt,
+  })
 
   updateRun(record.runId, patch)
   return buildReport({ ...record, ...patch })

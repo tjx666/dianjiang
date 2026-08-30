@@ -134,6 +134,18 @@ export interface RunUsage {
   costUsd?: number
 }
 
+/** Stable failure codes exposed to callers; vendor-specific details stay in `detail`. */
+export type RunFailureCode = 'quota_exhausted'
+
+/** A machine-readable harness failure that callers can act on without parsing prose. */
+export interface RunFailure {
+  code: RunFailureCode
+  /** Short caller-facing explanation, including the recommended next action. */
+  message: string
+  /** Original harness wording, when available (for example, a quota reset time). */
+  detail?: string
+}
+
 export interface HarnessResult {
   /** Final assistant message. */
   result: string
@@ -174,6 +186,12 @@ export interface HarnessAdapter {
   listModels?(): string[] | undefined
   buildCommand(spec: DispatchSpec): HarnessCommand
   /**
+   * Recognize actionable harness failures from the completed process streams.
+   * Called for every exit code because some CLIs report an error in structured
+   * stdout while exiting zero, and others exit non-zero with an empty stderr.
+   */
+  classifyFailure?(stdout: string, stderr: string, exitCode: number): RunFailure | undefined
+  /**
    * Parse the finished process's stdout (and outputFile contents, if the
    * command declared one) into the unified result.
    */
@@ -212,6 +230,8 @@ export interface RunRecord {
   instructions?: string
   /** Harness-reported usage; stored as flat nullable columns (see store.ts). */
   usage?: RunUsage
+  /** Actionable structured failure; omitted for unclassified failures. */
+  failure?: RunFailure
 }
 
 /** The single JSON object `run`/`resume`/`result` print on stdout. */
@@ -231,4 +251,6 @@ export interface RunReport {
   finishedAt: string | null
   /** Harness-reported usage; null when nothing was reported for this run. */
   usage: RunUsage | null
+  /** Actionable structured failure; null when the failure was not classified. */
+  failure: RunFailure | null
 }

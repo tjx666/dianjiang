@@ -11,7 +11,13 @@
  */
 
 import type { DispatchSpec, HarnessAdapter, HarnessResult, KnownModel, RunUsage } from '../types.ts'
-import { asRecord, finalizeUsage, num } from './shared.ts'
+import {
+  asRecord,
+  finalizeUsage,
+  isQuotaExhaustedMessage,
+  num,
+  quotaExhaustedFailure,
+} from './shared.ts'
 
 /**
  * Extract claude's usage from `--output-format json`:
@@ -72,6 +78,43 @@ export const claudeAdapter: HarnessAdapter = {
     if (spec.instructions) cmd.push('--append-system-prompt', spec.instructions)
     cmd.push(spec.prompt)
     return { cmd }
+  },
+
+  classifyFailure(stdout: string, stderr: string, exitCode: number) {
+    let detail = ''
+    let hasStructuredError = false
+    let parsedJson = false
+    try {
+      const obj = JSON.parse(stdout) as Record<string, unknown>
+      parsedJson = true
+      const nestedError = asRecord(obj['error'])
+      for (const value of [obj['result'], obj['message'], obj['error'], nestedError?.['message']]) {
+        if (typeof value === 'string' && value.trim()) {
+          detail = value.trim()
+          break
+        }
+      }
+      hasStructuredError =
+        obj['is_error'] === true ||
+        obj['terminal_reason'] === 'api_error' ||
+        typeof obj['api_error_status'] === 'number' ||
+        obj['type'] === 'error' ||
+        typeof obj['error'] === 'string' ||
+        nestedError !== undefined
+    } catch {
+      // Older/alternate Claude builds may emit plain text; use the strict prose
+      // matcher below rather than treating every non-JSON failure as quota.
+    }
+    if (exitCode === 0 && !hasStructuredError) return undefined
+    if (!detail) detail = (stderr.trim() || stdout.trim()).slice(-2000)
+    // A non-zero wrapper exit does not turn a successful assistant response
+    // into an error envelope; in that case only stderr may classify the cause.
+    const evidenceParts = parsedJson && !hasStructuredError ? [stderr.trim()] : [detail, stderr.trim(), stdout.trim()]
+    const quotaDetail = evidenceParts.find(isQuotaExhaustedMessage)
+    if (quotaDetail) {
+      return quotaExhaustedFailure('claude', quotaDetail.slice(-2000))
+    }
+    return undefined
   },
 
   parseResult(spec: DispatchSpec, stdout: string): HarnessResult {

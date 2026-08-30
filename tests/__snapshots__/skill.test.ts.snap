@@ -62,8 +62,11 @@ reach for dianjiang only when an agent below clearly fits.
   \`status: "running"\` — just re-run it. Run it in the foreground (\`--timeout\` keeps it
   bounded), or in a background shell if your environment pushes completion
   notifications.
-- Check \`.status\` first: read \`.result\` when it is "completed" — on "failed"
-  \`.result\` is the stderr tail, not an answer.
+- Check \`.status\` first: read \`.result\` only when it is "completed". On
+  "failed", inspect \`.failure\` before \`.result\`; \`code: "quota_exhausted"\`
+  means the selected harness has no available quota — recommend another
+  harness, and never treat \`.result\` as the task's answer. When \`.failure\`
+  is null, \`.result\` is still a diagnostic summary, not a task answer.
 - Write tasks self-contained (background, file paths, acceptance criteria,
   expected output): the delegate starts fresh in your cwd — it sees your files,
   not your conversation.
@@ -145,8 +148,11 @@ reach for dianjiang only when an agent below clearly fits.
   immediately after dispatching — its completion notification delivers the
   result while you keep working. Run it in the foreground only when the result
   is the last thing you need before you can proceed.
-- Check \`.status\` first: read \`.result\` when it is "completed" — on "failed"
-  \`.result\` is the stderr tail, not an answer.
+- Check \`.status\` first: read \`.result\` only when it is "completed". On
+  "failed", inspect \`.failure\` before \`.result\`; \`code: "quota_exhausted"\`
+  means the selected harness has no available quota — recommend another
+  harness, and never treat \`.result\` as the task's answer. When \`.failure\`
+  is null, \`.result\` is still a diagnostic summary, not a task answer.
 - Write tasks self-contained (background, file paths, acceptance criteria,
   expected output): the delegate starts fresh in your cwd — it sees your files,
   not your conversation.
@@ -242,8 +248,11 @@ reach for dianjiang only when an agent below clearly fits.
   on how long you expect the run to take. Fall back to a foreground wait ONLY if
   subagents are unavailable or no slot is free. Every dispatched run must be
   collected before your turn ends.
-- Check \`.status\` first: read \`.result\` when it is "completed" — on "failed"
-  \`.result\` is the stderr tail, not an answer.
+- Check \`.status\` first: read \`.result\` only when it is "completed". On
+  "failed", inspect \`.failure\` before \`.result\`; \`code: "quota_exhausted"\`
+  means the selected harness has no available quota — recommend another
+  harness, and never treat \`.result\` as the task's answer. When \`.failure\`
+  is null, \`.result\` is still a diagnostic summary, not a task answer.
 - Write tasks self-contained (background, file paths, acceptance criteria,
   expected output): the delegate starts fresh in your cwd — it sees your files,
   not your conversation.
@@ -326,8 +335,11 @@ reach for dianjiang only when an agent below clearly fits.
   immediately after dispatching — its completion notification delivers the
   result while you keep working. Run it in the foreground only when the result
   is the last thing you need before you can proceed.
-- Check \`.status\` first: read \`.result\` when it is "completed" — on "failed"
-  \`.result\` is the stderr tail, not an answer.
+- Check \`.status\` first: read \`.result\` only when it is "completed". On
+  "failed", inspect \`.failure\` before \`.result\`; \`code: "quota_exhausted"\`
+  means the selected harness has no available quota — recommend another
+  harness, and never treat \`.result\` as the task's answer. When \`.failure\`
+  is null, \`.result\` is still a diagnostic summary, not a task answer.
 - Write tasks self-contained (background, file paths, acceptance criteria,
   expected output): the delegate starts fresh in your cwd — it sees your files,
   not your conversation.

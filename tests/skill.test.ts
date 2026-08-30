@@ -216,4 +216,13 @@ describe('renderSkillDoc collection-strategy conflict freedom', () => {
     expect(doc).not.toContain('spawn_agent')
     expect(doc).not.toContain('run_in_background')
   })
+
+  test('every render teaches callers to act on exhausted harness quota', () => {
+    for (const caller of [undefined, 'claude', 'codex', 'grok'] as const) {
+      const doc = renderSkillDoc(defaultConfig, caller)
+      expect(doc).toContain('`code: "quota_exhausted"`')
+      expect(doc).toContain('recommend another')
+      expect(doc).toContain('never treat `.result` as the task\'s answer')
+    }
+  })
 })

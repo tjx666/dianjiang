@@ -140,8 +140,11 @@ ${agents}
 - Collect every run with \`dianjiang result <runId> --wait --timeout 300\`: it
   exits with the final JSON the moment the run finishes; on timeout it prints
   \`status: "running"\` — just re-run it. ${caller ? COLLECTION_STRATEGY[caller] : DEFAULT_COLLECTION}
-- Check \`.status\` first: read \`.result\` when it is "completed" — on "failed"
-  \`.result\` is the stderr tail, not an answer.
+- Check \`.status\` first: read \`.result\` only when it is "completed". On
+  "failed", inspect \`.failure\` before \`.result\`; \`code: "quota_exhausted"\`
+  means the selected harness has no available quota — recommend another
+  harness, and never treat \`.result\` as the task's answer. When \`.failure\`
+  is null, \`.result\` is still a diagnostic summary, not a task answer.
 - Write tasks self-contained (background, file paths, acceptance criteria,
   expected output): the delegate starts fresh in your cwd — it sees your files,
   not your conversation.

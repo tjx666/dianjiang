@@ -4,7 +4,7 @@
  * camelCase, mapped explicitly below.
  */
 
-import type { HarnessName, RunRecord, RunStatus, RunUsage } from './types.ts'
+import type { HarnessName, RunFailure, RunRecord, RunStatus, RunUsage } from './types.ts'
 import { dbPath } from './paths.ts'
 import { openDatabase, type SqliteDatabase } from './sqlite.ts'
 
@@ -32,14 +32,15 @@ interface Row {
   total_tokens: number | null
   turns: number | null
   cost_usd: number | null
+  failure_json: string | null
 }
 
 /**
- * camelCase field -> snake_case column, for dynamic UPDATE building. `usage` is
- * intentionally absent: it maps to the six flat usage columns (USAGE_COLUMNS),
- * not a single column, and is handled specially by insert/update/read.
+ * camelCase field -> snake_case column, for dynamic UPDATE building. `usage`
+ * and `failure` are intentionally absent: both have custom storage mappings
+ * handled by insert/update/read.
  */
-const FIELD_TO_COLUMN: Record<Exclude<keyof RunRecord, 'usage'>, string> = {
+const FIELD_TO_COLUMN: Record<Exclude<keyof RunRecord, 'usage' | 'failure'>, string> = {
   runId: 'run_id',
   agent: 'agent',
   harness: 'harness',
@@ -70,9 +71,9 @@ const USAGE_COLUMNS: Record<keyof RunUsage, string> = {
 
 /**
  * Add any columns that a pre-existing DB is missing. Lazy migration: a real
- * populated `~/.dianjiang/runs.sqlite` predates later columns (the usage columns,
- * then `instructions`), so on every open we reconcile the schema. Old rows read
- * back with the added columns null.
+ * populated `~/.dianjiang/runs.sqlite` predates later columns (usage,
+ * instructions, then structured failure), so on every open we reconcile the
+ * schema. Old rows read back with the added columns null.
  */
 function ensureColumns(db: SqliteDatabase): void {
   const existing = new Set(
@@ -85,6 +86,7 @@ function ensureColumns(db: SqliteDatabase): void {
       Object.values(USAGE_COLUMNS).map((column) => [column, column === 'cost_usd' ? 'REAL' : 'INTEGER']),
     ),
     instructions: 'TEXT',
+    failure_json: 'TEXT',
   }
   for (const [column, type] of Object.entries(migrated)) {
     if (existing.has(column)) continue
@@ -118,9 +120,10 @@ function openStore(path: string): SqliteDatabase {
     cache_read_tokens INTEGER,
     total_tokens INTEGER,
     turns INTEGER,
-    cost_usd REAL
+    cost_usd REAL,
+    failure_json TEXT
   );`)
-  // Bring DBs created before later columns (usage, instructions) up to schema.
+  // Bring DBs created before later columns up to the current schema.
   ensureColumns(db)
   return db
 }
@@ -148,6 +151,22 @@ function rowToUsage(row: Row): RunUsage | undefined {
   return Object.keys(usage).length > 0 ? usage : undefined
 }
 
+/** Parse the single JSON failure column defensively; malformed legacy data is ignored. */
+function rowToFailure(row: Row): RunFailure | undefined {
+  if (!row.failure_json) return undefined
+  try {
+    const value = JSON.parse(row.failure_json) as Partial<RunFailure>
+    if (value.code !== 'quota_exhausted' || typeof value.message !== 'string') return undefined
+    return {
+      code: value.code,
+      message: value.message,
+      ...(typeof value.detail === 'string' ? { detail: value.detail } : {}),
+    }
+  } catch {
+    return undefined
+  }
+}
+
 function rowToRecord(row: Row): RunRecord {
   return {
     runId: row.run_id,
@@ -167,6 +186,7 @@ function rowToRecord(row: Row): RunRecord {
     parentRunId: row.parent_run_id ?? undefined,
     instructions: row.instructions ?? undefined,
     usage: rowToUsage(row),
+    failure: rowToFailure(row),
   }
 }
 
@@ -177,8 +197,9 @@ export function insertRun(record: RunRecord, db = getStore()): void {
       run_id, agent, harness, model, effort, status, exit_code, result,
       harness_session_id, cwd, task, started_at, finished_at, pid, parent_run_id,
       instructions,
-      input_tokens, output_tokens, cache_read_tokens, total_tokens, turns, cost_usd
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      input_tokens, output_tokens, cache_read_tokens, total_tokens, turns, cost_usd,
+      failure_json
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
   ).run(
     record.runId,
     record.agent ?? null,
@@ -202,6 +223,7 @@ export function insertRun(record: RunRecord, db = getStore()): void {
     u?.totalTokens ?? null,
     u?.turns ?? null,
     u?.costUsd ?? null,
+    record.failure ? JSON.stringify(record.failure) : null,
   )
 }
 
@@ -218,6 +240,11 @@ export function updateRun(runId: string, patch: Partial<RunRecord>, db = getStor
         assignments.push(`${column} = ?`)
         values.push(usage?.[usageField as keyof RunUsage] ?? null)
       }
+      continue
+    }
+    if (field === 'failure') {
+      assignments.push('failure_json = ?')
+      values.push(value === undefined ? null : JSON.stringify(value))
       continue
     }
     const column = FIELD_TO_COLUMN[field as keyof typeof FIELD_TO_COLUMN]

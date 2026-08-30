@@ -261,11 +261,19 @@ stdout carries exactly one JSON object; harness process logs go to stderr.
   "harnessSessionId": "…",    // codex thread_id; equals runId for claude/grok
   "cwd": "/path/to/project",
   "startedAt": "…",
-  "finishedAt": "…"
+  "finishedAt": "…",
+  "failure": null             // actionable harness failure; otherwise null
 }
 ```
 
-- Failure: same schema, `status: "failed"`, `result` carries the tail of stderr.
+- Failure: same schema, `status: "failed"`; unclassified failures keep a
+  non-empty stdout/stderr summary in `result`.
+- Claude Code / Grok Build quota exhaustion: `failure.code` is
+  `"quota_exhausted"`, `failure.message` explicitly recommends another harness,
+  and `failure.detail` retains the vendor's original reason/reset time. This is
+  advisory only: dianjiang never auto-reroutes because it is a tool, not an
+  orchestrator. Classification requires a failed process/error envelope plus a
+  high-confidence quota code or phrase; a bare 429/403 is never enough.
 - `--detach`: returns immediately with `status: "detached"`, `result: null`;
   `dianjiang result <runId>` serves the full object once finished.
 - `resume` reuses the same schema.

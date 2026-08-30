@@ -112,6 +112,28 @@ test('a run with no usage reads back with usage undefined', () => {
   expect(getRun('r1')?.usage).toBeUndefined()
 })
 
+test('structured failure roundtrips through the JSON column', () => {
+  insertRun(record())
+  updateRun('r1', {
+    status: 'failed',
+    failure: {
+      code: 'quota_exhausted',
+      message: 'The selected Claude Code harness has no available quota. Choose another harness.',
+      detail: "You've hit your weekly limit",
+    },
+  })
+  expect(getRun('r1')?.failure).toEqual({
+    code: 'quota_exhausted',
+    message: 'The selected Claude Code harness has no available quota. Choose another harness.',
+    detail: "You've hit your weekly limit",
+  })
+})
+
+test('a run with no structured failure reads back with failure undefined', () => {
+  insertRun(record())
+  expect(getRun('r1')?.failure).toBeUndefined()
+})
+
 test('lazy migration: an OLD-schema DB gains usage columns and old rows survive', () => {
   // Reproduce the real ~/.dianjiang/runs.sqlite that predates the usage columns:
   // create the table WITHOUT them, insert a row, then reopen through the store.
@@ -148,6 +170,7 @@ test('lazy migration: an OLD-schema DB gains usage columns and old rows survive'
   expect(legacy?.usage).toBeUndefined()
   // The old schema also predates `instructions`; the added column reads null.
   expect(legacy?.instructions).toBeUndefined()
+  expect(legacy?.failure).toBeUndefined()
 
   // The added columns are usable: a fresh usage write roundtrips.
   updateRun('old1', { usage: { inputTokens: 5, turns: 1 } })
@@ -155,6 +178,14 @@ test('lazy migration: an OLD-schema DB gains usage columns and old rows survive'
   // The migrated `instructions` column is writable too.
   updateRun('old1', { instructions: 'freeze me' })
   expect(getRun('old1')?.instructions).toBe('freeze me')
+  // The migrated failure column is writable too.
+  updateRun('old1', {
+    failure: {
+      code: 'quota_exhausted',
+      message: 'The selected Grok Build harness has no available quota. Choose another harness.',
+    },
+  })
+  expect(getRun('old1')?.failure?.code).toBe('quota_exhausted')
 })
 
 test('listRuns returns every run oldest-first', () => {
