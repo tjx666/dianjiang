@@ -2,7 +2,8 @@
  * Append-only operational log: one JSON object per line at
  * `<DIANJIANG_HOME>/dianjiang.log`. Records the lifecycle of dispatches
  * (dispatch / spawn / exec.start / exec.done / exec.error / reconcile.failed /
- * cli.error), correlated by runId.
+ * cli.error), plus privacy-safe Claude user-settings snapshots before and
+ * after Claude runs, correlated by runId.
  *
  * NOT a public library export (kept out of the core barrel): it's an internal
  * observability sink, not part of the contract a GUI would build on. It also

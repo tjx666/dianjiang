@@ -23,6 +23,12 @@ import type {
   RunReport,
 } from './types.ts'
 import { adapters } from './adapters/index.ts'
+import {
+  captureClaudeSettings,
+  claudeUserSettingsPath,
+  compareClaudeSettings,
+  type ClaudeSettingsSnapshot,
+} from './claude-settings.ts'
 import { logEvent } from './log.ts'
 import { resolveHarnessOutcome } from './outcome.ts'
 import { logFilePath } from './paths.ts'
@@ -123,50 +129,80 @@ async function runToCompletion(record: RunRecord, spec: DispatchSpec): Promise<R
   const command = adapter.buildCommand(spec)
   // The child is one level deeper; its own guard reads this.
   const childDepth = Number(process.env.DIANJIANG_DEPTH ?? 0) + 1
+  const childEnv = { ...process.env, ...(command.env ?? {}), DIANJIANG_DEPTH: String(childDepth) }
 
-  const [bin, ...args] = command.cmd
-  if (!bin) throw new Error('adapter returned an empty command')
-  const proc = spawn(bin, args, {
-    cwd: record.cwd,
-    env: { ...process.env, ...(command.env ?? {}), DIANJIANG_DEPTH: String(childDepth) },
-    stdio: ['ignore', 'pipe', 'pipe'],
-  })
-  if (!proc.stdout || !proc.stderr) throw new Error('spawn did not provide piped stdio')
-
-  const [stdout, stderr] = await Promise.all([tee(proc.stdout, process.stdout), tee(proc.stderr, process.stderr)])
-  const exitCode = await new Promise<number>((resolve, reject) => {
-    proc.once('error', reject)
-    proc.once('close', (code) => resolve(code ?? 1))
-  })
-  const finishedAt = new Date().toISOString()
-
-  // Read then remove the adapter's temp output file, if it declared one.
-  let outputFileContents: string | undefined
-  if (command.outputFile) {
-    try {
-      outputFileContents = readFileSync(command.outputFile, 'utf8')
-    } catch {
-      // File never written; fall back to the JSONL stream.
-    }
-    try {
-      unlinkSync(command.outputFile)
-    } catch {
-      // Already gone; ignore.
-    }
+  let claudeSettingsPath: string | undefined
+  let claudeSettingsBefore: ClaudeSettingsSnapshot | undefined
+  let harnessPid: number | undefined
+  if (record.harness === 'claude') {
+    // Resolve against the exact environment sent to Claude. A future adapter
+    // override of CLAUDE_CONFIG_DIR must not make the probe watch another file.
+    claudeSettingsPath = claudeUserSettingsPath(childEnv)
+    claudeSettingsBefore = captureClaudeSettings(claudeSettingsPath)
+    logEvent('claude.settings.before', {
+      runId: record.runId,
+      path: claudeSettingsPath,
+      ...claudeSettingsBefore,
+    })
   }
 
-  const patch = resolveHarnessOutcome({
-    adapter,
-    spec,
-    exitCode,
-    stdout,
-    stderr,
-    outputFileContents,
-    finishedAt,
-  })
+  try {
+    const [bin, ...args] = command.cmd
+    if (!bin) throw new Error('adapter returned an empty command')
+    const proc = spawn(bin, args, {
+      cwd: record.cwd,
+      env: childEnv,
+      stdio: ['ignore', 'pipe', 'pipe'],
+    })
+    harnessPid = proc.pid
+    if (!proc.stdout || !proc.stderr) throw new Error('spawn did not provide piped stdio')
 
-  updateRun(record.runId, patch)
-  return buildReport({ ...record, ...patch })
+    const [stdout, stderr] = await Promise.all([tee(proc.stdout, process.stdout), tee(proc.stderr, process.stderr)])
+    const exitCode = await new Promise<number>((resolve, reject) => {
+      proc.once('error', reject)
+      proc.once('close', (code) => resolve(code ?? 1))
+    })
+    const finishedAt = new Date().toISOString()
+
+    // Read then remove the adapter's temp output file, if it declared one.
+    let outputFileContents: string | undefined
+    if (command.outputFile) {
+      try {
+        outputFileContents = readFileSync(command.outputFile, 'utf8')
+      } catch {
+        // File never written; fall back to the JSONL stream.
+      }
+      try {
+        unlinkSync(command.outputFile)
+      } catch {
+        // Already gone; ignore.
+      }
+    }
+
+    const patch = resolveHarnessOutcome({
+      adapter,
+      spec,
+      exitCode,
+      stdout,
+      stderr,
+      outputFileContents,
+      finishedAt,
+    })
+
+    updateRun(record.runId, patch)
+    return buildReport({ ...record, ...patch })
+  } finally {
+    if (claudeSettingsPath && claudeSettingsBefore) {
+      const after = captureClaudeSettings(claudeSettingsPath)
+      logEvent('claude.settings.after', {
+        runId: record.runId,
+        harnessPid,
+        path: claudeSettingsPath,
+        ...after,
+        ...compareClaudeSettings(claudeSettingsBefore, after),
+      })
+    }
+  }
 }
 
 /** True if a PID currently maps to a live process (signal 0 probe). */

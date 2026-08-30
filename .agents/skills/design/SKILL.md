@@ -130,6 +130,16 @@ repos defaulted into slow full reviews. This lives in the roster description
 (caller guidance), not in `instructions` (delegate injection), so the
 no-instructions decision stands.
 
+A second caller-side fix (2026-08) addresses sycophancy in opinion-bearing
+dispatches: because the runner receives the caller-authored task as its user
+message, `review`, `second-opinion`, and adversarial or comparative
+discussions (including battle-style debates) must
+separate evidence from the caller's interpretation, frame existing conclusions
+as hypotheses rather than answers, test the strongest counterarguments, and
+state disagreement plainly when warranted. This is task-writing guidance in
+the rendered `<rules>`, not hidden runner instructions, and deliberately does
+not apply to capability tasks such as search or image generation.
+
 Removed: `explore` (was fixed cheap+fast grok) — every caller harness ships a
 built-in explore/search subagent, so cross-vendor dispatch added only a
 process hop; a 2026-07 A/B against claude's built-in Explore showed parity on
@@ -411,6 +421,13 @@ Rejected:
   bindings + add/delete; `callers` stays file-edited.
 - **Operational log**: JSONL at `~/.dianjiang/dianjiang.log` — dispatch /
   spawn / exit / reconcile / error events, runId-correlated, append-only.
+  Claude runs additionally record `claude.settings.before` and
+  `claude.settings.after` snapshots of the user settings file: content
+  fingerprint plus the whitelisted `model` / `effortLevel` routing fields only
+  (never the full settings or arbitrary keys). The after event reports whether
+  content or either routing field changed during the run. This narrows a
+  configuration write to overlapping run IDs but deliberately does not claim
+  which concurrent process caused it.
   Distinct from per-run harness stream logs (`logs/<runId>.log`).
 - **Usage stats**: adapters extract what each harness reports — tokens
   (input/output/cache), turns, and cost. Harness-reported values only, no

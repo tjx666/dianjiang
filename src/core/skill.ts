@@ -148,6 +148,13 @@ ${agents}
 - Write tasks self-contained (background, file paths, acceptance criteria,
   expected output): the delegate starts fresh in your cwd — it sees your files,
   not your conversation.
+- For \`review\`, \`second-opinion\`, and adversarial or comparative discussions
+  (including battle-style debates), brief the delegate as an independent
+  evaluator: separate evidence (diffs, logs, measurements) from your
+  interpretation, and present any conclusion you have reached as a hypothesis
+  to test, not as the answer. Require the delegate to examine the strongest
+  counterarguments to that hypothesis and disagree plainly when the evidence
+  warrants it.
 - Follow up in the same session with \`dianjiang resume <runId> "<message>"\` —
   it takes \`--detach\` too; use the same detach-and-collect flow.
 - Overriding a preset is allowed ONLY to relay the human's explicit choice in

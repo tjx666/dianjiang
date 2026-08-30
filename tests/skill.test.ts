@@ -118,6 +118,18 @@ describe('renderSkillDoc', () => {
     }
   })
 
+  test('briefs opinion-bearing delegates for independent judgment', () => {
+    for (const caller of [undefined, 'claude', 'codex', 'grok'] as const) {
+      const doc = renderSkillDoc(config, caller)
+      expect(doc).toContain('`review`, `second-opinion`')
+      expect(doc).toContain('battle-style debates')
+      expect(doc).toMatch(/independent\s+evaluator/)
+      expect(doc).toMatch(/as a hypothesis\s+to test, not as the answer/)
+      expect(doc).toMatch(/strongest\s+counterarguments/)
+      expect(doc).toContain('disagree plainly')
+    }
+  })
+
   test("the default roster's claude render keeps review's focused use-when", () => {
     const doc = renderSkillDoc(parseConfig(defaultConfigJsonc()), 'claude')
     // review is not excluded for the claude caller, so its base use-when renders.
