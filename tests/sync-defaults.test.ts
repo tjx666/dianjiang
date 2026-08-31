@@ -20,6 +20,8 @@ const V050_REVIEW_USEWHEN =
 const CURRENT_REVIEW_USEWHEN =
   'you want an independent cross-vendor code review of a diff; in the task, explicitly state the depth you want — a deep comprehensive review (slow on large diffs) or a quick single-pass scan; runs gpt-5.6-sol at xhigh — stronger reasoning than opus, slightly below fable'
 const V050_CODEX_REVIEW_USEWHEN = 'you want an independent cross-vendor code review of a diff; runs claude opus at xhigh'
+const V0121_CODEX_REVIEW_USEWHEN =
+  'you want an independent cross-vendor code review of a diff; in the task, explicitly state the depth you want — a deep comprehensive review (slow on large diffs) or a quick single-pass scan; runs claude opus at xhigh'
 const V050_CODEX_APPEND =
   'Your shell sessions do NOT wake you when a background command finishes, and polling is easy to forget. To collect a dianjiang run without blocking, use your subagent notification channel: `spawn_agent` with `fork_turns: "none"` and the message "Run `dianjiang result <runId> --wait --timeout 300`. If it prints status \'running\', run it again. When the status is terminal, return the full JSON verbatim." — its completion notification wakes you with the result while you keep working. If you have nothing else to do, just run `dianjiang result <runId> --wait --timeout 300` in the foreground. Either way, never end your turn with a dispatched run uncollected.'
 
@@ -66,6 +68,23 @@ function expectSameConfig(a: string, b: string): void {
 }
 
 describe('planSyncDefaults / applySyncDefaults', () => {
+  test('the v0.12.1 codex review binding upgrades from opus to sonnet', () => {
+    const fixture = shape([
+      { path: ['callers', 'codex', 'agents', 'review', 'model'], value: 'opus' },
+      { path: ['callers', 'codex', 'agents', 'review', 'useWhen'], value: V0121_CODEX_REVIEW_USEWHEN },
+    ])
+
+    const plan = planSyncDefaults(fixture)
+    expect(actions(plan)).toEqual(
+      new Set([
+        'set callers.codex.agents.review.model',
+        'set callers.codex.agents.review.useWhen',
+      ]),
+    )
+    expect(plan.filter((c) => c.action === 'keep-custom')).toHaveLength(0)
+    expectSameConfig(applySyncDefaults(fixture, plan), defaultConfigJsonc())
+  })
+
   test('a v0.5.0-shaped config upgrades to the current defaults', () => {
     const rIdx = idx('review')
     const fixture = shape([

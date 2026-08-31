@@ -104,7 +104,9 @@ const LEGACY_DEFAULTS: Record<string, string[]> = {
   'callers.codex.agents.review.useWhen': [
     'you want an independent cross-vendor code review of a diff; runs claude opus at xhigh',
     "you want an independent cross-vendor code review of a diff; focused and findings-only by default — say 'deep review' in the task for a comprehensive audit; runs claude opus at xhigh",
+    'you want an independent cross-vendor code review of a diff; in the task, explicitly state the depth you want — a deep comprehensive review (slow on large diffs) or a quick single-pass scan; runs claude opus at xhigh',
   ],
+  'callers.codex.agents.review.model': ['opus'],
   'agents.explore.useWhen': [
     'broad codebase search, research, or summarization',
     'broad codebase search, research, or summarization where cheap and fast matters',

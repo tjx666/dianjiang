@@ -151,7 +151,7 @@ Cost/strength rationale:
 - **fable is reserved for low-frequency, judgment-heavy roles** — second
   brain (`second-opinion`) and visual taste (`design-frontend`). It is too
   expensive for `review`, which is high-frequency; review gets the neighbor
-  vendor's cheaper flagship (gpt-5.6-sol or opus 4.8) at xhigh instead.
+  vendor's cheaper review model (gpt-5.6-sol or sonnet) at xhigh instead.
 - Per-caller character: claude and codex implement with their own flagship;
   grok is fast and has native X search but weak reasoning, so it borrows
   fable to plan/consult and codex gpt-5.6-sol to review.
@@ -159,7 +159,7 @@ Cost/strength rationale:
 
 | Agent | Base binding | claude caller | codex caller | grok caller |
 |---|---|---|---|---|
-| `review` | codex / gpt-5.6-sol / xhigh | (base) | claude / opus / xhigh | (base) |
+| `review` | codex / gpt-5.6-sol / xhigh | (base) | claude / sonnet / xhigh | (base) |
 | `second-opinion` | claude / fable / high | codex / gpt-5.6-sol / xhigh | (base) | (base) |
 
 Base = the compiled view for the most common callers. Values recalibrate by

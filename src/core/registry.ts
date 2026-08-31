@@ -301,9 +301,9 @@ export function defaultConfigJsonc(): string {
       "agents": {
         "review": {
           "harness": "claude",
-          "model": "opus",
+          "model": "sonnet",
           "effort": "xhigh",
-          "useWhen": "you want an independent cross-vendor code review of a diff; in the task, explicitly state the depth you want — a deep comprehensive review (slow on large diffs) or a quick single-pass scan; runs claude opus at xhigh"
+          "useWhen": "you want an independent cross-vendor code review of a diff; in the task, explicitly state the depth you want — a deep comprehensive review (slow on large diffs) or a quick single-pass scan; runs claude sonnet at xhigh"
         }
       },
       // Codex already exposes imagegen directly — dispatching another Codex
