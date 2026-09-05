@@ -63,7 +63,7 @@ dianjiang config ...                     # agent CRUD + harnesses self-check (co
 Agents are the product. Config fields per agent:
 
 - `name` — verb/deliverable-style, not job titles (`review`,
-  `rewrite-prompt`) — job titles force the AI to do a second inference hop
+  `search-twitter`) — job titles force the AI to do a second inference hop
   ("which job owns this task?")
 - `description` — split into `useWhen` / `dontUseWhen`, written for the
   delegating AI. This drives delegation accuracy more than the name does.
@@ -90,9 +90,11 @@ Opinion/perspective agents are **rules over the caller**, compiled into base
 bindings + sparse `callers` overrides/excludes:
 
 - `review` / `second-opinion` — **always a different vendor than the caller**
-  (avoid same-model blind spots); review runs xhigh, second-opinion runs the
-  other vendor's flagship at high — fable and gpt-6-astra both deliver at high;
-  higher efforts cost more without a visible consulting gain.
+  (avoid same-model blind spots); second-opinion runs the other vendor's
+  flagship at high — fable and gpt-6-astra both deliver at high; higher
+  efforts cost more without a visible consulting gain. review runs gpt-5.6-sol
+  at high (dropped from xhigh 2026-09-05: review is high-frequency and xhigh
+  was not paying for itself) and opus at xhigh for the codex caller.
 
 `review` deliberately ships **no `instructions`** (decided 2026-07-21 after
 three dogfood rounds of injected review contracts, each corrected by the
@@ -117,7 +119,7 @@ project's review process itself and dispatches its subagent-shaped chunks
 through dianjiang); the TASK is the delegate's entire briefing: scope,
 process, output shape. dianjiang adds no review-specific words of its own.
 `instructions` stays a supported per-agent field (search-twitter and
-rewrite-prompt ship one-liners; users may add their own), and whatever it
+generate-image ship short ones; users may add their own), and whatever it
 resolves to is frozen into the RunRecord at dispatch, so a config edit
 mid-run or before a resume cannot change a run's execution contract. If
 delegates ignore task-stated scope again, fix it caller-side (task-writing
@@ -151,19 +153,22 @@ Cost/strength rationale:
 - **fable is reserved for low-frequency, judgment-heavy roles** — second
   brain (`second-opinion`) and visual taste (`design-frontend`). It is too
   expensive for `review`, which is high-frequency; review gets the neighbor
-  vendor's review model (gpt-5.6-sol or opus 5) at xhigh instead — opus 5
-  replaced sonnet for the codex caller on 2026-09-05 (sonnet reviews were
+  vendor's review model instead — gpt-5.6-sol at high, or opus at xhigh for
+  the codex caller (opus replaced sonnet on 2026-09-05: sonnet reviews were
   too shallow to be worth a cross-vendor hop).
 - Per-caller character: claude and codex implement with their own flagship;
   grok is fast and has native X search but weak reasoning, so it borrows
   fable to plan/consult and codex gpt-5.6-sol to review.
-- `rewrite-prompt` runs gpt-6-astra at medium (2026-09-05; previously opus
-  4.6 with 1M context, whose prose style has been matched by gpt-6-astra and
-  which no longer needs the 1M-context spelling to be maintained).
+- `rewrite-prompt` (opus 4.6 [1m], later gpt-6-astra) was dropped on
+  2026-09-05: it saw almost no use, and the caller's own model rewrites
+  prompts fine. Roster is now 5 agents.
+- Effort is graded by task shape, not prestige: `search-twitter` and
+  `design-frontend` run medium (2026-09-05) — X lookups and UI taste do not
+  benefit from deep reasoning budgets.
 
 | Agent | Base binding | claude caller | codex caller | grok caller |
 |---|---|---|---|---|
-| `review` | codex / gpt-5.6-sol / xhigh | (base) | claude / opus / xhigh | (base) |
+| `review` | codex / gpt-5.6-sol / high | (base) | claude / opus / xhigh | (base) |
 | `second-opinion` | claude / fable / high | codex / gpt-6-astra / high | (base) | (base) |
 
 Base = the compiled view for the most common callers. Values recalibrate by
@@ -179,9 +184,8 @@ excluded when the caller already exposes that capability natively:
 
 | Agent | Harness / model / effort | Capability |
 |---|---|---|
-| `search-twitter` | grok / grok-4.6 / high | grok's native live X/Twitter search tools (verified headless: returns real tweet URLs) |
-| `design-frontend` | claude / fable / high | strongest visual/UX taste for front-end work |
-| `rewrite-prompt` | codex / gpt-6-astra / medium | strong prose style (文风) for rewriting prompts/instructions |
+| `search-twitter` | grok / grok-4.6 / medium | grok's native live X/Twitter search tools (verified headless: returns real tweet URLs) |
+| `design-frontend` | claude / fable / medium | strongest visual/UX taste for front-end work |
 | `generate-image` | codex / gpt-5.6-luna / max | codex's built-in `imagegen` skill + `image_gen` tool for raster generation and editing |
 
 The earlier direct-model route remains rejected: codex rejects `gpt-image-2`

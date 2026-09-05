@@ -17,13 +17,17 @@ const FORMATTING: FormattingOptions = { tabSize: 2, insertSpaces: true }
  */
 const V050_REVIEW_USEWHEN =
   'you want an independent cross-vendor code review of a diff; runs gpt-5.6-sol at xhigh — stronger reasoning than opus, slightly below fable'
-const CURRENT_REVIEW_USEWHEN =
+const V0130_REVIEW_USEWHEN =
   'you want an independent cross-vendor code review of a diff; in the task, explicitly state the depth you want — a deep comprehensive review (slow on large diffs) or a quick single-pass scan; runs gpt-5.6-sol at xhigh — stronger reasoning than opus, slightly below fable'
+const CURRENT_REVIEW_USEWHEN =
+  'you want an independent cross-vendor code review of a diff; in the task, explicitly state the depth you want — a deep comprehensive review (slow on large diffs) or a quick single-pass scan; runs gpt-5.6-sol at high'
 const V050_CODEX_REVIEW_USEWHEN = 'you want an independent cross-vendor code review of a diff; runs claude opus at xhigh'
 const V0121_CODEX_REVIEW_USEWHEN =
   'you want an independent cross-vendor code review of a diff; in the task, explicitly state the depth you want — a deep comprehensive review (slow on large diffs) or a quick single-pass scan; runs claude opus at xhigh'
 const V0122_CODEX_REVIEW_USEWHEN =
   'you want an independent cross-vendor code review of a diff; in the task, explicitly state the depth you want — a deep comprehensive review (slow on large diffs) or a quick single-pass scan; runs claude sonnet at xhigh'
+const V0130_CODEX_REVIEW_USEWHEN =
+  'you want an independent cross-vendor code review of a diff; in the task, explicitly state the depth you want — a deep comprehensive review (slow on large diffs) or a quick single-pass scan; runs claude opus 5 at xhigh'
 const V050_CODEX_APPEND =
   'Your shell sessions do NOT wake you when a background command finishes, and polling is easy to forget. To collect a dianjiang run without blocking, use your subagent notification channel: `spawn_agent` with `fork_turns: "none"` and the message "Run `dianjiang result <runId> --wait --timeout 300`. If it prints status \'running\', run it again. When the status is terminal, return the full JSON verbatim." — its completion notification wakes you with the result while you keep working. If you have nothing else to do, just run `dianjiang result <runId> --wait --timeout 300` in the foreground. Either way, never end your turn with a dispatched run uncollected.'
 
@@ -87,18 +91,13 @@ describe('planSyncDefaults / applySyncDefaults', () => {
     expectSameConfig(applySyncDefaults(fixture, plan), defaultConfigJsonc())
   })
 
-  test('the v0.12.2 model bindings (grok-4.5, opus-4.6 rewrite, luna low, sol second-opinion) upgrade', () => {
-    const rpIdx = idx('rewrite-prompt')
+  test('the v0.13.0 bindings (grok-4.5, luna low, sol second-opinion, xhigh review/twitter/design) upgrade', () => {
     const fixture = shape([
+      { path: ['agents', idx('review'), 'effort'], value: 'xhigh' },
+      { path: ['agents', idx('review'), 'useWhen'], value: V0130_REVIEW_USEWHEN },
       { path: ['agents', idx('search-twitter'), 'model'], value: 'grok-4.5' },
-      { path: ['agents', rpIdx, 'harness'], value: 'claude' },
-      { path: ['agents', rpIdx, 'model'], value: 'claude-opus-4-6[1m]' },
-      { path: ['agents', rpIdx, 'effort'], value: undefined },
-      {
-        path: ['agents', rpIdx, 'useWhen'],
-        value:
-          'rewriting, compressing, or restructuring prompts and agent instructions, especially when a large corpus must be read first; runs opus 4.6 with 1M context — better prose style (文风) than later opus generations',
-      },
+      { path: ['agents', idx('search-twitter'), 'effort'], value: 'high' },
+      { path: ['agents', idx('design-frontend'), 'effort'], value: 'high' },
       { path: ['agents', idx('generate-image'), 'effort'], value: 'low' },
       { path: ['callers', 'claude', 'agents', 'second-opinion', 'model'], value: 'gpt-5.6-sol' },
       { path: ['callers', 'claude', 'agents', 'second-opinion', 'effort'], value: 'xhigh' },
@@ -107,20 +106,22 @@ describe('planSyncDefaults / applySyncDefaults', () => {
         value:
           "consult-only: a hard debugging hypothesis or an architecture/design decision where you're stuck or the call is expensive to reverse; runs gpt-5.6-sol at xhigh — stronger reasoning than opus, slightly below fable",
       },
+      { path: ['callers', 'codex', 'agents', 'review', 'useWhen'], value: V0130_CODEX_REVIEW_USEWHEN },
     ])
 
     const plan = planSyncDefaults(fixture)
     expect(actions(plan)).toEqual(
       new Set([
+        'set agents.review.effort',
+        'set agents.review.useWhen',
         'set agents.search-twitter.model',
-        'set agents.rewrite-prompt.harness',
-        'set agents.rewrite-prompt.model',
-        'add agents.rewrite-prompt.effort',
-        'set agents.rewrite-prompt.useWhen',
+        'set agents.search-twitter.effort',
+        'set agents.design-frontend.effort',
         'set agents.generate-image.effort',
         'set callers.claude.agents.second-opinion.model',
         'set callers.claude.agents.second-opinion.effort',
         'set callers.claude.agents.second-opinion.useWhen',
+        'set callers.codex.agents.review.useWhen',
       ]),
     )
     expect(plan.filter((c) => c.action === 'keep-custom')).toHaveLength(0)
@@ -184,31 +185,31 @@ describe('planSyncDefaults / applySyncDefaults', () => {
   test('a customized field is kept + reported; a deleted managed agent is re-added', () => {
     const rIdx = idx('review')
     const CUSTOM = 'MY OWN REVIEW BLURB — do not touch this'
-    // Custom useWhen on review, and delete rewrite-prompt (not referenced by any
+    // Custom useWhen on review, and delete search-twitter (not referenced by any
     // caller, so the pre-sync config stays valid).
     const fixture = shape([
       { path: ['agents', rIdx, 'useWhen'], value: CUSTOM },
-      { path: ['agents', idx('rewrite-prompt')], value: undefined },
+      { path: ['agents', idx('search-twitter')], value: undefined },
     ])
     expect(() => parseConfig(fixture)).not.toThrow()
-    expect(parseConfig(fixture).agents.some((a) => a.name === 'rewrite-prompt')).toBe(false)
+    expect(parseConfig(fixture).agents.some((a) => a.name === 'search-twitter')).toBe(false)
 
     const plan = planSyncDefaults(fixture)
     // The arbitrary useWhen is not a known default → kept, reported only.
     const keep = plan.find((c) => c.path === 'agents.review.useWhen')
     expect(keep).toEqual({ path: 'agents.review.useWhen', action: 'keep-custom', from: CUSTOM })
     // The deleted managed agent is re-added.
-    const add = plan.find((c) => c.path === 'agents.rewrite-prompt')
+    const add = plan.find((c) => c.path === 'agents.search-twitter')
     expect(add?.action).toBe('add')
 
     const applied = applySyncDefaults(fixture, plan)
     const parsed = parseConfig(applied)
     // Customization survived untouched.
     expect(parsed.agents.find((a) => a.name === 'review')?.useWhen).toBe(CUSTOM)
-    // rewrite-prompt is back, equal to the current default entry.
+    // search-twitter is back, equal to the current default entry.
     const defaults = parseConfig(defaultConfigJsonc())
-    expect(parsed.agents.find((a) => a.name === 'rewrite-prompt')).toEqual(
-      defaults.agents.find((a) => a.name === 'rewrite-prompt'),
+    expect(parsed.agents.find((a) => a.name === 'search-twitter')).toEqual(
+      defaults.agents.find((a) => a.name === 'search-twitter'),
     )
   })
 

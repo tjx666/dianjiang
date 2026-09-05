@@ -11,7 +11,6 @@ describe('defaultConfigJsonc', () => {
       'second-opinion',
       'search-twitter',
       'design-frontend',
-      'rewrite-prompt',
       'generate-image',
     ])
     // Caller-relative rules compile into base + sparse overrides + caller exclusions.
@@ -30,7 +29,7 @@ describe('defaultConfigJsonc', () => {
       harness: 'claude',
       model: 'opus',
       effort: 'xhigh',
-      useWhen: expect.stringContaining('runs claude opus 5 at xhigh'),
+      useWhen: expect.stringContaining('runs claude opus at xhigh'),
     })
     expect(config.callers?.codex?.exclude).toEqual(['generate-image'])
     expect(config.agents.find((agent) => agent.name === 'generate-image')).toEqual({
@@ -55,7 +54,7 @@ describe('defaultConfigJsonc', () => {
     // writes. Guard against a contract creeping back into the default roster.
     expect(review?.instructions).toBeUndefined()
     expect(review?.useWhen).toContain('independent cross-vendor code review')
-    expect(config.callers?.codex?.agents?.review?.useWhen).toContain('claude opus 5 at xhigh')
+    expect(config.callers?.codex?.agents?.review?.useWhen).toContain('claude opus at xhigh')
     // The codex wait discipline moved into skill.ts's structural collection
     // strategies; the default config no longer ships a codex append.
     expect(config.callers?.codex?.append).toBeUndefined()

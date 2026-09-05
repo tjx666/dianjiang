@@ -54,12 +54,14 @@ const OVERRIDE_FIELDS = ['useWhen', 'dontUseWhen', 'harness', 'model', 'effort']
  */
 const LEGACY_DEFAULTS: Record<string, string[]> = {
   'agents.review.useWhen': [
+    'you want an independent cross-vendor code review of a diff; in the task, explicitly state the depth you want — a deep comprehensive review (slow on large diffs) or a quick single-pass scan; runs gpt-5.6-sol at xhigh — stronger reasoning than opus, slightly below fable',
     'you want an independent cross-vendor code review of a diff; runs gpt-5.6-sol at xhigh — stronger reasoning than opus, slightly below fable',
     'you want an independent cross-vendor code review of a diff',
     'you want a second opinion on a diff from a different vendor than the implementer and caller',
     "you want an independent cross-vendor code review of a diff; focused and findings-only by default — say 'deep review' in the task for a comprehensive audit; runs gpt-5.6-sol at xhigh — stronger reasoning than opus, slightly below fable",
   ],
   'agents.review.dontUseWhen': ['a quick lint/style pass your own subagents already cover'],
+  'agents.review.effort': ['xhigh'],
   'agents.review.instructions': [
     "Default to a FOCUSED review: cover exactly the risks, files, and acceptance criteria the task names. Verifying a specific falsifiable hypothesis in depth is fine; a fixed all-dimension fan-out is not. Run a comprehensive deep review only when the task explicitly asks for one. Output contract: actionable findings only, ordered by severity — each with file:line, impact, how to trigger it, and a suggested fix; if nothing qualifies, output 'clean' plus one line on what you checked. Do not restate background or emit process narration, statistics, workflow/skill feedback, or non-blocking nits unless the task asks for them. Record `git rev-parse HEAD` (and whether the tree is dirty) before reading code and name that state in your verdict; if the tree changes mid-review, report 'snapshot changed' and state which state each finding applies to — never claim you covered a moving target. When resumed to verify fixes, check only the named findings and the fix delta — report each as fixed or still open, plus any regression the fix itself introduced; do not re-run the full review.",
   ],
@@ -83,7 +85,10 @@ const LEGACY_DEFAULTS: Record<string, string[]> = {
     'UI/UX work needing visual taste: components, layouts, styling, interaction polish, or design review of front-end code',
   ],
   'agents.design-frontend.dontUseWhen': ['backend logic or refactors with no visual/UX judgment involved'],
+  // rewrite-prompt was dropped from the roster on 2026-09-05 (rarely used);
+  // rows stay so a user's untouched copy is still recognized as a default.
   'agents.rewrite-prompt.useWhen': [
+    'rewriting, compressing, or restructuring prompts and agent instructions, especially when a large corpus must be read first; runs gpt-6-astra at medium — strong prose style (文风)',
     'rewriting, compressing, or restructuring prompts and agent instructions, especially when a large corpus must be read first; runs opus 4.6 with 1M context — better prose style (文风) than later opus generations',
     'rewriting, compressing, or restructuring prompts and agent instructions, especially when a large corpus must be read first',
   ],
@@ -91,7 +96,12 @@ const LEGACY_DEFAULTS: Record<string, string[]> = {
   'agents.rewrite-prompt.harness': ['claude'],
   'agents.rewrite-prompt.model': ['claude-opus-4-6[1m]'],
   'agents.search-twitter.model': ['grok-4.5'],
+  'agents.search-twitter.effort': ['high'],
+  'agents.design-frontend.effort': ['high'],
   'agents.generate-image.effort': ['low'],
+  'agents.generate-image.useWhen': [
+    "generating or editing raster images such as photos, illustrations, textures, sprites, mockups, or transparent-background cutouts through Codex's built-in image generation, especially when the caller is Claude Code",
+  ],
   'agents.rewrite-prompt.instructions': ['Output only the rewritten prompt unless asked otherwise.'],
   'callers.claude.prepend': [
     'If your session model is fable, act as an orchestrator to preserve fable tokens: delegate execution work (implementation, mechanical edits, running tests/builds) to your built-in subagents with `model: opus`, keeping only planning, task decomposition, tricky debugging, and verification of subagent output for yourself. Delegate coherent, independently verifiable chunks (a new file, a test suite, a bulk edit); keep small in-context edits yourself — the cost of writing the brief must not exceed the task. For cross-vendor perspectives or capabilities your subagents lack, use the dianjiang roster below.',
@@ -112,6 +122,7 @@ const LEGACY_DEFAULTS: Record<string, string[]> = {
     "you want an independent cross-vendor code review of a diff; focused and findings-only by default — say 'deep review' in the task for a comprehensive audit; runs claude opus at xhigh",
     'you want an independent cross-vendor code review of a diff; in the task, explicitly state the depth you want — a deep comprehensive review (slow on large diffs) or a quick single-pass scan; runs claude opus at xhigh',
     'you want an independent cross-vendor code review of a diff; in the task, explicitly state the depth you want — a deep comprehensive review (slow on large diffs) or a quick single-pass scan; runs claude sonnet at xhigh',
+    'you want an independent cross-vendor code review of a diff; in the task, explicitly state the depth you want — a deep comprehensive review (slow on large diffs) or a quick single-pass scan; runs claude opus 5 at xhigh',
   ],
   'callers.codex.agents.review.model': ['opus', 'sonnet'],
   'agents.explore.useWhen': [

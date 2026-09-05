@@ -218,11 +218,11 @@ export function defaultConfigJsonc(): string {
       "name": "review",
       // Base is codex; the callers section rebinds it to a different vendor for
       // the codex caller so review is never same-model as the code under review.
-      "useWhen": "you want an independent cross-vendor code review of a diff; in the task, explicitly state the depth you want — a deep comprehensive review (slow on large diffs) or a quick single-pass scan; runs gpt-5.6-sol at xhigh — stronger reasoning than opus, slightly below fable",
+      "useWhen": "you want an independent cross-vendor code review of a diff; in the task, explicitly state the depth you want — a deep comprehensive review (slow on large diffs) or a quick single-pass scan; runs gpt-5.6-sol at high",
       "dontUseWhen": "a quick lint/style pass your own subagents already cover",
       "harness": "codex",
       "model": "gpt-5.6-sol",
-      "effort": "xhigh"
+      "effort": "high"
       // Deliberately NO "instructions": three dogfood rounds of injected review
       // contracts (2026-07) each over-fit — the caller owns the briefing. Scope,
       // process, and expected output belong in the task the caller writes (the
@@ -245,8 +245,11 @@ export function defaultConfigJsonc(): string {
       "dontUseWhen": "general web research (use your own web/search tools) or anything needing code changes",
       "harness": "grok",
       "model": "grok-4.6",
-      "effort": "high",
-      "instructions": "Use your live X/Twitter search tools. Cite the tweet URL for every claim."
+      "effort": "medium",
+      // Dates: a "right now" agent must let the caller judge staleness. No-preamble:
+      // grok narrates its plan into the result (see design SKILL open questions);
+      // the instruction trims it to one line — verified live 2026-09-05.
+      "instructions": "Use your live X/Twitter search tools. Cite the tweet URL and post date for every claim. Output only the findings — no preamble about what you are about to do."
     },
     {
       "name": "design-frontend",
@@ -254,22 +257,11 @@ export function defaultConfigJsonc(): string {
       "dontUseWhen": "backend logic or refactors with no visual/UX judgment involved",
       "harness": "claude",
       "model": "fable",
-      "effort": "high"
-    },
-    {
-      "name": "rewrite-prompt",
-      // gpt-6-astra at medium: strong prose style (文风) for prompt rewriting
-      // without paying for deep reasoning it does not need.
-      "useWhen": "rewriting, compressing, or restructuring prompts and agent instructions, especially when a large corpus must be read first; runs gpt-6-astra at medium — strong prose style (文风)",
-      "dontUseWhen": "ordinary coding tasks",
-      "harness": "codex",
-      "model": "gpt-6-astra",
-      "effort": "medium",
-      "instructions": "Output only the rewritten prompt unless asked otherwise."
+      "effort": "medium"
     },
     {
       "name": "generate-image",
-      "useWhen": "generating or editing raster images such as photos, illustrations, textures, sprites, mockups, or transparent-background cutouts through Codex's built-in image generation, especially when the caller is Claude Code",
+      "useWhen": "generating or editing raster images such as photos, illustrations, textures, sprites, mockups, or transparent-background cutouts through Codex's built-in image generation",
       "dontUseWhen": "the visual should be implemented deterministically as SVG, HTML/CSS, canvas, or another code-native format",
       "harness": "codex",
       "model": "gpt-5.6-luna",
@@ -305,7 +297,7 @@ export function defaultConfigJsonc(): string {
           "harness": "claude",
           "model": "opus",
           "effort": "xhigh",
-          "useWhen": "you want an independent cross-vendor code review of a diff; in the task, explicitly state the depth you want — a deep comprehensive review (slow on large diffs) or a quick single-pass scan; runs claude opus 5 at xhigh"
+          "useWhen": "you want an independent cross-vendor code review of a diff; in the task, explicitly state the depth you want — a deep comprehensive review (slow on large diffs) or a quick single-pass scan; runs claude opus at xhigh"
         }
       },
       // Codex already exposes imagegen directly — dispatching another Codex

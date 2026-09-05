@@ -11,7 +11,7 @@ from your built-in subagents: default to your own tools and subagents, and
 reach for dianjiang only when an agent below clearly fits.
 
 <agent name="review">
-  <use-when>you want an independent cross-vendor code review of a diff; in the task, explicitly state the depth you want — a deep comprehensive review (slow on large diffs) or a quick single-pass scan; runs gpt-5.6-sol at xhigh — stronger reasoning than opus, slightly below fable</use-when>
+  <use-when>you want an independent cross-vendor code review of a diff; in the task, explicitly state the depth you want — a deep comprehensive review (slow on large diffs) or a quick single-pass scan; runs gpt-5.6-sol at high</use-when>
   <dont-use-when>a quick lint/style pass your own subagents already cover</dont-use-when>
 </agent>
 
@@ -30,13 +30,8 @@ reach for dianjiang only when an agent below clearly fits.
   <dont-use-when>backend logic or refactors with no visual/UX judgment involved</dont-use-when>
 </agent>
 
-<agent name="rewrite-prompt">
-  <use-when>rewriting, compressing, or restructuring prompts and agent instructions, especially when a large corpus must be read first; runs gpt-6-astra at medium — strong prose style (文风)</use-when>
-  <dont-use-when>ordinary coding tasks</dont-use-when>
-</agent>
-
 <agent name="generate-image">
-  <use-when>generating or editing raster images such as photos, illustrations, textures, sprites, mockups, or transparent-background cutouts through Codex's built-in image generation, especially when the caller is Claude Code</use-when>
+  <use-when>generating or editing raster images such as photos, illustrations, textures, sprites, mockups, or transparent-background cutouts through Codex's built-in image generation</use-when>
   <dont-use-when>the visual should be implemented deterministically as SVG, HTML/CSS, canvas, or another code-native format</dont-use-when>
 </agent>
 
@@ -108,7 +103,7 @@ from your built-in subagents: default to your own tools and subagents, and
 reach for dianjiang only when an agent below clearly fits.
 
 <agent name="review">
-  <use-when>you want an independent cross-vendor code review of a diff; in the task, explicitly state the depth you want — a deep comprehensive review (slow on large diffs) or a quick single-pass scan; runs gpt-5.6-sol at xhigh — stronger reasoning than opus, slightly below fable</use-when>
+  <use-when>you want an independent cross-vendor code review of a diff; in the task, explicitly state the depth you want — a deep comprehensive review (slow on large diffs) or a quick single-pass scan; runs gpt-5.6-sol at high</use-when>
   <dont-use-when>a quick lint/style pass your own subagents already cover</dont-use-when>
 </agent>
 
@@ -122,13 +117,8 @@ reach for dianjiang only when an agent below clearly fits.
   <dont-use-when>general web research (use your own web/search tools) or anything needing code changes</dont-use-when>
 </agent>
 
-<agent name="rewrite-prompt">
-  <use-when>rewriting, compressing, or restructuring prompts and agent instructions, especially when a large corpus must be read first; runs gpt-6-astra at medium — strong prose style (文风)</use-when>
-  <dont-use-when>ordinary coding tasks</dont-use-when>
-</agent>
-
 <agent name="generate-image">
-  <use-when>generating or editing raster images such as photos, illustrations, textures, sprites, mockups, or transparent-background cutouts through Codex's built-in image generation, especially when the caller is Claude Code</use-when>
+  <use-when>generating or editing raster images such as photos, illustrations, textures, sprites, mockups, or transparent-background cutouts through Codex's built-in image generation</use-when>
   <dont-use-when>the visual should be implemented deterministically as SVG, HTML/CSS, canvas, or another code-native format</dont-use-when>
 </agent>
 
@@ -197,7 +187,7 @@ from your built-in subagents: default to your own tools and subagents, and
 reach for dianjiang only when an agent below clearly fits.
 
 <agent name="review">
-  <use-when>you want an independent cross-vendor code review of a diff; in the task, explicitly state the depth you want — a deep comprehensive review (slow on large diffs) or a quick single-pass scan; runs claude opus 5 at xhigh</use-when>
+  <use-when>you want an independent cross-vendor code review of a diff; in the task, explicitly state the depth you want — a deep comprehensive review (slow on large diffs) or a quick single-pass scan; runs claude opus at xhigh</use-when>
   <dont-use-when>a quick lint/style pass your own subagents already cover</dont-use-when>
 </agent>
 
@@ -214,11 +204,6 @@ reach for dianjiang only when an agent below clearly fits.
 <agent name="design-frontend">
   <use-when>UI/UX work needing visual taste: components, layouts, styling, interaction polish, or design review of front-end code</use-when>
   <dont-use-when>backend logic or refactors with no visual/UX judgment involved</dont-use-when>
-</agent>
-
-<agent name="rewrite-prompt">
-  <use-when>rewriting, compressing, or restructuring prompts and agent instructions, especially when a large corpus must be read first; runs gpt-6-astra at medium — strong prose style (文风)</use-when>
-  <dont-use-when>ordinary coding tasks</dont-use-when>
 </agent>
 
 <rules>
@@ -304,7 +289,7 @@ from your built-in subagents: default to your own tools and subagents, and
 reach for dianjiang only when an agent below clearly fits.
 
 <agent name="review">
-  <use-when>you want an independent cross-vendor code review of a diff; in the task, explicitly state the depth you want — a deep comprehensive review (slow on large diffs) or a quick single-pass scan; runs gpt-5.6-sol at xhigh — stronger reasoning than opus, slightly below fable</use-when>
+  <use-when>you want an independent cross-vendor code review of a diff; in the task, explicitly state the depth you want — a deep comprehensive review (slow on large diffs) or a quick single-pass scan; runs gpt-5.6-sol at high</use-when>
   <dont-use-when>a quick lint/style pass your own subagents already cover</dont-use-when>
 </agent>
 
@@ -323,13 +308,8 @@ reach for dianjiang only when an agent below clearly fits.
   <dont-use-when>backend logic or refactors with no visual/UX judgment involved</dont-use-when>
 </agent>
 
-<agent name="rewrite-prompt">
-  <use-when>rewriting, compressing, or restructuring prompts and agent instructions, especially when a large corpus must be read first; runs gpt-6-astra at medium — strong prose style (文风)</use-when>
-  <dont-use-when>ordinary coding tasks</dont-use-when>
-</agent>
-
 <agent name="generate-image">
-  <use-when>generating or editing raster images such as photos, illustrations, textures, sprites, mockups, or transparent-background cutouts through Codex's built-in image generation, especially when the caller is Claude Code</use-when>
+  <use-when>generating or editing raster images such as photos, illustrations, textures, sprites, mockups, or transparent-background cutouts through Codex's built-in image generation</use-when>
   <dont-use-when>the visual should be implemented deterministically as SVG, HTML/CSS, canvas, or another code-native format</dont-use-when>
 </agent>
 
