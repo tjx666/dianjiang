@@ -91,8 +91,8 @@ bindings + sparse `callers` overrides/excludes:
 
 - `review` / `second-opinion` — **always a different vendor than the caller**
   (avoid same-model blind spots); review runs xhigh, second-opinion runs the
-  other vendor's flagship with effort graded per model — fable stays at high
-  (expensive; high already delivers), gpt-5.6-sol goes to xhigh.
+  other vendor's flagship at high — fable and gpt-6-astra both deliver at high;
+  higher efforts cost more without a visible consulting gain.
 
 `review` deliberately ships **no `instructions`** (decided 2026-07-21 after
 three dogfood rounds of injected review contracts, each corrected by the
@@ -151,16 +151,20 @@ Cost/strength rationale:
 - **fable is reserved for low-frequency, judgment-heavy roles** — second
   brain (`second-opinion`) and visual taste (`design-frontend`). It is too
   expensive for `review`, which is high-frequency; review gets the neighbor
-  vendor's cheaper review model (gpt-5.6-sol or sonnet) at xhigh instead.
+  vendor's review model (gpt-5.6-sol or opus 5) at xhigh instead — opus 5
+  replaced sonnet for the codex caller on 2026-09-05 (sonnet reviews were
+  too shallow to be worth a cross-vendor hop).
 - Per-caller character: claude and codex implement with their own flagship;
   grok is fast and has native X search but weak reasoning, so it borrows
   fable to plan/consult and codex gpt-5.6-sol to review.
-- opus 4.6 has the best prose style (文风) → `rewrite-prompt`.
+- `rewrite-prompt` runs gpt-6-astra at medium (2026-09-05; previously opus
+  4.6 with 1M context, whose prose style has been matched by gpt-6-astra and
+  which no longer needs the 1M-context spelling to be maintained).
 
 | Agent | Base binding | claude caller | codex caller | grok caller |
 |---|---|---|---|---|
-| `review` | codex / gpt-5.6-sol / xhigh | (base) | claude / sonnet / xhigh | (base) |
-| `second-opinion` | claude / fable / high | codex / gpt-5.6-sol / xhigh | (base) | (base) |
+| `review` | codex / gpt-5.6-sol / xhigh | (base) | claude / opus / xhigh | (base) |
+| `second-opinion` | claude / fable / high | codex / gpt-6-astra / high | (base) | (base) |
 
 Base = the compiled view for the most common callers. Values recalibrate by
 feel — that is exactly what config-time compilation is for.
@@ -175,10 +179,10 @@ excluded when the caller already exposes that capability natively:
 
 | Agent | Harness / model / effort | Capability |
 |---|---|---|
-| `search-twitter` | grok / grok-4.5 / high | grok's native live X/Twitter search tools (verified headless: returns real tweet URLs) |
+| `search-twitter` | grok / grok-4.6 / high | grok's native live X/Twitter search tools (verified headless: returns real tweet URLs) |
 | `design-frontend` | claude / fable / high | strongest visual/UX taste for front-end work |
-| `rewrite-prompt` | claude / claude-opus-4-6[1m] / — | 1M-context ingestion before rewriting prompts/instructions |
-| `generate-image` | codex / gpt-5.6-luna / low | codex's built-in `imagegen` skill + `image_gen` tool for raster generation and editing |
+| `rewrite-prompt` | codex / gpt-6-astra / medium | strong prose style (文风) for rewriting prompts/instructions |
+| `generate-image` | codex / gpt-5.6-luna / max | codex's built-in `imagegen` skill + `image_gen` tool for raster generation and editing |
 
 The earlier direct-model route remains rejected: codex rejects `gpt-image-2`
 as the session model under ChatGPT-subscription auth (HTTP 400). The shipped
@@ -188,13 +192,17 @@ image-generation tool, which requires no API-key auth.
 Locally verified model/effort space:
 
 - claude: aliases `fable` / `opus` / `sonnet` (haiku unconfirmed on this
-  machine); effort `low | medium | high | xhigh | max`
-- codex: `gpt-5.6-sol/-terra/-luna`, `gpt-5.5`, `gpt-5.4(-mini)`,
+  machine); effort `low | medium | high | xhigh | max`. Each alias tracks the
+  latest release of its tier — verified 2026-09-05 via `modelUsage`: `fable`
+  → `claude-fable-5-1`, `opus` → `claude-opus-5` — so a same-tier model
+  release needs no roster bump.
+- codex: `gpt-6-astra`, `gpt-5.6-sol/-terra/-luna`, `gpt-5.5`, `gpt-5.4(-mini)`,
   `gpt-5.3-codex-spark`; effort superset `low…ultra`, but `max`/`ultra` only on
-  the 5.6 series and `ultra` only on sol/terra (adapters must validate per model)
-- grok: `grok-4.5` only (effort `low | medium | high`).
-  `grok-composer-2.5-fast` was delisted by the vendor (2026-07-28: "unknown
-  model id"; `grok models` now lists a single model)
+  the 5.6+ series and `ultra` only on astra/sol/terra (adapters must validate
+  per model; verified 2026-09-05 from `~/.codex/models_cache.json`)
+- grok: `grok-4.6` (vendor default since 2026-09) and `grok-4.5` (effort
+  `low | medium | high`). `grok-composer-2.5-fast` was delisted by the vendor
+  (2026-07-28: "unknown model id")
 
 ## Skill doc (`dianjiang skill`)
 
@@ -308,7 +316,7 @@ Single `~/.dianjiang/config.jsonc`; runs metadata in `~/.dianjiang/runs.sqlite`.
   ],
   "callers": {
     "claude": {
-      "agents": { "second-opinion": { "harness": "codex", "model": "gpt-5.6-sol", "effort": "xhigh" } },
+      "agents": { "second-opinion": { "harness": "codex", "model": "gpt-6-astra", "effort": "high" } },
       "exclude": ["design-frontend"],
       "prepend": "…caller-behavior guidance rendered at the top of claude's block…"
     }

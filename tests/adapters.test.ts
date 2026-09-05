@@ -478,13 +478,13 @@ describe('describeHarness / mergeLiveModels', () => {
     expect(d.name).toBe('claude')
     expect(d.efforts).toEqual(adapters.claude.efforts)
     expect(d.models.source).toBe('curated')
-    expect(d.models.verifiedAt).toBe('2026-07-16')
+    expect(d.models.verifiedAt).toBe('2026-09-05')
     expect(d.models.list.map((m) => m.name)).toEqual(['fable', 'opus', 'sonnet'])
   })
 
   test('mergeLiveModels keeps curated efforts for a matched name', () => {
-    const merged = mergeLiveModels(['grok-4.5'], adapters.grok)
-    expect(merged).toEqual([{ name: 'grok-4.5', efforts: adapters.grok.efforts, isDefault: true }])
+    const merged = mergeLiveModels(['grok-4.6'], adapters.grok)
+    expect(merged).toEqual([{ name: 'grok-4.6', efforts: adapters.grok.efforts, isDefault: true }])
   })
 
   test('mergeLiveModels flags an unmatched live name as efforts-unverified', () => {

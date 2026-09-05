@@ -22,6 +22,8 @@ const CURRENT_REVIEW_USEWHEN =
 const V050_CODEX_REVIEW_USEWHEN = 'you want an independent cross-vendor code review of a diff; runs claude opus at xhigh'
 const V0121_CODEX_REVIEW_USEWHEN =
   'you want an independent cross-vendor code review of a diff; in the task, explicitly state the depth you want — a deep comprehensive review (slow on large diffs) or a quick single-pass scan; runs claude opus at xhigh'
+const V0122_CODEX_REVIEW_USEWHEN =
+  'you want an independent cross-vendor code review of a diff; in the task, explicitly state the depth you want — a deep comprehensive review (slow on large diffs) or a quick single-pass scan; runs claude sonnet at xhigh'
 const V050_CODEX_APPEND =
   'Your shell sessions do NOT wake you when a background command finishes, and polling is easy to forget. To collect a dianjiang run without blocking, use your subagent notification channel: `spawn_agent` with `fork_turns: "none"` and the message "Run `dianjiang result <runId> --wait --timeout 300`. If it prints status \'running\', run it again. When the status is terminal, return the full JSON verbatim." — its completion notification wakes you with the result while you keep working. If you have nothing else to do, just run `dianjiang result <runId> --wait --timeout 300` in the foreground. Either way, never end your turn with a dispatched run uncollected.'
 
@@ -68,10 +70,10 @@ function expectSameConfig(a: string, b: string): void {
 }
 
 describe('planSyncDefaults / applySyncDefaults', () => {
-  test('the v0.12.1 codex review binding upgrades from opus to sonnet', () => {
+  test('the v0.12.2 codex review binding upgrades from sonnet back to opus', () => {
     const fixture = shape([
-      { path: ['callers', 'codex', 'agents', 'review', 'model'], value: 'opus' },
-      { path: ['callers', 'codex', 'agents', 'review', 'useWhen'], value: V0121_CODEX_REVIEW_USEWHEN },
+      { path: ['callers', 'codex', 'agents', 'review', 'model'], value: 'sonnet' },
+      { path: ['callers', 'codex', 'agents', 'review', 'useWhen'], value: V0122_CODEX_REVIEW_USEWHEN },
     ])
 
     const plan = planSyncDefaults(fixture)
@@ -79,6 +81,46 @@ describe('planSyncDefaults / applySyncDefaults', () => {
       new Set([
         'set callers.codex.agents.review.model',
         'set callers.codex.agents.review.useWhen',
+      ]),
+    )
+    expect(plan.filter((c) => c.action === 'keep-custom')).toHaveLength(0)
+    expectSameConfig(applySyncDefaults(fixture, plan), defaultConfigJsonc())
+  })
+
+  test('the v0.12.2 model bindings (grok-4.5, opus-4.6 rewrite, luna low, sol second-opinion) upgrade', () => {
+    const rpIdx = idx('rewrite-prompt')
+    const fixture = shape([
+      { path: ['agents', idx('search-twitter'), 'model'], value: 'grok-4.5' },
+      { path: ['agents', rpIdx, 'harness'], value: 'claude' },
+      { path: ['agents', rpIdx, 'model'], value: 'claude-opus-4-6[1m]' },
+      { path: ['agents', rpIdx, 'effort'], value: undefined },
+      {
+        path: ['agents', rpIdx, 'useWhen'],
+        value:
+          'rewriting, compressing, or restructuring prompts and agent instructions, especially when a large corpus must be read first; runs opus 4.6 with 1M context — better prose style (文风) than later opus generations',
+      },
+      { path: ['agents', idx('generate-image'), 'effort'], value: 'low' },
+      { path: ['callers', 'claude', 'agents', 'second-opinion', 'model'], value: 'gpt-5.6-sol' },
+      { path: ['callers', 'claude', 'agents', 'second-opinion', 'effort'], value: 'xhigh' },
+      {
+        path: ['callers', 'claude', 'agents', 'second-opinion', 'useWhen'],
+        value:
+          "consult-only: a hard debugging hypothesis or an architecture/design decision where you're stuck or the call is expensive to reverse; runs gpt-5.6-sol at xhigh — stronger reasoning than opus, slightly below fable",
+      },
+    ])
+
+    const plan = planSyncDefaults(fixture)
+    expect(actions(plan)).toEqual(
+      new Set([
+        'set agents.search-twitter.model',
+        'set agents.rewrite-prompt.harness',
+        'set agents.rewrite-prompt.model',
+        'add agents.rewrite-prompt.effort',
+        'set agents.rewrite-prompt.useWhen',
+        'set agents.generate-image.effort',
+        'set callers.claude.agents.second-opinion.model',
+        'set callers.claude.agents.second-opinion.effort',
+        'set callers.claude.agents.second-opinion.useWhen',
       ]),
     )
     expect(plan.filter((c) => c.action === 'keep-custom')).toHaveLength(0)

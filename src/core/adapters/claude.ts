@@ -40,11 +40,13 @@ function extractUsage(obj: Record<string, unknown>): RunUsage | undefined {
 export const CLAUDE_EFFORTS = ['low', 'medium', 'high', 'xhigh', 'max'] as const
 
 /**
- * Locally-verified claude models (2026-07-16). Aliases only; the CLI also
- * accepts full model IDs and the `[1m]` 1M-context suffix — e.g.
- * `claude-opus-4-6[1m]` (verified) — which validation passes through as
- * unknown-but-permitted names. The CLI has no headless model-list command, so
- * there is no `listModels`.
+ * Locally-verified claude models (2026-09-05). Aliases only — each alias tracks
+ * the vendor's latest release of that tier (verified live via `modelUsage`:
+ * `fable` → claude-fable-5-1, `opus` → claude-opus-5), so the roster never has
+ * to be bumped for a same-tier model release. The CLI also accepts full model
+ * IDs and the `[1m]` 1M-context suffix — e.g. `claude-opus-4-6[1m]` (verified)
+ * — which validation passes through as unknown-but-permitted names. The CLI
+ * has no headless model-list command, so there is no `listModels`.
  */
 export const CLAUDE_MODELS: readonly KnownModel[] = [
   {
@@ -61,7 +63,7 @@ export const claudeAdapter: HarnessAdapter = {
   name: 'claude',
   efforts: CLAUDE_EFFORTS,
   knownModels: CLAUDE_MODELS,
-  modelsVerifiedAt: '2026-07-16',
+  modelsVerifiedAt: '2026-09-05',
   versionArgs: ['--version'],
 
   buildCommand(spec: DispatchSpec) {

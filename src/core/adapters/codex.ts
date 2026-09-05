@@ -23,11 +23,14 @@ const CODEX_56_NO_ULTRA = ['low', 'medium', 'high', 'xhigh', 'max'] as const
 const CODEX_PRE_56 = ['low', 'medium', 'high', 'xhigh'] as const
 
 /**
- * Locally-verified codex models (2026-07-16). `ultra` exists only on
- * gpt-5.6-sol/terra; `max` only on the 5.6 series. The CLI has no model-list
- * command exposed under ChatGPT-subscription auth, so there is no `listModels`.
+ * Locally-verified codex models (2026-09-05, from `~/.codex/models_cache.json`
+ * on codex-cli 0.153.4). gpt-6-astra (2026-09 release) shares the full sol/terra
+ * effort set incl. `ultra`; `max` exists only on the 5.6+ series. The CLI has no
+ * model-list command exposed under ChatGPT-subscription auth, so there is no
+ * `listModels`.
  */
 export const CODEX_MODELS: readonly KnownModel[] = [
+  { name: 'gpt-6-astra', efforts: CODEX_EFFORTS },
   { name: 'gpt-5.6-sol', efforts: CODEX_EFFORTS, isDefault: true },
   { name: 'gpt-5.6-terra', efforts: CODEX_EFFORTS },
   { name: 'gpt-5.6-luna', efforts: CODEX_56_NO_ULTRA },
@@ -113,7 +116,7 @@ export const codexAdapter: HarnessAdapter = {
   name: 'codex',
   efforts: CODEX_EFFORTS,
   knownModels: CODEX_MODELS,
-  modelsVerifiedAt: '2026-07-16',
+  modelsVerifiedAt: '2026-09-05',
   versionArgs: ['--version'],
 
   buildCommand(spec: DispatchSpec) {

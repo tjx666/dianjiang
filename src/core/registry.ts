@@ -244,7 +244,7 @@ export function defaultConfigJsonc(): string {
       "useWhen": "live X/Twitter lookups: find tweets, threads, account activity, or what people say about a topic right now — grok's native X search is real-time and extremely fast",
       "dontUseWhen": "general web research (use your own web/search tools) or anything needing code changes",
       "harness": "grok",
-      "model": "grok-4.5",
+      "model": "grok-4.6",
       "effort": "high",
       "instructions": "Use your live X/Twitter search tools. Cite the tweet URL for every claim."
     },
@@ -258,11 +258,13 @@ export function defaultConfigJsonc(): string {
     },
     {
       "name": "rewrite-prompt",
-      // 1M-context opus: can ingest a huge corpus before rewriting.
-      "useWhen": "rewriting, compressing, or restructuring prompts and agent instructions, especially when a large corpus must be read first; runs opus 4.6 with 1M context — better prose style (文风) than later opus generations",
+      // gpt-6-astra at medium: strong prose style (文风) for prompt rewriting
+      // without paying for deep reasoning it does not need.
+      "useWhen": "rewriting, compressing, or restructuring prompts and agent instructions, especially when a large corpus must be read first; runs gpt-6-astra at medium — strong prose style (文风)",
       "dontUseWhen": "ordinary coding tasks",
-      "harness": "claude",
-      "model": "claude-opus-4-6[1m]",
+      "harness": "codex",
+      "model": "gpt-6-astra",
+      "effort": "medium",
       "instructions": "Output only the rewritten prompt unless asked otherwise."
     },
     {
@@ -271,7 +273,7 @@ export function defaultConfigJsonc(): string {
       "dontUseWhen": "the visual should be implemented deterministically as SVG, HTML/CSS, canvas, or another code-native format",
       "harness": "codex",
       "model": "gpt-5.6-luna",
-      "effort": "low",
+      "effort": "max",
       "instructions": "Use the imagegen skill, following its built-in image_gen path by default. Complete the requested image generation or edit. For project-bound work, save the final output in the working directory. Return the final artifact path(s), final prompt, and whether built-in or fallback mode was used."
     }
   ],
@@ -287,9 +289,9 @@ export function defaultConfigJsonc(): string {
       "agents": {
         "second-opinion": {
           "harness": "codex",
-          "model": "gpt-5.6-sol",
-          "effort": "xhigh",
-          "useWhen": "consult-only: a hard debugging hypothesis or an architecture/design decision where you're stuck or the call is expensive to reverse; runs gpt-5.6-sol at xhigh — stronger reasoning than opus, slightly below fable"
+          "model": "gpt-6-astra",
+          "effort": "high",
+          "useWhen": "consult-only: a hard debugging hypothesis or an architecture/design decision where you're stuck or the call is expensive to reverse; runs gpt-6-astra at high — OpenAI's strongest reasoning model"
         }
       },
       // design-frontend is claude/fable itself — the claude caller gains nothing over its own subagents.
@@ -301,9 +303,9 @@ export function defaultConfigJsonc(): string {
       "agents": {
         "review": {
           "harness": "claude",
-          "model": "sonnet",
+          "model": "opus",
           "effort": "xhigh",
-          "useWhen": "you want an independent cross-vendor code review of a diff; in the task, explicitly state the depth you want — a deep comprehensive review (slow on large diffs) or a quick single-pass scan; runs claude sonnet at xhigh"
+          "useWhen": "you want an independent cross-vendor code review of a diff; in the task, explicitly state the depth you want — a deep comprehensive review (slow on large diffs) or a quick single-pass scan; runs claude opus 5 at xhigh"
         }
       },
       // Codex already exposes imagegen directly — dispatching another Codex

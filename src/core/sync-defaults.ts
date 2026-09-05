@@ -88,6 +88,10 @@ const LEGACY_DEFAULTS: Record<string, string[]> = {
     'rewriting, compressing, or restructuring prompts and agent instructions, especially when a large corpus must be read first',
   ],
   'agents.rewrite-prompt.dontUseWhen': ['ordinary coding tasks'],
+  'agents.rewrite-prompt.harness': ['claude'],
+  'agents.rewrite-prompt.model': ['claude-opus-4-6[1m]'],
+  'agents.search-twitter.model': ['grok-4.5'],
+  'agents.generate-image.effort': ['low'],
   'agents.rewrite-prompt.instructions': ['Output only the rewritten prompt unless asked otherwise.'],
   'callers.claude.prepend': [
     'If your session model is fable, act as an orchestrator to preserve fable tokens: delegate execution work (implementation, mechanical edits, running tests/builds) to your built-in subagents with `model: opus`, keeping only planning, task decomposition, tricky debugging, and verification of subagent output for yourself. Delegate coherent, independently verifiable chunks (a new file, a test suite, a bulk edit); keep small in-context edits yourself — the cost of writing the brief must not exceed the task. For cross-vendor perspectives or capabilities your subagents lack, use the dianjiang roster below.',
@@ -97,6 +101,8 @@ const LEGACY_DEFAULTS: Record<string, string[]> = {
   'callers.claude.agents.second-opinion.useWhen': [
     "consult-only: a hard debugging hypothesis or an architecture/design decision where you're stuck or the call is expensive to reverse; runs gpt-5.6-sol at xhigh — stronger reasoning than opus, slightly below fable",
   ],
+  'callers.claude.agents.second-opinion.model': ['gpt-5.6-sol'],
+  'callers.claude.agents.second-opinion.effort': ['xhigh'],
   'callers.codex.append': [
     'Your shell sessions do NOT wake you when a background command finishes, and polling is easy to forget. To collect a dianjiang run without blocking, use your subagent notification channel: `spawn_agent` with `fork_turns: "none"` and the message "Run `dianjiang result <runId> --wait --timeout 300`. If it prints status \'running\', run it again. When the status is terminal, return the full JSON verbatim." — its completion notification wakes you with the result while you keep working. If you have nothing else to do, just run `dianjiang result <runId> --wait --timeout 300` in the foreground. Either way, never end your turn with a dispatched run uncollected.',
     'Your shell sessions do NOT wake you when a background command finishes, and polling is easy to forget. To collect a dianjiang run without blocking, use your subagent notification channel: `spawn_agent` with `fork_turns: "none"` and the message "Run `dianjiang result <runId> --wait --timeout 300`. If it prints status \'running\', run it again. When the status is terminal, return the full JSON verbatim." — its completion notification wakes you with the result while you keep working. One waiter can collect several runIds — list them all in its message rather than spawning one waiter per run. If you have nothing else to do, just run `dianjiang result <runId> --wait --timeout 300` in the foreground. Either way, never end your turn with a dispatched run uncollected.',
@@ -105,8 +111,9 @@ const LEGACY_DEFAULTS: Record<string, string[]> = {
     'you want an independent cross-vendor code review of a diff; runs claude opus at xhigh',
     "you want an independent cross-vendor code review of a diff; focused and findings-only by default — say 'deep review' in the task for a comprehensive audit; runs claude opus at xhigh",
     'you want an independent cross-vendor code review of a diff; in the task, explicitly state the depth you want — a deep comprehensive review (slow on large diffs) or a quick single-pass scan; runs claude opus at xhigh',
+    'you want an independent cross-vendor code review of a diff; in the task, explicitly state the depth you want — a deep comprehensive review (slow on large diffs) or a quick single-pass scan; runs claude sonnet at xhigh',
   ],
-  'callers.codex.agents.review.model': ['opus'],
+  'callers.codex.agents.review.model': ['opus', 'sonnet'],
   'agents.explore.useWhen': [
     'broad codebase search, research, or summarization',
     'broad codebase search, research, or summarization where cheap and fast matters',

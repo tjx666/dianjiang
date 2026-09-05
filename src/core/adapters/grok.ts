@@ -48,12 +48,16 @@ function extractUsage(obj: Record<string, unknown>): RunUsage | undefined {
 export const GROK_EFFORTS = ['low', 'medium', 'high'] as const
 
 /**
- * Locally-verified grok models (2026-07-28). grok-composer-2.5-fast was
+ * Locally-verified grok models (2026-09-05). grok-4.6 became the vendor default
+ * with the 2026-09 release; grok-4.5 is still listed. grok-composer-2.5-fast was
  * delisted by the vendor between 2026-07-16 and 2026-07-28 (dispatching it now
  * fails with "unknown model id"). grok also supports live enumeration via
  * `grok models`, so this snapshot is a fallback only.
  */
-export const GROK_MODELS: readonly KnownModel[] = [{ name: 'grok-4.5', efforts: GROK_EFFORTS, isDefault: true }]
+export const GROK_MODELS: readonly KnownModel[] = [
+  { name: 'grok-4.6', efforts: GROK_EFFORTS, isDefault: true },
+  { name: 'grok-4.5', efforts: GROK_EFFORTS },
+]
 
 /**
  * Parse the output of `grok models` into model names. The command works even
@@ -85,7 +89,7 @@ export const grokAdapter: HarnessAdapter = {
   name: 'grok',
   efforts: GROK_EFFORTS,
   knownModels: GROK_MODELS,
-  modelsVerifiedAt: '2026-07-28',
+  modelsVerifiedAt: '2026-09-05',
   versionArgs: ['--version'],
 
   listModels(): string[] | undefined {

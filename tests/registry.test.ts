@@ -19,18 +19,18 @@ describe('defaultConfigJsonc', () => {
     expect(config.callers?.claude?.agents?.implement).toBeUndefined()
     expect(config.callers?.claude?.agents?.['second-opinion']).toEqual({
       harness: 'codex',
-      model: 'gpt-5.6-sol',
-      effort: 'xhigh',
-      useWhen: expect.stringContaining('runs gpt-5.6-sol at xhigh'),
+      model: 'gpt-6-astra',
+      effort: 'high',
+      useWhen: expect.stringContaining('runs gpt-6-astra at high'),
     })
     expect(config.callers?.claude?.prepend).toContain('built-in subagents')
     // design-frontend is claude/fable itself — hidden from the claude caller.
     expect(config.callers?.claude?.exclude).toEqual(['design-frontend'])
     expect(config.callers?.codex?.agents?.review).toEqual({
       harness: 'claude',
-      model: 'sonnet',
+      model: 'opus',
       effort: 'xhigh',
-      useWhen: expect.stringContaining('runs claude sonnet at xhigh'),
+      useWhen: expect.stringContaining('runs claude opus 5 at xhigh'),
     })
     expect(config.callers?.codex?.exclude).toEqual(['generate-image'])
     expect(config.agents.find((agent) => agent.name === 'generate-image')).toEqual({
@@ -39,7 +39,7 @@ describe('defaultConfigJsonc', () => {
       dontUseWhen: expect.stringContaining('SVG, HTML/CSS, canvas'),
       harness: 'codex',
       model: 'gpt-5.6-luna',
-      effort: 'low',
+      effort: 'max',
       instructions: expect.stringContaining('imagegen skill'),
     })
     // explore was dropped from the roster (callers ship built-in explore
@@ -55,7 +55,7 @@ describe('defaultConfigJsonc', () => {
     // writes. Guard against a contract creeping back into the default roster.
     expect(review?.instructions).toBeUndefined()
     expect(review?.useWhen).toContain('independent cross-vendor code review')
-    expect(config.callers?.codex?.agents?.review?.useWhen).toContain('claude sonnet at xhigh')
+    expect(config.callers?.codex?.agents?.review?.useWhen).toContain('claude opus 5 at xhigh')
     // The codex wait discipline moved into skill.ts's structural collection
     // strategies; the default config no longer ships a codex append.
     expect(config.callers?.codex?.append).toBeUndefined()
