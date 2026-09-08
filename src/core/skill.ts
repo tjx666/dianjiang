@@ -29,7 +29,9 @@ import { resolveAgent } from './registry.ts'
  * the re-run loop to the waiter and bans short-poll waits on the parent.
  * A third incident (2026-08): "one long wait" was still interpreted as a 60s
  * parent-side poll. The strategy therefore names Codex's maximum supported
- * one-hour wait explicitly instead of leaving "long" open to interpretation.
+ * one-hour wait explicitly, subject to the current session's limits.
+ * Tool yields are not CLI timeouts: reuse the live shell session (and outer
+ * orchestration cell, when available) before considering another collector.
  */
 const COLLECTION_STRATEGY: Record<HarnessName, string> = {
   claude: `Start that command in a background shell (\`run_in_background: true\`)
@@ -38,18 +40,39 @@ const COLLECTION_STRATEGY: Record<HarnessName, string> = {
   is the last thing you need before you can proceed.`,
   codex: `That re-run-on-"running" loop belongs INSIDE a waiter subagent —
   never in your own turn. The moment you hold a runId, spawn a waiter —
-  \`spawn_agent\` with \`fork_turns: "none"\` and the message: "Run
-  \`dianjiang result <runId> --wait --timeout 300\`. If it prints status
-  'running', run it again. Stop only on a terminal status, return that full
-  JSON verbatim, and emit no progress narration." One waiter per runId; runIds
+  \`spawn_agent\` with \`fork_turns: "none"\`; include this entire collection protocol
+  in its message, plus the runId and the command's required cwd/environment
+  (including a custom DIANJIANG_HOME or PATH):
+  "Start \`dianjiang result <runId> --wait --timeout 300\` once. If the shell
+  tool returns a session ID, continue the same \`session_id\` with \`write_stdin\`
+  until the process exits; a tool's running response is NOT a CLI timeout.
+  Only re-run the collection command after it exits successfully and its
+  JSON explicitly says \`status: "running"\`. Stop only on a terminal status,
+  return that full JSON verbatim, preserve the shell \`exit_code\` separately
+  from the report's \`exitCode\`, and emit no progress narration. On a tool/command
+  error, return the diagnostic and known session ID instead of blindly retrying.
+  If your environment exposes \`functions.exec\` JavaScript orchestration with
+  \`tools.exec_command\` and \`tools.write_stdin\`, put the mechanical same-process
+  waits in an awaited loop there: accumulate output chunks in order, then emit
+  the complete output and terminal shell exit code. This is tool orchestration,
+  not a shell script. If the outer call returns a cell ID, use \`functions.wait\`
+  on that same cell until completion; never restart the script or command while
+  it is running. Without this capability, call the tools directly with the same
+  session discipline. Use the longest waits allowed by current tool schemas and
+  higher-priority session limits, including the outer yield/wait; batching only
+  saves model turns when that outer wait can cover multiple inner returns.
+  Allow enough output budget; recover truncated output before claiming it is
+  complete." One waiter per runId; runIds
   you already hold may share a single waiter, but never delay the first waiter
   for runs you might dispatch later. The waiter's completion notification
-  wakes you with the result; your shell sessions do NOT push completion
-  events, so a background-shell wait WILL be forgotten. NEVER poll the waiter
+  wakes you with the result and does not require \`wait_agent\`. Do not rely on
+  shell completion notifications to collect the run. NEVER poll the waiter
   with repeated \`wait_agent\` calls — each one renders visible "Waiting for
   agents" noise. When you need the waiter's result and have no other useful
   work, call \`wait_agent({ timeout_ms: 3600000 })\` ONCE, using the maximum
-  supported one-hour timeout. It returns early when the waiter finishes or new
+  supported one-hour timeout only if your tools and higher-priority session
+  limits allow it; otherwise use their longest permitted wait. It returns early
+  when the waiter finishes or new
   user input arrives; new input does not stop the waiter. If the result is still
   pending afterward, handle any input or other work first, then use another
   maximum-timeout wait only when the waiter is again your sole unfinished work.

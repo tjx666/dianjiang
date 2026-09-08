@@ -210,6 +210,31 @@ describe('renderSkillDoc collection-strategy conflict freedom', () => {
     expect(doc).not.toContain('ONE long')
   })
 
+  test('codex waiter distinguishes live tools from an exited running report', () => {
+    const doc = renderSkillDoc(defaultConfig, 'codex').replace(/\s+/g, ' ')
+    expect(doc).toContain('include this entire collection protocol')
+    expect(doc).toContain('same `session_id` with `write_stdin`')
+    expect(doc).toContain('Only re-run the collection command after it exits successfully')
+    expect(doc).toContain('JSON explicitly says `status: "running"`')
+    expect(doc).toContain('preserve the shell `exit_code` separately from the report')
+    expect(doc).toContain('On a tool/command error, return the diagnostic')
+  })
+
+  test('codex orchestration is optional and resumes the existing outer cell', () => {
+    const doc = renderSkillDoc(defaultConfig, 'codex').replace(/\s+/g, ' ')
+    expect(doc).toContain('If your environment exposes `functions.exec`')
+    expect(doc).toContain('`tools.exec_command` and `tools.write_stdin`')
+    expect(doc).toContain('accumulate output chunks in order')
+    expect(doc).toContain('`functions.wait` on that same cell')
+    expect(doc).toContain('never restart the script or command while it is running')
+    expect(doc).toContain('Without this capability, call the tools directly')
+    expect(doc).toContain('higher-priority session limits')
+    expect(doc).toContain('does not require `wait_agent`')
+    for (const caller of [undefined, 'claude', 'grok'] as const) {
+      expect(renderSkillDoc(defaultConfig, caller)).not.toContain('functions.exec')
+    }
+  })
+
   test('claude render waits in a background shell', () => {
     const doc = renderSkillDoc(defaultConfig, 'claude')
     expect(doc).toContain('run_in_background')
