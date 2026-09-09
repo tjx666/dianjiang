@@ -227,9 +227,11 @@ reach for dianjiang only when an agent below clearly fits.
   exits with the final JSON the moment the run finishes; on timeout it prints
   \`status: "running"\` — just re-run it. That re-run-on-"running" loop belongs INSIDE a waiter subagent —
   never in your own turn. The moment you hold a runId, spawn a waiter —
-  \`spawn_agent\` with \`fork_turns: "none"\`; include this entire collection protocol
+  \`spawn_agent\` with \`fork_turns: "none"\`. Explicitly choose an available
+  low-cost model and low reasoning effort; prefer \`model: "gpt-5.6-luna"\` and
+  \`reasoning_effort: "low"\` when available. Include this entire collection protocol
   in its message, plus the runId and the command's required cwd/environment
-  (including a custom DIANJIANG_HOME or PATH):
+  (including a custom DIANJIANG_HOME or PATH), plus any existing session/cell ID:
   "Start \`dianjiang result <runId> --wait --timeout 300\` once. If the shell
   tool returns a session ID, continue the same \`session_id\` with \`write_stdin\`
   until the process exits; a tool's running response is NOT a CLI timeout.
@@ -237,19 +239,37 @@ reach for dianjiang only when an agent below clearly fits.
   JSON explicitly says \`status: "running"\`. Stop only on a terminal status,
   return that full JSON verbatim, preserve the shell \`exit_code\` separately
   from the report's \`exitCode\`, and emit no progress narration. On a tool/command
-  error, return the diagnostic and known session ID instead of blindly retrying.
+  error, return the diagnostic, partial output, and known handles instead of
+  blindly retrying; never invent an exit code. Do no repository investigation,
+  extra status probes, or changes: the parent interprets the collected result.
   If your environment exposes \`functions.exec\` JavaScript orchestration with
   \`tools.exec_command\` and \`tools.write_stdin\`, put the mechanical same-process
-  waits in an awaited loop there: accumulate output chunks in order, then emit
+  waits in an awaited loop there. When \`store\`/\`load\` are available, save an
+  attempt-specific record before launch: phase, accumulated output, session ID,
+  and terminal exit code. Inspect an existing record instead of launching again,
+  and save it after every tool return. Accumulate output chunks in order, then emit
   the complete output and terminal shell exit code. This is tool orchestration,
   not a shell script. If the outer call returns a cell ID, use \`functions.wait\`
   on that same cell until completion; never restart the script or command while
-  it is running. Without this capability, call the tools directly with the same
+  it is running. Retain the cell ID alongside the shell ID; never start a competing
+  collector or call \`yield_control()\` between continuations. After interruption,
+  collect the active cell first; only once it ends may you resume a nonterminal
+  shell with \`write_stdin\`. An exited record is already collected. A starting
+  record without a handle needs process-state diagnosis; report a concrete blocker
+  if recovery is unavailable. A new attempt key does not justify another launch.
+  Without this capability, call the tools directly with the same
   session discipline. Use the longest waits allowed by current tool schemas and
   higher-priority session limits, including the outer yield/wait; batching only
   saves model turns when that outer wait can cover multiple inner returns.
+  Prefer explicit \`yield_time_ms: 3600000\` on outer exec and every outer wait
+  when supported and permitted. Shell continuation waits, outer cell yields,
+  parent notification waits, and the CLI's 300-second deadline are separate;
+  a long tool wait does not extend that deadline.
   Allow enough output budget; recover truncated output before claiming it is
-  complete." One waiter per runId; runIds
+  complete. Preserve stdout/stderr in order; arrange an output artifact at launch
+  if needed, and never rerun a finished collector to recover truncated output."
+  One waiter per runId; reuse the active waiter after a yield, parent interruption,
+  or missing notification. RunIds
   you already hold may share a single waiter, but never delay the first waiter
   for runs you might dispatch later. The waiter's completion notification
   wakes you with the result and does not require \`wait_agent\`. Do not rely on
@@ -258,15 +278,29 @@ reach for dianjiang only when an agent below clearly fits.
   agents" noise. When you need the waiter's result and have no other useful
   work, call \`wait_agent({ timeout_ms: 3600000 })\` ONCE, using the maximum
   supported one-hour timeout only if your tools and higher-priority session
-  limits allow it; otherwise use their longest permitted wait. It returns early
+  limits allow it; otherwise use their longest permitted wait. Advice to avoid
+  blocking calls longer than 60 seconds is a responsiveness concern, not itself
+  a hard cap on interruptible notification waits. Check the actual contract;
+  identify a concrete tool limit, mandatory instruction, or observed responsiveness
+  problem before shortening the wait. Do not assume shell or outer cell waits
+  share the notification wait's limits or interruption behavior. It returns early
   when the waiter finishes or new
   user input arrives; new input does not stop the waiter. If the result is still
   pending afterward, handle any input or other work first, then use another
   maximum-timeout wait only when the waiter is again your sole unfinished work.
   NEVER shorten the timeout to poll, and print no unchanged-status updates
-  between waits. Do not wait in the foreground first, and do not gate the waiter
+  between waits. After one hour without a terminal result, inspect the existing
+  waiter once with \`list_agents\`; if it is running normally, repeat the long wait
+  and hourly check. Shorter required waits do not justify extra status queries.
+  On an error, unexpected idle state, or unclear progress, ask the same waiter to
+  diagnose its retained state without competing for its shell output.
+  Do not wait in the foreground first, and do not gate the waiter
   on how long you expect the run to take. Fall back to a foreground wait ONLY if
-  subagents are unavailable or no slot is free. Every dispatched run must be
+  subagents are unavailable or no slot is free; the original process owner must
+  continue the same resumable session and report the responsiveness limitation.
+  For foreground-only tools, keep the CLI deadline within the command time limit.
+  Missing capabilities never justify abandoning a run or launching duplicates.
+  Every dispatched run must be
   collected before your turn ends.
 - Check \`.status\` first: read \`.result\` only when it is "completed". On
   "failed", inspect \`.failure\` before \`.result\`; \`code: "quota_exhausted"\`
