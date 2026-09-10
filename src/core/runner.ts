@@ -45,6 +45,9 @@ export class DepthLimitError extends Error {
 }
 
 export interface DispatchOptions {
+  /** Reserved UUID for crash-correlating an external-session wake with its receipt. */
+  runId?: string
+  externalResumeSessionId?: string
   /** Agent name to record (raw `--harness` dispatches omit it). */
   agent?: string
   /**
@@ -294,7 +297,9 @@ export async function dispatch(opts: DispatchOptions, config: DianjiangConfig): 
   const depth = Number(process.env.DIANJIANG_DEPTH ?? 0)
   if (depth >= config.maxDepth) throw new DepthLimitError(depth, config.maxDepth)
 
-  const runId = crypto.randomUUID()
+  if (opts.parentRunId && opts.externalResumeSessionId) throw new Error('A run cannot have both a parent run and an external resume target.')
+  if (opts.runId && !/^[0-9a-f]{8}(-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i.test(opts.runId)) throw new Error('runId must be a UUID.')
+  const runId = opts.runId ?? crypto.randomUUID()
   const record: RunRecord = {
     runId,
     agent: opts.agent,
@@ -306,6 +311,7 @@ export async function dispatch(opts: DispatchOptions, config: DianjiangConfig): 
     task: opts.task,
     startedAt: new Date().toISOString(),
     parentRunId: opts.parentRunId,
+    externalResumeSessionId: opts.externalResumeSessionId,
     instructions: opts.instructions,
   }
   insertRun(record)
@@ -347,7 +353,7 @@ export function specFromRecord(record: RunRecord, resumeSessionId?: string): Dis
     model: record.model,
     effort: record.effort,
     instructions: record.instructions,
-    resumeSessionId,
+    resumeSessionId: resumeSessionId ?? record.externalResumeSessionId,
   }
 }
 

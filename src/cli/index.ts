@@ -38,6 +38,7 @@ import {
 import { renderSkillDoc } from '../core/skill.ts'
 import { computeStats } from '../core/stats.ts'
 import { getRun, listRuns } from '../core/store.ts'
+import { sessionCommand } from './session.ts'
 
 function errorMessage(err: unknown): string {
   return err instanceof Error ? err.message : String(err)
@@ -717,6 +718,7 @@ const main = defineCommand({
     result,
     skill,
     stats,
+    session: sessionCommand,
     config: configCmd,
     _exec: exec,
   },

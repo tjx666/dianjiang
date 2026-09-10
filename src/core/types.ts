@@ -222,6 +222,8 @@ export interface RunRecord {
   pid?: number
   /** For `resume` runs: the run this one follows up on. */
   parentRunId?: string
+  /** Native session resumed without a dianjiang parent run. */
+  externalResumeSessionId?: string
   /**
    * Resolved agent instructions frozen at dispatch. The detached worker and
    * resumes use this, never the live config — a config edit or deletion after

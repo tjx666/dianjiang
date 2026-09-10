@@ -47,4 +47,10 @@ bun run src/cli/index.ts <command>   # run the CLI without linking
   use the cheapest paths listed there.
 - Adapter quirks are documented in-code (grok's `-p` takes the prompt as its
   value; codex parses sessionId from JSONL events). Don't "unify" them.
+- Before answering harness capability questions, check each relevant installed
+  CLI version, command help, and current official protocol documentation. Do
+  not infer that a harness lacks a feature because dianjiang's adapter does not
+  expose it. For external-session messaging, identify each harness's concrete
+  live-session entry point and distinguish queueing, active-turn steering, and
+  history resume; label protocol evidence separately from delivery tests.
 - Comments in English, JSDoc preferred over line comments.

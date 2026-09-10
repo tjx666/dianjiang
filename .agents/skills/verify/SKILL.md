@@ -35,7 +35,8 @@ paths per harness:
 - grok: `run --harness grok -m grok-4.6 --effort low "..."` (composer-fast was
   delisted 2026-07-28; check `grok models` if this fails)
 - claude: `run --harness claude --model sonnet --effort low "..."`
-- codex: `run --harness codex --model gpt-5.4-mini "..."`
+- codex: `run --harness codex --model gpt-5.6-luna --effort low "..."`
+  (`gpt-5.4-mini` was rejected under ChatGPT authentication on 2026-09-11)
 
 ## Standard flow (copy-paste base)
 

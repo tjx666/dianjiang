@@ -527,6 +527,11 @@ Crowded space; two camps, each missing half of this idea:
 
 ## Open questions
 
+External-session messaging is implemented as a separate `SessionAdapter` boundary,
+with native backend discovery, attributed messages, durable receipts, and explicit
+external resume. See [the decision and evidence record](../../references/session-messaging.md)
+before changing delivery semantics, retry behavior, or supported transports.
+
 - Progressive-disclosure model metrics (deferred): keep the default
   agent-driven, but a `config models` subcommand could list
   harnesses × models × human-set rankings plus a prose "how to apply", so the
