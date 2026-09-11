@@ -238,7 +238,8 @@ ${agents}
   same message ID returns the existing receipt and never sends again; changed
   content under that ID is refused. Do not blindly use a new ID after uncertainty.
   Default \`--mode queue\` preserves the native queue. \`--mode steer\` requires
-  an active Codex turn; Grok requests best-effort mid-turn queue promotion;
+  an active Codex turn on a server that lists turns — the app-server daemon does
+  not, and \`status\` then reports queue only; Grok requests best-effort mid-turn queue promotion;
   Claude accepts messages between tool calls and does not offer this mode.
 - To continue a stopped external conversation, explicitly add \`--wake --cwd
   <original-directory>\` (optionally \`--model\` and \`--effort\`). Stop other
