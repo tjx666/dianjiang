@@ -43,7 +43,16 @@ Grok 1.0.25 (`f7e67d6988e2`), macOS. Other versions and Windows are not live-tes
 | Grok | Existing leader `_x.ai/sessions/list` with nested result envelope | ACP stdio proxy to that leader; `session/load`, `session/prompt` | Matching queue entry/running prompt; steer additionally requests versioned queue interjection |
 
 Codex uses its existing control socket, not a new app-server or a raw JSONL
-connection. Bun's `ws` shim ignores a custom Unix connection factory; explicitly
+connection. That socket exists only while a shared app-server daemon runs, and
+`codex app-server daemon start` refuses on an npm/pnpm install ("managed
+standalone Codex install not found"); a plain-CLI TUI holds no named socket. So
+on such a machine a live Codex target must be addressed with `--endpoint` for an
+app-server the caller owns. The native `codex queue` fallback is not an
+alternative transport for live sessions: without a daemon it starts an embedded
+app-server that reads the rollout store, which returns `no rollout found for
+thread id` for a TUI thread that is mid-turn. It queues into stored history, so
+it is deferred delivery to the next load, not delivery to the running process.
+Bun's `ws` shim ignores a custom Unix connection factory; explicitly
 load the installed `ws` implementation, with packaged Node and Bun smoke coverage.
 Grok checks leader reachability before invoking its auto-start-capable proxy.
 A leader disappearance between probe and proxy startup remains a native CLI race;
@@ -70,6 +79,12 @@ other owners before waking. An unreachable backend is `unknown`; this implementa
 does not silently resume it. Standalone older CLIs without a shared native endpoint
 cannot receive live messages through these adapters. Listing is also native-scoped,
 not a global inventory of every historical conversation.
+
+The Grok roster is not a scan of `~/.grok/sessions`. Sessions created by headless
+`grok -p`, with or without an explicit `--session-id`, were absent from
+`_x.ai/sessions/list` while `grok sessions list` showed them, and a leader restart
+did not add them. Only conversations the leader itself knows are addressable, so
+`unknown` there means "not this leader's", not "no such conversation".
 
 ## Prior art and sources
 
@@ -116,8 +131,10 @@ in the original UUID; Grok answered SECOND in its original UUID. Codex accepted
 steering during a tool and answered STEERED. Grok accepted a message during a task
 and emitted STEERED, with only queue admission confirmed. The real CLI woke a
 stopped external Claude conversation and returned AWAKENED in the same UUID.
-Stopped Codex/Grok wake uses the existing native resume adapters; that combination
-was not separately live-tested. Unit fixtures cover detached external resume,
+Stopped Codex and Grok wake were live-tested separately on 2026-09-11: each `send
+--wake` returned `resumed`, and the detached run finished with `AWAKENED` under the
+target's own native session UUID (Codex `gpt-5.3-codex-spark`, Grok `grok-4.6`),
+with resumed history visible in the input-token count. Unit fixtures cover detached external resume,
 identity preservation, concurrency, dead/reused PIDs, ambiguity, and native framing.
 Package smoke exercises Unix WebSocket delivery from the installed npm artifact
 under both Node and Bun.
