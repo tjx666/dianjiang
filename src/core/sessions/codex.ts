@@ -13,15 +13,29 @@ async function connect(endpoint?: string): Promise<SessionRpc> {
   } catch (error) { rpc.close(); throw error }
 }
 
-function info(thread: RpcObject, endpoint?: string): SessionInfo {
+function info(thread: RpcObject, endpoint?: string, turnsRead = true): SessionInfo {
   if (typeof thread?.id !== 'string') throw new SessionError('Codex returned an invalid thread.')
   const state = thread.status?.type
   return {
     harness: 'codex', sessionId: thread.id, endpoint, cwd: thread.cwd,
     state: state === 'active' ? 'active' : state === 'idle' ? 'idle' : state === 'notLoaded' ? 'stopped' : 'unknown',
-    observedAt: new Date().toISOString(), capabilities: ['queue', 'steer'],
+    observedAt: new Date().toISOString(), capabilities: turnsRead ? ['queue', 'steer'] : ['queue'],
     turnId: thread.turns?.findLast((turn: RpcObject) => turn.status === 'inProgress')?.id,
-    detail: state === 'notLoaded' ? 'Not loaded on this server; another server may own the conversation.' : undefined,
+    detail: state === 'notLoaded' ? 'Not loaded on this server; another server may own the conversation.'
+      : turnsRead ? undefined : 'This server does not expose turns for a loaded thread, so steering has no turn ID to target.',
+  }
+}
+
+/**
+ * The app-server daemon answers `thread/read` for a loaded thread but rejects its
+ * turn listing with `-32601: list_turns is not supported yet` (Codex 0.154.0).
+ * Re-read without turns so queueing still works; steering loses its precondition.
+ */
+async function read(rpc: SessionRpc, threadId: string, endpoint?: string): Promise<SessionInfo> {
+  try { return info((await rpc.request('thread/read', { threadId, includeTurns: true })).thread, endpoint) }
+  catch (error) {
+    if (!(error instanceof SessionError) || error.code !== -32601) throw error
+    return info((await rpc.request('thread/read', { threadId })).thread, endpoint, false)
   }
 }
 
@@ -38,17 +52,18 @@ export function createCodexSessionAdapter(open: (endpoint?: string) => Promise<S
   },
   async inspect(target) {
     const rpc = await open(target.endpoint)
-    try { return info((await rpc.request('thread/read', { threadId: target.sessionId, includeTurns: true })).thread, target.endpoint) }
+    try { return await read(rpc, target.sessionId, target.endpoint) }
     finally { rpc.close() }
   },
   async send(message) {
     const rpc = await open(message.to.endpoint)
     try {
       // Re-read on the connection doing the write; steering also has a native turn-ID precondition.
-      const current = info((await rpc.request('thread/read', { threadId: message.to.sessionId, includeTurns: true })).thread, message.to.endpoint)
+      const current = await read(rpc, message.to.sessionId, message.to.endpoint)
       if (current.state !== 'active' && current.state !== 'idle') throw new SessionError('Target is not loaded on this Codex server. Use --wake only after stopping other owners.')
       const input = [{ type: 'text', text: formatSessionMessage(message), text_elements: [] }]
       if (message.mode === 'steer') {
+        if (!current.capabilities.includes('steer')) throw new SessionError('This Codex server does not expose turns for a loaded thread, so steering has no turn to target; use queue.')
         if (current.state !== 'active' || !current.turnId) throw new SessionError('Codex steering requires an active turn; use queue for idle sessions.')
         const result = await rpc.request('turn/steer', { threadId: message.to.sessionId, expectedTurnId: current.turnId, clientUserMessageId: message.id, input })
         if (typeof result?.turnId !== 'string') throw new SessionError('Codex returned no steering acknowledgement.', 'unknown')

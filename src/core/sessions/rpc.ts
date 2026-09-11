@@ -43,7 +43,7 @@ export class SessionRpc {
           if (!pending) continue
           clearTimeout(pending.timer)
           this.pending.delete(message.id)
-          if (message.error) pending.reject(new SessionError(`Native RPC error ${message.error.code}: ${message.error.message}`, [-32600, -32601, -32602].includes(message.error.code) ? 'rejected' : 'unknown'))
+          if (message.error) pending.reject(new SessionError(`Native RPC error ${message.error.code}: ${message.error.message}`, [-32600, -32601, -32602].includes(message.error.code) ? 'rejected' : 'unknown', message.error.code))
           else pending.resolve(message.result)
         }
       }

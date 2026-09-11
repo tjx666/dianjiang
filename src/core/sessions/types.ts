@@ -67,7 +67,7 @@ export interface SessionAdapter {
 
 /** Only errors proven to precede admission are safe to label rejected. */
 export class SessionError extends Error {
-  constructor(message: string, public readonly outcome: 'rejected' | 'unknown' = 'rejected') {
+  constructor(message: string, public readonly outcome: 'rejected' | 'unknown' = 'rejected', public readonly code?: number) {
     super(message)
     this.name = 'SessionError'
   }

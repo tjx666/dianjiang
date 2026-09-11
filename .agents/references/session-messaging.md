@@ -43,15 +43,25 @@ Grok 1.0.25 (`f7e67d6988e2`), macOS. Other versions and Windows are not live-tes
 | Grok | Existing leader `_x.ai/sessions/list` with nested result envelope | ACP stdio proxy to that leader; `session/load`, `session/prompt` | Matching queue entry/running prompt; steer additionally requests versioned queue interjection |
 
 Codex uses its existing control socket, not a new app-server or a raw JSONL
-connection. That socket exists only while a shared app-server daemon runs, and
+connection. That socket exists only while the shared app-server daemon runs, and
 `codex app-server daemon start` refuses on an npm/pnpm install ("managed
-standalone Codex install not found"); a plain-CLI TUI holds no named socket. So
-on such a machine a live Codex target must be addressed with `--endpoint` for an
-app-server the caller owns. The native `codex queue` fallback is not an
-alternative transport for live sessions: without a daemon it starts an embedded
-app-server that reads the rollout store, which returns `no rollout found for
-thread id` for a TUI thread that is mid-turn. It queues into stored history, so
-it is deferred delivery to the next load, not delivery to the running process.
+standalone Codex install not found"), because the daemon launches app-server from
+the standalone installer's fixed path ([codex#41188](https://github.com/openai/codex/issues/41188),
+open). With the standalone install and a started daemon, an ordinary `codex` TUI
+session is discovered as `idle` and reachable live: a queued message was consumed
+by the running TUI in its own session on 2026-09-11. Without a daemon, only an
+app-server the caller owns (`--endpoint`) can serve a live target. The native
+`codex queue` fallback is not an alternative transport for live sessions: without
+a daemon it starts an embedded app-server that reads the rollout store, which
+returns `no rollout found for thread id` for a TUI thread that is mid-turn. It
+queues into stored history, so it is deferred delivery to the next load, not
+delivery to the running process.
+
+The daemon answers `thread/read` for a loaded thread but rejects its turn listing
+with `-32601: list_turns is not supported yet` (0.154.0). The adapter re-reads
+without turns, keeps queueing, and drops `steer` from the reported capabilities
+rather than steering blind: `turn/steer` needs an `expectedTurnId` that this
+server will not give up. A server that does expose turns still supports steering.
 Bun's `ws` shim ignores a custom Unix connection factory; explicitly
 load the installed `ws` implementation, with packaged Node and Bun smoke coverage.
 Grok checks leader reachability before invoking its auto-start-capable proxy.
@@ -134,7 +144,10 @@ stopped external Claude conversation and returned AWAKENED in the same UUID.
 Stopped Codex and Grok wake were live-tested separately on 2026-09-11: each `send
 --wake` returned `resumed`, and the detached run finished with `AWAKENED` under the
 target's own native session UUID (Codex `gpt-5.3-codex-spark`, Grok `grok-4.6`),
-with resumed history visible in the input-token count. Unit fixtures cover detached external resume,
+with resumed history visible in the input-token count. The same day, an ordinary
+`codex` TUI session — started from the terminal, not by dianjiang or a test
+app-server — was discovered through the daemon socket and answered SECOND to a
+queued message in that same session. Unit fixtures cover detached external resume,
 identity preservation, concurrency, dead/reused PIDs, ambiguity, and native framing.
 Package smoke exercises Unix WebSocket delivery from the installed npm artifact
 under both Node and Bun.

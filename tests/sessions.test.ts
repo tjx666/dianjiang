@@ -223,6 +223,40 @@ describe('native protocol boundaries', () => {
       expect(steer.detail).toContain('active turn')
     } finally { server.close() }
   })
+  test('Codex queues when the server refuses to list turns, and refuses to steer', async () => {
+    const endpoint = join(home, 'codex-no-turns.sock')
+    const request = { ...options(), to: { harness: 'codex' as const, sessionId: randomUUID(), endpoint } }
+    const server = createServer((socket) => {
+      let buffer = ''
+      socket.on('data', (chunk) => {
+        buffer += chunk
+        let index: number
+        while ((index = buffer.indexOf('\n')) >= 0) {
+          const frame = JSON.parse(buffer.slice(0, index)); buffer = buffer.slice(index + 1)
+          if (frame.id === undefined) continue
+          // The daemon reads a loaded thread but rejects its turn listing.
+          if (frame.method === 'thread/read' && frame.params.includeTurns) {
+            socket.write(JSON.stringify({ id: frame.id, error: { code: -32601, message: 'list_turns is not supported yet' } }) + '\n')
+            continue
+          }
+          let result: any = {}
+          if (frame.method === 'thread/read') result = { thread: { id: request.to.sessionId, status: { type: 'idle' } } }
+          if (frame.method === 'thread/queue/add') result = { queuedSubmission: { id: 'native-2' } }
+          socket.write(JSON.stringify({ id: frame.id, result }) + '\n')
+        }
+      })
+    })
+    await new Promise<void>((resolve) => server.listen(endpoint, resolve))
+    try {
+      const adapter = createCodexSessionAdapter((path) => SessionRpc.socket(path!))
+      expect((await adapter.inspect(request.to)).capabilities).toEqual(['queue'])
+      const receipt = await sendSessionMessage(request, config, { codex: adapter })
+      expect(receipt.status).toBe('accepted')
+      const steer = await sendSessionMessage({ ...request, messageId: randomUUID(), mode: 'steer' }, config, { codex: adapter })
+      expect(steer.status).toBe('rejected')
+      expect(steer.detail).toContain('does not support steer')
+    } finally { server.close() }
+  })
   test('RPC disconnect after write is unknown, invalid JSON fails without hanging', async () => {
     for (const malformed of [false, true]) {
       const endpoint = join(home, `rpc-${malformed}.sock`)
