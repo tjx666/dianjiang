@@ -816,7 +816,7 @@ const sessionSearch = defineCommand({
   meta: { name: 'search', description: 'Search inside one session; hits carry entry ids for `read --around`.' },
   args: {
     sessionId: { type: 'positional', required: false, description: 'Harness session id' },
-    query: { type: 'positional', required: true, description: 'Case-insensitive substring' },
+    query: { type: 'positional', required: false, description: 'Case-insensitive substring' },
     run: { type: 'string', description: 'Search the session behind a dianjiang run id instead' },
     cursor: { type: 'string', description: 'Continue from a previous response\'s nextCursor' },
     limit: { type: 'string', description: 'Max hits in the response' },
@@ -825,6 +825,10 @@ const sessionSearch = defineCommand({
     harness: { type: 'string', description: 'Skip id probing by naming the harness' },
   },
   run({ args }) {
+    // citty assigns the sole positional to sessionId even with --run. In that
+    // form the positional is the query, so resolve it before the target.
+    const query = args.query ?? (args.run ? args.sessionId : undefined)
+    if (!query) return fail('Missing query. Pass a session id and query, or --run <run-id> <query>.')
     let harness: HarnessName | undefined
     if (args.harness) {
       harness = parseHarnessArg(args.harness, 'harness')
@@ -832,7 +836,7 @@ const sessionSearch = defineCommand({
     }
     const target = resolveTarget(args.sessionId, args.run)
     if (!target) return
-    const result = searchSession(target.id, args.query, readOptions(args as Record<string, unknown>), harness ?? target.harness)
+    const result = searchSession(target.id, query, readOptions(args as Record<string, unknown>), harness ?? target.harness)
     if (!result) return fail(`Session ${target.id} not found in any local harness store.`)
     emit(result)
   },

@@ -117,6 +117,24 @@ test('claude: find matches by content and reports the cwd it ran in', () => {
   expect(matches[0]?.evidence[0]?.preview).toContain('login button')
 })
 
+test('claude: find excludes a request on an abandoned branch', () => {
+  writeClaudeTranscript('11111111-1111-4111-8111-111111111111')
+  const result = findSessions({ query: 'actually use a modal', cwd: PROJECT, harness: 'claude' })
+  expect(result.matches).toHaveLength(0)
+})
+
+test('claude: search can locate text beyond the entry preview cap', () => {
+  const sessionId = '11111111-1111-4111-8111-111111111111'
+  const file = join(process.env.CLAUDE_CONFIG_DIR!, 'projects', encodeProjectDir(PROJECT), `${sessionId}.jsonl`)
+  writeJsonl(file, [
+    { type: 'user', uuid: 'deep', sessionId, cwd: PROJECT, message: { role: 'user', content: `${'x'.repeat(4100)} DEEP-NEEDLE` } },
+  ])
+  expect(findSessions({ query: 'DEEP-NEEDLE', cwd: PROJECT, harness: 'claude' }).matches).toHaveLength(1)
+  const result = searchSession(sessionId, 'DEEP-NEEDLE', {}, 'claude')
+  expect(result?.hits.map((hit) => hit.id)).toEqual(['deep'])
+  expect(result?.hits[0]?.text).toContain('DEEP-NEEDLE')
+})
+
 test('claude: find honours the cwd filter', () => {
   writeClaudeTranscript('11111111-1111-4111-8111-111111111111')
   expect(findSessions({ cwd: '/somewhere/else', harness: 'claude' }).matches).toHaveLength(0)
@@ -164,6 +182,48 @@ test('codex: reads the thread history index, including unknown item types', () =
   expect(byKind.some((k) => k.includes('quantumThing'))).toBe(true)
 })
 
+test('codex: find discovers a thread present only in the SQLite index', () => {
+  const threadId = '01a08c09-51ae-7361-9f92-9b519d0b24d4'
+  writeCodexThreadHistory(threadId)
+  const result = findSessions({ query: 'why is the build slow', cwd: PROJECT, harness: 'codex' })
+  expect(result.matches.map((match) => match.session.sessionId)).toContain(threadId)
+})
+
+test('codex: search reaches text beyond the indexed entry preview cap', () => {
+  const threadId = '01a08c09-51ae-7361-9f92-9b519d0b24d4'
+  writeCodexThreadHistory(threadId)
+  const db = openDatabase(join(process.env.CODEX_HOME!, 'thread_history_1.sqlite'))
+  db.query('insert into thread_items values (?, ?, ?, ?, ?, ?, ?)').run(
+    threadId, 't1', 'deep', 5, 1_757_000_000_005,
+    JSON.stringify({ type: 'commandExecution', id: 'deep', command: 'cat log', cwd: PROJECT, aggregatedOutput: `${'x'.repeat(4100)} DEEP-NEEDLE` }),
+    'commandExecution',
+  )
+  db.close()
+  const result = searchSession(threadId, 'DEEP-NEEDLE', {}, 'codex')
+  expect(result?.hits.map((hit) => hit.id)).toEqual(['deep'])
+  expect(result?.hits[0]?.text).toContain('DEEP-NEEDLE')
+})
+
+test('codex: indexed threads do not fall back to stale rollout text on a search miss', () => {
+  const threadId = '01a08c09-51ae-7361-9f92-9b519d0b24d4'
+  writeCodexThreadHistory(threadId)
+  writeCodexRollout(threadId, threadId)
+  const result = findSessions({ query: 'ship the release', all: true, harness: 'codex' })
+  expect(result.matches).toHaveLength(0)
+})
+
+test('CLI: search --run accepts a query without a session id', () => {
+  const home = join(root, 'dianjiang')
+  mkdirSync(home, { recursive: true })
+  const proc = Bun.spawnSync({
+    cmd: ['bun', 'run', 'src/cli/index.ts', 'session', 'search', '--run', 'missing-run', 'needle'],
+    cwd: join(import.meta.dir, '..'),
+    env: { ...process.env, DIANJIANG_HOME: home },
+  })
+  expect(proc.exitCode).toBe(1)
+  expect(JSON.parse(proc.stdout.toString())).toEqual({ status: 'failed', error: 'Run missing-run not found.' })
+})
+
 /** A resumed rollout: its own meta first, the parent's copied in after it. */
 function writeCodexRollout(sessionId: string, parentId: string): string {
   const file = join(process.env.CODEX_HOME!, 'sessions', '2026', '09', '01', `rollout-2026-09-01T10-00-00-${sessionId}.jsonl`)
@@ -189,6 +249,18 @@ test('codex: rollout fallback keeps its own identity and flags the parent', () =
   // event_msg mirrors response_item; counting both would duplicate m1.
   expect(result?.entries?.filter((e) => e.id === 'm1')).toHaveLength(1)
   expect(result?.entries?.map((e) => e.kind)).toEqual(['user', 'assistant'])
+})
+
+test('codex: unindexed rollout search streams across chunk boundaries', () => {
+  const sessionId = '01a07263-63a3-7082-bbf4-8dfdf600ce9e'
+  const file = join(process.env.CODEX_HOME!, 'sessions', '2026', '09', '01', `rollout-2026-09-01T10-00-00-${sessionId}.jsonl`)
+  writeJsonl(file, [
+    { type: 'session_meta', payload: { id: sessionId, cwd: PROJECT, timestamp: '2026-09-01T10:00:00.000Z' } },
+    { type: 'response_item', payload: { type: 'message', id: 'large', role: 'user', content: [{ type: 'input_text', text: 'x'.repeat(70_000) }] } },
+    { type: 'response_item', payload: { type: 'message', id: 'hit', role: 'user', content: [{ type: 'input_text', text: 'LEGACY-NEEDLE' }] } },
+  ])
+  const result = findSessions({ query: 'LEGACY-NEEDLE', cwd: PROJECT, harness: 'codex' })
+  expect(result.matches[0]?.evidence[0]?.entryId).toBe('hit')
 })
 
 function writeGrokSession(sessionId: string): void {

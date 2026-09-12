@@ -6,12 +6,15 @@
  * received is the whole session.
  */
 
+import { closeSync, openSync, readSync } from 'node:fs'
+import { StringDecoder } from 'node:string_decoder'
+import { openDatabaseReadonly } from '../sqlite.ts'
 import type { HarnessName } from '../types.ts'
 import { HARNESS_NAMES } from '../types.ts'
 import { claudeReader } from './claude.ts'
 import { codexReader } from './codex.ts'
 import { grokReader } from './grok.ts'
-import { applyBudget, applyCursor, capText, PREVIEW_CHARS } from './shared.ts'
+import { applyBudget, applyCursor, capText, PREVIEW_CHARS, previewAround } from './shared.ts'
 import type {
   FindOptions,
   LoadedSession,
@@ -200,7 +203,79 @@ export function searchSession(
   if (!loaded) return undefined
   const needle = query.toLowerCase()
   const entries = visibleEntries(loaded.entries, options.includeInjected)
-  const hits = entries.filter((entry) => entry.text.toLowerCase().includes(needle)).map(shorten)
+  const raw = rawMatches(loaded, entries.filter((entry) => entry.truncated), query)
+  const hits = entries.flatMap((entry) => {
+    if (entry.text.toLowerCase().includes(needle)) return [shorten(entry)]
+    const match = raw.get(entry.id)
+    return match ? [{ ...entry, text: previewAround(match, query, OVERVIEW_TEXT), truncated: true }] : []
+  })
   const { entries: budgeted, page } = applyBudget(applyCursor(hits, options.cursor), hits.length, options)
   return { session: loaded.session, query, hits: budgeted, page, warnings: loaded.warnings }
+}
+
+/** Recover only truncated hits from the raw store; entry previews remain small. */
+function rawMatches(loaded: LoadedSession, truncated: SessionEntry[], query: string): Map<string, string> {
+  const matches = new Map<string, string>()
+  if (truncated.length === 0) return matches
+  const needle = query.toLowerCase()
+  if (loaded.session.store.endsWith('.sqlite')) {
+    let db: ReturnType<typeof openDatabaseReadonly> | undefined
+    try {
+      db = openDatabaseReadonly(loaded.session.store)
+      const ids = new Set(truncated.map((entry) => entry.id))
+      const rows = db.query(`select item_id, item_json from thread_items
+        where thread_id = ? and instr(lower(item_json), lower(?)) > 0`).all(loaded.session.sessionId, query) as Array<{
+        item_id: string
+        item_json: string
+      }>
+      for (const row of rows) {
+        if (ids.has(row.item_id) && row.item_json.toLowerCase().includes(needle)) matches.set(row.item_id, row.item_json)
+      }
+    } catch {
+      return matches
+    } finally {
+      db?.close()
+    }
+    return matches
+  }
+
+  const wanted = new Map<number, SessionEntry>()
+  for (const entry of truncated) {
+    const lineNumber = Number(entry.source.slice(entry.source.lastIndexOf(':') + 1))
+    if (lineNumber > 0) wanted.set(lineNumber, entry)
+  }
+  if (wanted.size === 0) return matches
+  let lastWanted = 0
+  for (const lineNumber of wanted.keys()) lastWanted = Math.max(lastWanted, lineNumber)
+  const buffer = Buffer.allocUnsafe(64 * 1024)
+  const decoder = new StringDecoder('utf8')
+  let fd: number | undefined
+  let pending = ''
+  let lineNumber = 0
+  const accept = (line: string): void => {
+    lineNumber += 1
+    const entry = wanted.get(lineNumber)
+    if (entry && line.toLowerCase().includes(needle)) matches.set(entry.id, line)
+  }
+  try {
+    fd = openSync(loaded.session.store, 'r')
+    while (lineNumber < lastWanted) {
+      const size = readSync(fd, buffer, 0, buffer.length, null)
+      if (size === 0) {
+        if (pending) accept(pending + decoder.end())
+        break
+      }
+      pending += decoder.write(buffer.subarray(0, size))
+      let end: number
+      while (lineNumber < lastWanted && (end = pending.indexOf('\n')) !== -1) {
+        accept(pending.slice(0, end))
+        pending = pending.slice(end + 1)
+      }
+    }
+  } catch {
+    return matches
+  } finally {
+    if (fd !== undefined) closeSync(fd)
+  }
+  return matches
 }

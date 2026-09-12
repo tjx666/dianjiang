@@ -19,6 +19,7 @@
 
 import { existsSync, openSync, readdirSync, readFileSync, readSync, closeSync, type Dirent } from 'node:fs'
 import { join } from 'node:path'
+import { StringDecoder } from 'node:string_decoder'
 import { openDatabaseReadonly, type SqliteDatabase } from '../sqlite.ts'
 import type { FindOptions, LoadedSession, SessionEntry, SessionInfo, SessionMatch, SessionReader } from './types.ts'
 import { capText, codexHome, evidencePreview, parseJsonLine, shellQuote } from './shared.ts'
@@ -28,6 +29,9 @@ const DB_FILE = 'thread_history_1.sqlite'
 
 /** Sessions examined per `find` call before the scan stops and warns. */
 const SCAN_CAP = 400
+
+/** Total raw rollout bytes a find may inspect when an index has no thread. */
+const FALLBACK_BYTE_BUDGET = 128 * 1024 * 1024
 
 const MAX_EVIDENCE = 3
 
@@ -49,6 +53,12 @@ interface RolloutFile {
   path: string
   /** Filename timestamp; sorts lexicographically, newest last. */
   stamp: string
+}
+
+interface ThreadCandidate {
+  sessionId: string
+  file?: RolloutFile
+  updatedAtMs: number
 }
 
 interface SessionMeta {
@@ -424,6 +434,95 @@ function lastActivityFromDb(db: SqliteDatabase, threadId: string): string | unde
   }
 }
 
+/** Include index-only threads while retaining rollout-only fallback sessions. */
+function threadCandidates(files: RolloutFile[], db: SqliteDatabase | undefined): ThreadCandidate[] {
+  const candidates = new Map<string, ThreadCandidate>()
+  for (const file of files) {
+    const stamp = file.stamp.replace(/T(\d{2})-(\d{2})-(\d{2})/, 'T$1:$2:$3')
+    candidates.set(file.sessionId, { sessionId: file.sessionId, file, updatedAtMs: Date.parse(`${stamp}Z`) || 0 })
+  }
+  if (db) {
+    try {
+      // DISTINCT uses the thread-id index; the correlated lookup visits only
+      // each thread's final indexed item instead of grouping large item_json rows.
+      const rows = db.query(`select ids.thread_id,
+        (select created_at_ms from thread_items where thread_id = ids.thread_id
+          order by rollout_ordinal desc limit 1) as updated_at_ms
+        from (select distinct thread_id from thread_items) ids
+        order by updated_at_ms desc limit ${SCAN_CAP + 1}`).all() as Array<{
+        thread_id: string
+        updated_at_ms: number
+      }>
+      for (const row of rows) {
+        const existing = candidates.get(row.thread_id)
+        candidates.set(row.thread_id, {
+          sessionId: row.thread_id,
+          ...(existing?.file ? { file: existing.file } : {}),
+          updatedAtMs: row.updated_at_ms,
+        })
+      }
+    } catch {
+      // An unreadable index still leaves the rollout fallback available.
+    }
+  }
+  return [...candidates.values()].sort((a, b) => b.updatedAtMs - a.updatedAtMs)
+}
+
+function threadHasItems(db: SqliteDatabase, threadId: string): boolean {
+  try {
+    return Boolean(db.query('select 1 from thread_items where thread_id = ? limit 1').get(threadId))
+  } catch {
+    return false
+  }
+}
+
+/** Scan an unindexed rollout with fixed memory and a caller-owned byte budget. */
+function scanRolloutEvidence(
+  path: string,
+  needle: string,
+  includeInjected: boolean | undefined,
+  byteBudget: number,
+): { evidence: SessionMatch['evidence']; bytesRead: number; complete: boolean } {
+  const evidence: SessionMatch['evidence'] = []
+  let fd: number | undefined
+  let bytesRead = 0
+  let complete = false
+  let lineNumber = 0
+  let pending = ''
+  const decoder = new StringDecoder('utf8')
+  const buffer = Buffer.allocUnsafe(64 * 1024)
+  const accept = (line: string): void => {
+    lineNumber += 1
+    if (!line.toLowerCase().includes(needle.toLowerCase())) return
+    const entry = rolloutLineToEntry(line, path, lineNumber)
+    if (!entry || (!includeInjected && entry.kind === 'injected')) return
+    evidence.push({ entryId: entry.id, kind: entry.kind, preview: evidencePreview(entry.text, line, needle) })
+  }
+  try {
+    fd = openSync(path, 'r')
+    while (bytesRead < byteBudget && evidence.length < MAX_EVIDENCE) {
+      const size = readSync(fd, buffer, 0, Math.min(buffer.length, byteBudget - bytesRead), null)
+      if (size === 0) {
+        complete = true
+        break
+      }
+      bytesRead += size
+      pending += decoder.write(buffer.subarray(0, size))
+      let end: number
+      while (evidence.length < MAX_EVIDENCE && (end = pending.indexOf('\n')) !== -1) {
+        accept(pending.slice(0, end))
+        pending = pending.slice(end + 1)
+      }
+    }
+    if (complete && pending.trim() && evidence.length < MAX_EVIDENCE) accept(pending + decoder.end())
+  } catch {
+    complete = false
+  } finally {
+    if (fd !== undefined) closeSync(fd)
+  }
+  return { evidence, bytesRead, complete: complete || evidence.length >= MAX_EVIDENCE }
+}
+
 export const codexReader: SessionReader = {
   harness: 'codex',
 
@@ -437,34 +536,42 @@ export const codexReader: SessionReader = {
     const files = rolloutFiles()
     const titles = titleIndex()
     const db = openThreadHistory()
+    const candidates = threadCandidates(files, db)
     const matches: SessionMatch[] = []
     const warnings: string[] = []
+    let fallbackBytesRead = 0
+    let skippedUnknownCwd = 0
     if (!db) warnings.push('codex thread history is unavailable (missing DB or unexpected schema); falling back to rollout files.')
 
     try {
       let scanned = 0
-      for (const file of files) {
+      for (const candidate of candidates) {
         if (matches.length >= limit) break
         if (scanned >= SCAN_CAP) {
           warnings.push(
-            `codex: stopped after the ${SCAN_CAP} newest of ${files.length} sessions; older sessions were not searched.`,
+            `codex: stopped after the ${SCAN_CAP} newest of ${candidates.length} sessions; older sessions were not searched.`,
           )
           break
         }
         scanned += 1
+        const { file, sessionId } = candidate
 
         // cwd first: the DB answers without reading the 18 GB of rollouts.
-        let cwd = db ? cwdFromDb(db, file.sessionId) : undefined
+        let cwd = db ? cwdFromDb(db, sessionId) : undefined
         let meta: SessionMeta | undefined
-        if (!cwd) {
+        if (!cwd && file) {
           meta = readMeta(file.path)
           cwd = meta.cwd
+        }
+        if (!options.all && options.cwd && !cwd) {
+          skippedUnknownCwd += 1
+          continue
         }
         if (!options.all && options.cwd && cwd !== options.cwd) continue
 
         const evidence: SessionMatch['evidence'] = []
         if (needle !== undefined) {
-          const rows = db ? queryEvidence(db, file.sessionId, needle) : []
+          const rows = db ? queryEvidence(db, sessionId, needle) : []
           if (rows.length > 0) {
             for (const row of rows) {
               if (evidence.length >= MAX_EVIDENCE) break
@@ -477,37 +584,43 @@ export const codexReader: SessionReader = {
                 preview: evidencePreview(entry.text, row.item_json, needle),
               })
             }
-          } else {
-            const text = safeRead(file.path)
-            if (!text?.toLowerCase().includes(needle.toLowerCase())) continue
-            for (const line of text.split('\n')) {
-              if (evidence.length >= MAX_EVIDENCE) break
-              if (!line.toLowerCase().includes(needle.toLowerCase())) continue
-              const entry = rolloutLineToEntry(line, file.path, 0)
-              if (!entry) continue
-              if (!options.includeInjected && entry.kind === 'injected') continue
-              evidence.push({ entryId: entry.id, kind: entry.kind, preview: evidencePreview(entry.text, line, needle) })
+          } else if (file && (!db || !threadHasItems(db, sessionId))) {
+            const remaining = FALLBACK_BYTE_BUDGET - fallbackBytesRead
+            if (remaining <= 0) {
+              warnings.push(`codex: raw rollout search stopped at the ${FALLBACK_BYTE_BUDGET} byte read budget.`)
+              break
+            }
+            const scannedFile = scanRolloutEvidence(file.path, needle, options.includeInjected, remaining)
+            fallbackBytesRead += scannedFile.bytesRead
+            evidence.push(...scannedFile.evidence)
+            if (!scannedFile.complete) {
+              warnings.push(`codex: raw rollout search stopped within ${sessionId} at the byte read budget.`)
+              break
             }
           }
           if (evidence.length === 0) continue
         }
 
-        meta ??= readMeta(file.path)
+        meta ??= file ? readMeta(file.path) : undefined
         matches.push({
           session: buildInfo({
-            sessionId: meta.ownId ?? file.sessionId,
-            title: titles.get(file.sessionId),
+            sessionId: meta?.ownId ?? sessionId,
+            title: titles.get(sessionId),
             cwd,
-            startedAt: meta.startedAt,
-            updatedAt: db ? lastActivityFromDb(db, file.sessionId) : undefined,
-            parentId: meta.parentId,
-            store: file.path,
+            startedAt: meta?.startedAt,
+            updatedAt: db ? lastActivityFromDb(db, sessionId) : undefined,
+            parentId: meta?.parentId,
+            store: file?.path ?? join(codexHome(), DB_FILE),
           }),
           evidence,
         })
       }
     } finally {
       db?.close()
+    }
+
+    if (skippedUnknownCwd > 0) {
+      warnings.push(`codex: ${skippedUnknownCwd} session(s) have no recorded cwd and were skipped; use --all to include them.`)
     }
 
     return { matches, warnings }
@@ -569,9 +682,9 @@ function queryEvidence(db: SqliteDatabase, threadId: string, needle: string): Th
     return db
       .query(
         `select item_id, item_type, item_json, created_at_ms from thread_items
-         where thread_id = ? and item_json like ? order by rollout_ordinal limit ${EVIDENCE_SCAN}`,
+         where thread_id = ? and instr(lower(item_json), lower(?)) > 0 order by rollout_ordinal limit ${EVIDENCE_SCAN}`,
       )
-      .all(threadId, `%${needle}%`) as ThreadItemRow[]
+      .all(threadId, needle) as ThreadItemRow[]
   } catch {
     return []
   }

@@ -333,6 +333,39 @@ export const claudeReader: SessionReader = {
         }
       }
 
+      if (needle !== undefined && evidence.length > 0) {
+        // Only parse the full tree for candidate sessions. The cheap text scan
+        // above can also match requests that the user later rewound.
+        const records = lines.flatMap((line) => {
+          const record = parseJsonLine<ClaudeRecord>(line)
+          return record ? [{ record }] : []
+        })
+        const live = liveBranchUuids(records)
+        evidence.length = 0
+        let abandonedMatches = 0
+        for (let i = 0; i < lines.length && evidence.length < MAX_EVIDENCE; i += 1) {
+          const line = lines[i]
+          if (!line?.toLowerCase().includes(needle)) continue
+          const record = parseJsonLine<ClaudeRecord>(line)
+          if (!record) continue
+          if (live && record.uuid && !record.isSidechain && isSpine(record) && !live.has(record.uuid)) {
+            abandonedMatches += 1
+            continue
+          }
+          const entry = toEntry(record, file.path, i + 1, fileSessionId)
+          if (entry && (options.includeInjected || entry.kind !== 'injected')) {
+            evidence.push({
+              entryId: entry.id,
+              kind: entry.kind,
+              preview: evidencePreview(entry.text, line, options.query ?? ''),
+              ...(entry.inherited ? { inherited: true } : {}),
+            })
+          }
+        }
+        if (abandonedMatches > 0) {
+          warnings.push(`claude: abandoned-branch match(es) excluded from ${fileSessionId}.`)
+        }
+      }
       if (needle !== undefined && evidence.length === 0) continue
       matches.push({ session: buildInfo(file.path, { first, last, title }), evidence })
     }
