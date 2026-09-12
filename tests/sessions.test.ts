@@ -139,32 +139,45 @@ describe('delivery receipts', () => {
   })
 })
 
+/**
+ * A fake native backend: one JSONL frame per line, `respond` returns the frame
+ * to write back (or nothing, when the server answers out of band instead).
+ */
+async function jsonlServer(endpoint: string, respond: (frame: any, emit: (value: unknown) => void) => unknown) {
+  const server = createServer((socket) => {
+    const emit = (value: unknown) => socket.write(`${JSON.stringify(value)}\n`)
+    let buffer = ''
+    socket.on('data', (chunk) => {
+      buffer += chunk
+      let index: number
+      while ((index = buffer.indexOf('\n')) >= 0) {
+        const frame = JSON.parse(buffer.slice(0, index)); buffer = buffer.slice(index + 1)
+        const reply = respond(frame, emit)
+        if (reply !== undefined) emit(reply)
+      }
+    })
+  })
+  await new Promise<void>((resolve) => server.listen(endpoint, resolve))
+  return server
+}
+
 describe('native protocol boundaries', () => {
   test('Grok unwraps the roster and keeps its proxy until correlated interjection confirmation', async () => {
     const endpoint = join(home, 'grok.sock')
     const request = { ...options(), to: { harness: 'grok' as const, sessionId: randomUUID(), endpoint }, mode: 'steer' as const }
     let promoted = false
-    const server = createServer((socket) => {
-      let buffer = ''
-      socket.on('data', (chunk) => {
-        buffer += chunk
-        let index: number
-        while ((index = buffer.indexOf('\n')) >= 0) {
-          const frame = JSON.parse(buffer.slice(0, index)); buffer = buffer.slice(index + 1)
-          const emit = (value: unknown) => socket.write(JSON.stringify(value) + '\n')
-          if (frame.method === '_x.ai/sessions/list') emit({ id: frame.id, result: { result: { sessions: [{ sessionId: request.to.sessionId, resident: true, activity: 'working', cwd: home }] } } })
-          else if (frame.method === 'session/load') emit({ id: frame.id, result: {} })
-          else if (frame.method === 'session/prompt') {
-            expect(frame.params._meta.promptId).toBe(request.messageId)
-            emit({ method: '_x.ai/queue/changed', params: { sessionId: request.to.sessionId, entries: [{ id: request.messageId, version: 2 }] } })
-          } else if (frame.method === '_x.ai/queue/interject') {
-            expect(frame.params.expectedVersion).toBe(2)
-            setTimeout(() => { promoted = true; emit({ method: '_x.ai/session/interjection', params: { sessionId: request.to.sessionId, interjectionId: request.messageId } }) }, 30)
-          }
-        }
-      })
+    const server = await jsonlServer(endpoint, (frame, emit) => {
+      if (frame.method === '_x.ai/sessions/list') return { id: frame.id, result: { result: { sessions: [{ sessionId: request.to.sessionId, resident: true, activity: 'working', cwd: home }] } } }
+      if (frame.method === 'session/load') return { id: frame.id, result: {} }
+      if (frame.method === 'session/prompt') {
+        expect(frame.params._meta.promptId).toBe(request.messageId)
+        return { method: '_x.ai/queue/changed', params: { sessionId: request.to.sessionId, entries: [{ id: request.messageId, version: 2 }] } }
+      }
+      if (frame.method === '_x.ai/queue/interject') {
+        expect(frame.params.expectedVersion).toBe(2)
+        setTimeout(() => { promoted = true; emit({ method: '_x.ai/session/interjection', params: { sessionId: request.to.sessionId, interjectionId: request.messageId } }) }, 30)
+      }
     })
-    await new Promise<void>((resolve) => server.listen(endpoint, resolve))
     try {
       const receipt = await sendSessionMessage(request, config, { grok: createGrokSessionAdapter((path) => SessionRpc.socket(path!)) })
       expect(receipt.status).toBe('accepted')
@@ -196,22 +209,13 @@ describe('native protocol boundaries', () => {
     const endpoint = join(home, 'codex.sock')
     const request = { ...options(), to: { harness: 'codex' as const, sessionId: randomUUID(), endpoint } }
     let queued: any
-    const server = createServer((socket) => {
-      let buffer = ''
-      socket.on('data', (chunk) => {
-        buffer += chunk
-        let index: number
-        while ((index = buffer.indexOf('\n')) >= 0) {
-          const frame = JSON.parse(buffer.slice(0, index)); buffer = buffer.slice(index + 1)
-          if (frame.id === undefined) continue
-          let result: any = {}
-          if (frame.method === 'thread/read') result = { thread: { id: request.to.sessionId, status: { type: 'idle' }, turns: [] } }
-          if (frame.method === 'thread/queue/add') { queued = frame.params; result = { queuedSubmission: { id: 'native-1' } } }
-          socket.write(JSON.stringify({ id: frame.id, result }) + '\n')
-        }
-      })
+    const server = await jsonlServer(endpoint, (frame) => {
+      if (frame.id === undefined) return
+      let result: any = {}
+      if (frame.method === 'thread/read') result = { thread: { id: request.to.sessionId, status: { type: 'idle' }, turns: [] } }
+      if (frame.method === 'thread/queue/add') { queued = frame.params; result = { queuedSubmission: { id: 'native-1' } } }
+      return { id: frame.id, result }
     })
-    await new Promise<void>((resolve) => server.listen(endpoint, resolve))
     try {
       const registry = { codex: createCodexSessionAdapter((path) => SessionRpc.socket(path!)) }
       const receipt = await sendSessionMessage(request, config, registry)
@@ -226,27 +230,15 @@ describe('native protocol boundaries', () => {
   test('Codex queues when the server refuses to list turns, and refuses to steer', async () => {
     const endpoint = join(home, 'codex-no-turns.sock')
     const request = { ...options(), to: { harness: 'codex' as const, sessionId: randomUUID(), endpoint } }
-    const server = createServer((socket) => {
-      let buffer = ''
-      socket.on('data', (chunk) => {
-        buffer += chunk
-        let index: number
-        while ((index = buffer.indexOf('\n')) >= 0) {
-          const frame = JSON.parse(buffer.slice(0, index)); buffer = buffer.slice(index + 1)
-          if (frame.id === undefined) continue
-          // The daemon reads a loaded thread but rejects its turn listing.
-          if (frame.method === 'thread/read' && frame.params.includeTurns) {
-            socket.write(JSON.stringify({ id: frame.id, error: { code: -32601, message: 'list_turns is not supported yet' } }) + '\n')
-            continue
-          }
-          let result: any = {}
-          if (frame.method === 'thread/read') result = { thread: { id: request.to.sessionId, status: { type: 'idle' } } }
-          if (frame.method === 'thread/queue/add') result = { queuedSubmission: { id: 'native-2' } }
-          socket.write(JSON.stringify({ id: frame.id, result }) + '\n')
-        }
-      })
+    const server = await jsonlServer(endpoint, (frame) => {
+      if (frame.id === undefined) return
+      // The daemon reads a loaded thread but rejects its turn listing.
+      if (frame.method === 'thread/read' && frame.params.includeTurns) return { id: frame.id, error: { code: -32601, message: 'list_turns is not supported yet' } }
+      let result: any = {}
+      if (frame.method === 'thread/read') result = { thread: { id: request.to.sessionId, status: { type: 'idle' } } }
+      if (frame.method === 'thread/queue/add') result = { queuedSubmission: { id: 'native-2' } }
+      return { id: frame.id, result }
     })
-    await new Promise<void>((resolve) => server.listen(endpoint, resolve))
     try {
       const adapter = createCodexSessionAdapter((path) => SessionRpc.socket(path!))
       expect((await adapter.inspect(request.to)).capabilities).toEqual(['queue'])

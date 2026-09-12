@@ -1,8 +1,7 @@
 import { existsSync, statSync } from 'node:fs'
 import { homedir } from 'node:os'
 import { join } from 'node:path'
-import { createConnection } from 'node:net'
-import { nativeOutput } from './process.ts'
+import { connectSocket, nativeOutput } from './process.ts'
 import { formatSessionMessage, SessionError, type SessionAdapter, type SessionInfo } from './types.ts'
 
 async function activeSessions(): Promise<SessionInfo[]> {
@@ -45,17 +44,14 @@ export const claudeSessions: SessionAdapter = {
     let stat
     try { stat = statSync(endpoint) } catch { throw new SessionError('Claude inbox socket is unavailable; no resume was attempted.') }
     if (!stat.isSocket() || (process.getuid && stat.uid !== process.getuid())) throw new SessionError('Claude inbox must be a socket owned by the current user.')
+    const socket = await connectSocket(endpoint, { timedOut: 'Claude socket timed out.' })
+    // Once the frame is on the wire the outcome is ambiguous, so failures past this point are `unknown`.
     await new Promise<void>((resolve, reject) => {
-      const socket = createConnection(endpoint)
-      let wrote = false
-      const timer = setTimeout(() => { socket.destroy(); reject(new SessionError('Claude socket timed out.', wrote ? 'unknown' : 'rejected')) }, 5000)
-      socket.on('error', (error) => { clearTimeout(timer); reject(new SessionError(error.message, wrote ? 'unknown' : 'rejected')) })
-      socket.once('connect', () => {
-        wrote = true
-        // Do not claim a Claude permission class: native inbound policy still decides delivery.
-        socket.end(`${JSON.stringify({ type: 'user', session_id: message.to.sessionId, msg_id: message.id, message: { role: 'user', content: formatSessionMessage(message) } })}\n`, () => {
-          clearTimeout(timer); socket.destroy(); resolve()
-        })
+      const timer = setTimeout(() => { socket.destroy(); reject(new SessionError('Claude socket timed out.', 'unknown')) }, 5000)
+      socket.on('error', (error) => { clearTimeout(timer); reject(new SessionError(error.message, 'unknown')) })
+      // Do not claim a Claude permission class: native inbound policy still decides delivery.
+      socket.end(`${JSON.stringify({ type: 'user', session_id: message.to.sessionId, msg_id: message.id, message: { role: 'user', content: formatSessionMessage(message) } })}\n`, () => {
+        clearTimeout(timer); socket.destroy(); resolve()
       })
     })
     return { status: 'written', transport: 'claude-peer-socket', detail: 'Written to the socket, not acknowledged by Claude. Native crossSessionInbound policy may hold or refuse it; this is not proof of delivery.' }

@@ -22,6 +22,7 @@ import type {
   RunRecord,
   RunReport,
 } from './types.ts'
+import { isUuid } from './types.ts'
 import { adapters } from './adapters/index.ts'
 import {
   captureClaudeSettings,
@@ -298,7 +299,7 @@ export async function dispatch(opts: DispatchOptions, config: DianjiangConfig): 
   if (depth >= config.maxDepth) throw new DepthLimitError(depth, config.maxDepth)
 
   if (opts.parentRunId && opts.externalResumeSessionId) throw new Error('A run cannot have both a parent run and an external resume target.')
-  if (opts.runId && !/^[0-9a-f]{8}(-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i.test(opts.runId)) throw new Error('runId must be a UUID.')
+  if (opts.runId && !isUuid(opts.runId)) throw new Error('runId must be a UUID.')
   const runId = opts.runId ?? crypto.randomUUID()
   const record: RunRecord = {
     runId,

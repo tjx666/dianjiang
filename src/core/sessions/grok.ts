@@ -1,17 +1,12 @@
 import { homedir } from 'node:os'
 import { join } from 'node:path'
-import { createConnection } from 'node:net'
+import { connectSocket } from './process.ts'
 import { SessionRpc, type RpcObject } from './rpc.ts'
 import { formatSessionMessage, SessionError, type SessionAdapter, type SessionInfo } from './types.ts'
 
 async function connect(endpoint = join(homedir(), '.grok', 'leader.sock')): Promise<SessionRpc> {
   // The stdio proxy can auto-start a leader. Refuse missing leaders before invoking it.
-  await new Promise<void>((resolve, reject) => {
-    const socket = createConnection(endpoint)
-    const timer = setTimeout(() => { socket.destroy(); reject(new SessionError('Grok leader connection timed out.')) }, 5000)
-    socket.once('connect', () => { clearTimeout(timer); socket.destroy(); resolve() })
-    socket.once('error', () => { clearTimeout(timer); reject(new SessionError('No reachable Grok leader at this socket; no new leader was started.')) })
-  })
+  ;(await connectSocket(endpoint, { timedOut: 'Grok leader connection timed out.', unreachable: 'No reachable Grok leader at this socket; no new leader was started.' })).destroy()
   const rpc = SessionRpc.process(['grok', 'agent', '--leader', '--leader-socket', endpoint, 'stdio'])
   try {
     const init = await rpc.request('initialize', { protocolVersion: 1, clientCapabilities: {}, clientInfo: { name: 'dianjiang', version: '1' } })

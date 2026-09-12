@@ -10,6 +10,11 @@ export type HarnessName = 'claude' | 'codex' | 'grok'
 
 export const HARNESS_NAMES: readonly HarnessName[] = ['claude', 'codex', 'grok']
 
+/** Run IDs and native session IDs are canonical UUIDs, never names or slugs. */
+export function isUuid(value: string): boolean {
+  return /^[0-9a-f]{8}(-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i.test(value)
+}
+
 export type RunStatus = 'running' | 'completed' | 'failed' | 'detached'
 
 /** One entry of the roster in config.jsonc. */

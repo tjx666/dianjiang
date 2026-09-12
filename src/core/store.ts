@@ -128,6 +128,8 @@ function openStore(path: string): SqliteDatabase {
   );`)
   // Bring DBs created before later columns up to the current schema.
   ensureColumns(db)
+  // Created after ensureColumns: the column itself is a lazy migration.
+  db.exec('CREATE INDEX IF NOT EXISTS runs_external_resume ON runs(external_resume_session_id);')
   return db
 }
 
@@ -265,6 +267,21 @@ export function updateRun(runId: string, patch: Partial<RunRecord>, db = getStor
 export function getRun(runId: string, db = getStore()): RunRecord | undefined {
   const row = db.query('SELECT * FROM runs WHERE run_id = ?').get(runId) as Row | null
   return row ? rowToRecord(row) : undefined
+}
+
+/**
+ * Runs that resume one native session, newest first. Answers "is a wake already
+ * in flight for this target?" without loading the whole run history.
+ */
+export function findExternalResumeRuns(
+  harness: HarnessName,
+  sessionId: string,
+  db = getStore(),
+): RunRecord[] {
+  const rows = db
+    .query('SELECT * FROM runs WHERE external_resume_session_id = ? AND harness = ? ORDER BY started_at DESC')
+    .all(sessionId, harness) as Row[]
+  return rows.map(rowToRecord)
 }
 
 /** All runs, oldest first. Backs `dianjiang stats` aggregation. */

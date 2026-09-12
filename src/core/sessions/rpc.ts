@@ -9,6 +9,7 @@ import { dirname, join } from 'node:path'
 // https://github.com/websockets/ws/blob/master/doc/ws.md#new-websocketaddress-protocols-options
 const require = createRequire(import.meta.url)
 const WebSocket = require(join(dirname(require.resolve('ws/package.json')), 'index.js')) as typeof import('ws').default
+import { connectSocket } from './process.ts'
 import { SessionError } from './types.ts'
 
 export type RpcObject = Record<string, any>
@@ -54,12 +55,7 @@ export class SessionRpc {
   }
 
   static async socket(path: string): Promise<SessionRpc> {
-    const socket = createConnection(path)
-    await new Promise<void>((resolve, reject) => {
-      const timer = setTimeout(() => { socket.destroy(); reject(new SessionError('Native socket connection timed out.')) }, 5000)
-      socket.once('connect', () => { clearTimeout(timer); resolve() })
-      socket.once('error', (error) => { clearTimeout(timer); reject(new SessionError(error.message)) })
-    })
+    const socket = await connectSocket(path, { timedOut: 'Native socket connection timed out.' })
     return new SessionRpc(socket, socket, () => socket.destroy())
   }
 
