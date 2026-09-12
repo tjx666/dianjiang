@@ -37,9 +37,13 @@ try {
   mkdirSync(work, { recursive: true })
   mkdirSync(fakeBin, { recursive: true })
 
-  run('npm', ['pack', '--pack-destination', packRoot], { cwd: root })
+  // Publish dry-runs must still create the tarball and installed package used by this smoke test.
+  const npmEnv = { ...process.env, npm_config_dry_run: 'false', NPM_CONFIG_DRY_RUN: 'false' }
+  run('npm', ['pack', '--pack-destination', packRoot], { cwd: root, env: npmEnv })
   const tarball = join(packRoot, `${packageJson.name}-${packageJson.version}.tgz`)
-  run('npm', ['install', '--prefix', installRoot, tarball, '--silent', '--no-package-lock'])
+  run('npm', ['install', '--prefix', installRoot, tarball, '--silent', '--no-package-lock'], {
+    env: npmEnv,
+  })
 
   const packageRoot = join(installRoot, 'node_modules', packageJson.name)
   const installedEntry = join(packageRoot, packageJson.bin.dianjiang)
