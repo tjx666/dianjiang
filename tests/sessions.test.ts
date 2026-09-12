@@ -81,6 +81,25 @@ describe('delivery receipts', () => {
       expect(receipt.runId).toBeUndefined()
     }
   })
+  test('Codex wake without a reachable app-server explains the required observation', async () => {
+    const previousCodexHome = process.env.CODEX_HOME
+    process.env.CODEX_HOME = home
+    try {
+      const request = options()
+      const receipt = await sendSessionMessage({
+        ...request,
+        to: { harness: 'codex', sessionId: randomUUID(), cwd: home },
+        wake: true,
+      }, config)
+      expect(receipt.status).toBe('rejected')
+      expect(receipt.runId).toBeUndefined()
+      expect(receipt.detail).toContain('--endpoint')
+      expect(receipt.detail).toContain('--wake')
+    } finally {
+      if (previousCodexHome === undefined) delete process.env.CODEX_HOME
+      else process.env.CODEX_HOME = previousCodexHome
+    }
+  })
   test('a reused PID releases the dead process incarnation without expiring live senders', () => {
     const request = options()
     const message = { id: request.messageId!, from: request.from, to: request.to, text: request.text, mode: 'queue' as const, createdAt: new Date().toISOString() }

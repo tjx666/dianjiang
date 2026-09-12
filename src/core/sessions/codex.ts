@@ -5,7 +5,15 @@ import { formatSessionMessage, SessionError, type SessionAdapter, type SessionIn
 
 /** Connect to the existing daemon; never spawn an independent app-server for a live target. */
 async function connect(endpoint?: string): Promise<SessionRpc> {
-  const rpc = await SessionRpc.webSocket(endpoint ?? join(process.env.CODEX_HOME ?? join(homedir(), '.codex'), 'app-server-control', 'app-server-control.sock'))
+  const socketPath = endpoint ?? join(process.env.CODEX_HOME ?? join(homedir(), '.codex'), 'app-server-control', 'app-server-control.sock')
+  let rpc: SessionRpc
+  try { rpc = await SessionRpc.webSocket(socketPath) }
+  catch (error) {
+    const guidance = endpoint
+      ? 'Check --endpoint for a reachable Codex app-server.'
+      : 'Start the shared Codex app-server daemon or pass --endpoint for an existing app-server.'
+    throw new SessionError(`Cannot observe Codex session state. ${guidance} --wake cannot infer stopped from an unavailable connection. ${error instanceof Error ? error.message : String(error)}`)
+  }
   try {
     await rpc.request('initialize', { clientInfo: { name: 'dianjiang', version: '1' }, capabilities: { experimentalApi: true } })
     rpc.notify('initialized')

@@ -57,6 +57,15 @@ returns `no rollout found for thread id` for a TUI thread that is mid-turn. It
 queues into stored history, so it is deferred delivery to the next load, not
 delivery to the running process.
 
+The same observation requirement applies to `--wake`: without a reachable
+app-server, Codex's persisted thread history does not distinguish a stopped
+session from one owned by another process
+([codex#36571](https://github.com/openai/codex/issues/36571)). Do not treat a
+missing control socket as stopped. Start the shared daemon where supported, or
+pass an existing app-server socket with `--endpoint`; only wake when that backend
+reports `notLoaded`. [Native writer locks](https://github.com/openai/codex/blob/main/codex-rs/thread-store/src/local/writer_lock.rs)
+guard the eventual resume but are not a pre-dispatch observation of stopped state.
+
 The daemon answers `thread/read` for a loaded thread but rejects its turn listing
 with `-32601: list_turns is not supported yet` (0.154.0). The adapter re-reads
 without turns, keeps queueing, and drops `steer` from the reported capabilities

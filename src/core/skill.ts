@@ -227,9 +227,10 @@ ${agents}
   control socket; Grok requires an existing shared leader. Pass \`--endpoint\`
   for another local backend or Claude's Peer address (strip \`uds:\`). A session
   in a separate private backend is not reachable through the default backend.
-  Codex exposes that control socket only while a shared app-server daemon runs;
-  without one, a Codex session is live-reachable only through an app-server you
-  pass with \`--endpoint\`, and otherwise only through \`--wake\`.
+  Codex exposes that control socket only while a shared app-server daemon runs.
+  Without one, pass \`--endpoint\` for an existing app-server; neither live
+  delivery nor \`--wake\` can proceed without a reachable server to observe the
+  session state. A missing socket does not prove that the session is stopped.
   Claude's inbound policy can hold or refuse messages; dianjiang does not change it.
 - \`session send\` returns a receipt, never the target's model response:
   \`accepted\` means native queue admission, \`written\` means no native ACK,
