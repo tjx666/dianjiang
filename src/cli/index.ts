@@ -22,7 +22,6 @@ import {
   setAgentField,
   writeConfigText,
 } from '../core/config-edit.ts'
-import { logEvent } from '../core/log.ts'
 import { configPath } from '../core/paths.ts'
 import { defaultConfigJsonc, findAgent, loadConfig, parseConfig, resolveAgent } from '../core/registry.ts'
 import { applySyncDefaults, planSyncDefaults } from '../core/sync-defaults.ts'
@@ -37,38 +36,13 @@ import {
 } from '../core/runner.ts'
 import { renderSkillDoc } from '../core/skill.ts'
 import { computeStats } from '../core/stats.ts'
-import { findSessions, readSession, searchSession, type ReadOptions, type SessionView } from '../core/sessions/index.ts'
+import { findSessions, readSession, searchSession, type ReadOptions, type SessionView } from '../core/session-history/index.ts'
 import { getRun, listRuns } from '../core/store.ts'
-
-function errorMessage(err: unknown): string {
-  return err instanceof Error ? err.message : String(err)
-}
-
-/** Print a JSON value on stdout (the single machine-readable line). */
-function emit(value: unknown): void {
-  process.stdout.write(`${JSON.stringify(value, null, 2)}\n`)
-}
+import { emit, errorMessage, fail, parseHarnessArg } from './output.ts'
+import { sessionCommand } from './session.ts'
 
 /** Route every clack prompt to stderr so stdout stays the single JSON value. */
 const CLACK_OUT = { output: process.stderr } as const
-
-/** Print a `{status:"failed", error}` object and set the exit code. */
-function fail(message: string, code = 1): void {
-  logEvent('cli.error', { message, exitCode: code })
-  emit({ status: 'failed', error: message })
-  process.exitCode = code
-}
-
-/**
- * Narrow a harness-name arg. On an unknown name, emit the standard failure
- * (setting the exit code) and return undefined — the caller should then
- * `return`. `noun` names the offending arg in the message ("harness"/"caller").
- */
-function parseHarnessArg(value: string, noun: string): HarnessName | undefined {
-  if (HARNESS_NAMES.includes(value as HarnessName)) return value as HarnessName
-  fail(`Unknown ${noun} "${value}" (expected one of: ${HARNESS_NAMES.join(', ')}).`)
-  return undefined
-}
 
 /** Load config, reporting a friendly error if it's missing/invalid. */
 function tryLoadConfig(): DianjiangConfig | undefined {
@@ -843,8 +817,8 @@ const sessionSearch = defineCommand({
 })
 
 const sessionCmd = defineCommand({
-  meta: { name: 'session', description: 'Read harness sessions (claude/codex/grok), including ones dianjiang never dispatched.' },
-  subCommands: { find: sessionFind, read: sessionRead, search: sessionSearch },
+  meta: { name: 'session', description: 'Discover, read, and message native harness sessions.' },
+  subCommands: { ...sessionCommand.subCommands, find: sessionFind, read: sessionRead, search: sessionSearch },
 })
 
 // Internal worker entry used by detached dispatch (the `_` prefix marks it as

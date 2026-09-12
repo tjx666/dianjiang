@@ -14,3 +14,28 @@ export * from './skill.ts'
 export * from './caller.ts'
 export * from './adapters/index.ts'
 export * from './sessions/index.ts'
+export {
+  encodeProjectDir,
+  findSessions,
+  loadSession,
+  readSession,
+  searchSession,
+  sessionReaders,
+} from './session-history/index.ts'
+export type {
+  FindOptions,
+  FindResult,
+  LoadedSession,
+  ReadOptions,
+  ReaderFindResult,
+  SessionEntry,
+  SessionEntryKind,
+  SessionInfo as HistoricalSessionInfo,
+  SessionMatch,
+  SessionOverview,
+  SessionPage,
+  SessionReadResult,
+  SessionReader,
+  SessionSearchResult,
+  SessionView,
+} from './session-history/index.ts'

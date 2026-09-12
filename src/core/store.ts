@@ -25,6 +25,7 @@ interface Row {
   finished_at: string | null
   pid: number | null
   parent_run_id: string | null
+  external_resume_session_id: string | null
   instructions: string | null
   input_tokens: number | null
   output_tokens: number | null
@@ -56,6 +57,7 @@ const FIELD_TO_COLUMN: Record<Exclude<keyof RunRecord, 'usage' | 'failure'>, str
   finishedAt: 'finished_at',
   pid: 'pid',
   parentRunId: 'parent_run_id',
+  externalResumeSessionId: 'external_resume_session_id',
   instructions: 'instructions',
 }
 
@@ -87,6 +89,7 @@ function ensureColumns(db: SqliteDatabase): void {
     ),
     instructions: 'TEXT',
     failure_json: 'TEXT',
+    external_resume_session_id: 'TEXT',
   }
   for (const [column, type] of Object.entries(migrated)) {
     if (existing.has(column)) continue
@@ -125,6 +128,8 @@ function openStore(path: string): SqliteDatabase {
   );`)
   // Bring DBs created before later columns up to the current schema.
   ensureColumns(db)
+  // Created after ensureColumns: the column itself is a lazy migration.
+  db.exec('CREATE INDEX IF NOT EXISTS runs_external_resume ON runs(external_resume_session_id);')
   return db
 }
 
@@ -184,6 +189,7 @@ function rowToRecord(row: Row): RunRecord {
     finishedAt: row.finished_at ?? undefined,
     pid: row.pid ?? undefined,
     parentRunId: row.parent_run_id ?? undefined,
+    externalResumeSessionId: row.external_resume_session_id ?? undefined,
     instructions: row.instructions ?? undefined,
     usage: rowToUsage(row),
     failure: rowToFailure(row),
@@ -198,8 +204,8 @@ export function insertRun(record: RunRecord, db = getStore()): void {
       harness_session_id, cwd, task, started_at, finished_at, pid, parent_run_id,
       instructions,
       input_tokens, output_tokens, cache_read_tokens, total_tokens, turns, cost_usd,
-      failure_json
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      failure_json, external_resume_session_id
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
   ).run(
     record.runId,
     record.agent ?? null,
@@ -224,6 +230,7 @@ export function insertRun(record: RunRecord, db = getStore()): void {
     u?.turns ?? null,
     u?.costUsd ?? null,
     record.failure ? JSON.stringify(record.failure) : null,
+    record.externalResumeSessionId ?? null,
   )
 }
 
@@ -260,6 +267,21 @@ export function updateRun(runId: string, patch: Partial<RunRecord>, db = getStor
 export function getRun(runId: string, db = getStore()): RunRecord | undefined {
   const row = db.query('SELECT * FROM runs WHERE run_id = ?').get(runId) as Row | null
   return row ? rowToRecord(row) : undefined
+}
+
+/**
+ * Runs that resume one native session, newest first. Answers "is a wake already
+ * in flight for this target?" without loading the whole run history.
+ */
+export function findExternalResumeRuns(
+  harness: HarnessName,
+  sessionId: string,
+  db = getStore(),
+): RunRecord[] {
+  const rows = db
+    .query('SELECT * FROM runs WHERE external_resume_session_id = ? AND harness = ? ORDER BY started_at DESC')
+    .all(sessionId, harness) as Row[]
+  return rows.map(rowToRecord)
 }
 
 /** All runs, oldest first. Backs `dianjiang stats` aggregation. */

@@ -509,7 +509,7 @@ Notes:
 
 ## Session reading (`dianjiang session`)
 
-Status: designed and implemented 2026-09-11 (`src/core/sessions/`). Reading "what happened in that
+Status: designed and implemented 2026-09-11 (`src/core/session-history/`). Reading "what happened in that
 session" is a recurring need (find the session behind a PR, trace who made a
 change, recover the reasoning behind a design, hand off a quota-exhausted
 session) and today every instance ends in a throwaway JSONL parser.
@@ -641,6 +641,11 @@ Crowded space; two camps, each missing half of this idea:
   (`dianjiang skill --caller <harness>`) across all three vendors.
 
 ## Open questions
+
+External-session messaging is implemented as a separate `SessionAdapter` boundary,
+with native backend discovery, attributed messages, durable receipts, and explicit
+external resume. See [the decision and evidence record](../../references/session-messaging.md)
+before changing delivery semantics, retry behavior, or supported transports.
 
 - Progressive-disclosure model metrics (deferred): keep the default
   agent-driven, but a `config models` subcommand could list

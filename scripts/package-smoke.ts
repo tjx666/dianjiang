@@ -96,6 +96,43 @@ try {
 
   run('bun', [installedEntry, 'stats'], { env })
 
+  // Exercise the installed public API and real Unix WebSocket framing in both runtimes.
+  if (process.platform !== 'win32') {
+    const sessionConsumer = join(installRoot, 'sessions.mjs')
+    writeFileSync(sessionConsumer, `// 验证已安装包的会话传输与历史读取 API；仅在测试目录创建临时 socket 和回执。\n
+import { createRequire } from 'node:module'
+import { dirname, join } from 'node:path'
+import { createServer } from 'node:http'
+import { randomUUID } from 'node:crypto'
+import { sendSessionMessage, getMessageReceipt, findSessions } from '${packageJson.name}'
+if (typeof findSessions !== 'function') throw new Error('Session history API is missing')
+const require = createRequire(import.meta.url)
+const { WebSocketServer } = require(join(dirname(require.resolve('ws/package.json')), 'index.js'))
+const server = createServer()
+const wss = new WebSocketServer({ server })
+const target = randomUUID(), messageId = randomUUID()
+const endpoint = join(process.env.DIANJIANG_HOME, 'package-' + process.pid + '.sock')
+wss.on('connection', socket => socket.on('message', data => {
+  const frame = JSON.parse(String(data))
+  if (frame.id === undefined) return
+  let result = {}
+  if (frame.method === 'thread/read') result = { thread: { id: target, status: { type: 'idle' }, turns: [] } }
+  if (frame.method === 'thread/queue/add') {
+    if (frame.params.clientUserMessageId !== messageId) throw new Error('Message identity lost')
+    result = { queuedSubmission: { id: 'native-ack' } }
+  }
+  socket.send(JSON.stringify({ id: frame.id, result }))
+}))
+await new Promise(resolve => server.listen(endpoint, resolve))
+try {
+  const receipt = await sendSessionMessage({ from: { harness: 'claude', sessionId: randomUUID() }, to: { harness: 'codex', sessionId: target, endpoint }, text: 'package delivery', messageId }, { maxDepth: 1, agents: [] })
+  if (receipt.status !== 'accepted' || getMessageReceipt(messageId)?.nativeMessageId !== 'native-ack') throw new Error(JSON.stringify(receipt))
+} finally { for (const socket of wss.clients) socket.terminate(); wss.close(); server.close() }
+`)
+    run('node', [sessionConsumer], { env, cwd: installRoot })
+    run('bun', [sessionConsumer], { env, cwd: installRoot })
+  }
+
   const consumer = join(installRoot, 'consumer.ts')
   writeFileSync(
     consumer,
