@@ -74,6 +74,41 @@ reach for dianjiang only when an agent below clearly fits.
   warrants it.
 - Follow up in the same session with \`dianjiang resume <runId> "<message>"\` —
   it takes \`--detach\` too; use the same detach-and-collect flow.
+- For an external native session, use \`dianjiang session list --harness <harness>\`
+  and \`dianjiang session status --harness <harness> --session <native-session-uuid>\`.
+  These inspect native sessions; \`status <runId>\` still inspects a dianjiang run.
+- Deliver attributed text with \`dianjiang session send --harness <target-harness>
+  --session <target-session-uuid> --from-session <your-native-session-uuid>
+  --message-id <stable-message-uuid> "<message>"\`. Sender harness is detected from
+  process ancestry; pass \`--from-harness\` when running outside an agent. Never
+  borrow an inherited environment marker or invent a sender session ID.
+  Use the same shell-safe message transport as \`resume\`.
+- Native endpoints are local sockets: Codex defaults to its shared app-server
+  control socket; Grok requires an existing shared leader. Pass \`--endpoint\`
+  for another local backend or Claude's Peer address (strip \`uds:\`). A session
+  in a separate private backend is not reachable through the default backend.
+  Codex exposes that control socket only while a shared app-server daemon runs.
+  Without one, pass \`--endpoint\` for an existing app-server; neither live
+  delivery nor \`--wake\` can proceed without a reachable server to observe the
+  session state. A missing socket does not prove that the session is stopped.
+  Claude's inbound policy can hold or refuse messages; dianjiang does not change it.
+- \`session send\` returns a receipt, never the target's model response:
+  \`accepted\` means native queue admission, \`written\` means no native ACK,
+  \`unknown\` means delivery is uncertain, and \`rejected\` means no confirmed
+  admission. Read it with \`dianjiang session receipt <message-id>\`. Reusing the
+  same message ID returns the existing receipt and never sends again; changed
+  content under that ID is refused. Do not blindly use a new ID after uncertainty.
+  Default \`--mode queue\` preserves the native queue. \`--mode steer\` requires
+  an active Codex turn on a server that lists turns — the app-server daemon does
+  not, and \`status\` then reports queue only; Grok requests best-effort mid-turn queue promotion;
+  Claude accepts messages between tool calls and does not offer this mode.
+- To continue a stopped external conversation, explicitly add \`--wake --cwd
+  <original-directory>\` (optionally \`--model\` and \`--effort\`). Stop other
+  owners first: state is scoped to the selected backend, not every process on
+  the machine. Unknown state or connection failure never triggers a resume.
+  A \`resumed\` receipt contains \`runId\`; collect that run using the same
+  detached-run collection rule above. This starts a new execution of the
+  existing conversation, not a fresh conversation or a reply receipt.
 - Overriding a preset is allowed ONLY to relay the human's explicit choice in
   their current request: if they name a vendor, harness, model, or effort, pass
   it through — \`dianjiang run --harness <claude|codex|grok> [-m <model>] [--effort <level>] "<task>"\`,
@@ -162,6 +197,41 @@ reach for dianjiang only when an agent below clearly fits.
   warrants it.
 - Follow up in the same session with \`dianjiang resume <runId> "<message>"\` —
   it takes \`--detach\` too; use the same detach-and-collect flow.
+- For an external native session, use \`dianjiang session list --harness <harness>\`
+  and \`dianjiang session status --harness <harness> --session <native-session-uuid>\`.
+  These inspect native sessions; \`status <runId>\` still inspects a dianjiang run.
+- Deliver attributed text with \`dianjiang session send --harness <target-harness>
+  --session <target-session-uuid> --from-session <your-native-session-uuid>
+  --message-id <stable-message-uuid> "<message>"\`. Sender harness is detected from
+  process ancestry; pass \`--from-harness\` when running outside an agent. Never
+  borrow an inherited environment marker or invent a sender session ID.
+  Use the same shell-safe message transport as \`resume\`.
+- Native endpoints are local sockets: Codex defaults to its shared app-server
+  control socket; Grok requires an existing shared leader. Pass \`--endpoint\`
+  for another local backend or Claude's Peer address (strip \`uds:\`). A session
+  in a separate private backend is not reachable through the default backend.
+  Codex exposes that control socket only while a shared app-server daemon runs.
+  Without one, pass \`--endpoint\` for an existing app-server; neither live
+  delivery nor \`--wake\` can proceed without a reachable server to observe the
+  session state. A missing socket does not prove that the session is stopped.
+  Claude's inbound policy can hold or refuse messages; dianjiang does not change it.
+- \`session send\` returns a receipt, never the target's model response:
+  \`accepted\` means native queue admission, \`written\` means no native ACK,
+  \`unknown\` means delivery is uncertain, and \`rejected\` means no confirmed
+  admission. Read it with \`dianjiang session receipt <message-id>\`. Reusing the
+  same message ID returns the existing receipt and never sends again; changed
+  content under that ID is refused. Do not blindly use a new ID after uncertainty.
+  Default \`--mode queue\` preserves the native queue. \`--mode steer\` requires
+  an active Codex turn on a server that lists turns — the app-server daemon does
+  not, and \`status\` then reports queue only; Grok requests best-effort mid-turn queue promotion;
+  Claude accepts messages between tool calls and does not offer this mode.
+- To continue a stopped external conversation, explicitly add \`--wake --cwd
+  <original-directory>\` (optionally \`--model\` and \`--effort\`). Stop other
+  owners first: state is scoped to the selected backend, not every process on
+  the machine. Unknown state or connection failure never triggers a resume.
+  A \`resumed\` receipt contains \`runId\`; collect that run using the same
+  detached-run collection rule above. This starts a new execution of the
+  existing conversation, not a fresh conversation or a reply receipt.
 - Overriding a preset is allowed ONLY to relay the human's explicit choice in
   their current request: if they name a vendor, harness, model, or effort, pass
   it through — \`dianjiang run --harness <claude|codex|grok> [-m <model>] [--effort <level>] "<task>"\`,
@@ -319,6 +389,41 @@ reach for dianjiang only when an agent below clearly fits.
   warrants it.
 - Follow up in the same session with \`dianjiang resume <runId> "<message>"\` —
   it takes \`--detach\` too; use the same detach-and-collect flow.
+- For an external native session, use \`dianjiang session list --harness <harness>\`
+  and \`dianjiang session status --harness <harness> --session <native-session-uuid>\`.
+  These inspect native sessions; \`status <runId>\` still inspects a dianjiang run.
+- Deliver attributed text with \`dianjiang session send --harness <target-harness>
+  --session <target-session-uuid> --from-session <your-native-session-uuid>
+  --message-id <stable-message-uuid> "<message>"\`. Sender harness is detected from
+  process ancestry; pass \`--from-harness\` when running outside an agent. Never
+  borrow an inherited environment marker or invent a sender session ID.
+  Use the same shell-safe message transport as \`resume\`.
+- Native endpoints are local sockets: Codex defaults to its shared app-server
+  control socket; Grok requires an existing shared leader. Pass \`--endpoint\`
+  for another local backend or Claude's Peer address (strip \`uds:\`). A session
+  in a separate private backend is not reachable through the default backend.
+  Codex exposes that control socket only while a shared app-server daemon runs.
+  Without one, pass \`--endpoint\` for an existing app-server; neither live
+  delivery nor \`--wake\` can proceed without a reachable server to observe the
+  session state. A missing socket does not prove that the session is stopped.
+  Claude's inbound policy can hold or refuse messages; dianjiang does not change it.
+- \`session send\` returns a receipt, never the target's model response:
+  \`accepted\` means native queue admission, \`written\` means no native ACK,
+  \`unknown\` means delivery is uncertain, and \`rejected\` means no confirmed
+  admission. Read it with \`dianjiang session receipt <message-id>\`. Reusing the
+  same message ID returns the existing receipt and never sends again; changed
+  content under that ID is refused. Do not blindly use a new ID after uncertainty.
+  Default \`--mode queue\` preserves the native queue. \`--mode steer\` requires
+  an active Codex turn on a server that lists turns — the app-server daemon does
+  not, and \`status\` then reports queue only; Grok requests best-effort mid-turn queue promotion;
+  Claude accepts messages between tool calls and does not offer this mode.
+- To continue a stopped external conversation, explicitly add \`--wake --cwd
+  <original-directory>\` (optionally \`--model\` and \`--effort\`). Stop other
+  owners first: state is scoped to the selected backend, not every process on
+  the machine. Unknown state or connection failure never triggers a resume.
+  A \`resumed\` receipt contains \`runId\`; collect that run using the same
+  detached-run collection rule above. This starts a new execution of the
+  existing conversation, not a fresh conversation or a reply receipt.
 - Overriding a preset is allowed ONLY to relay the human's explicit choice in
   their current request: if they name a vendor, harness, model, or effort, pass
   it through — \`dianjiang run --harness <claude|codex|grok> [-m <model>] [--effort <level>] "<task>"\`,
@@ -408,6 +513,41 @@ reach for dianjiang only when an agent below clearly fits.
   warrants it.
 - Follow up in the same session with \`dianjiang resume <runId> "<message>"\` —
   it takes \`--detach\` too; use the same detach-and-collect flow.
+- For an external native session, use \`dianjiang session list --harness <harness>\`
+  and \`dianjiang session status --harness <harness> --session <native-session-uuid>\`.
+  These inspect native sessions; \`status <runId>\` still inspects a dianjiang run.
+- Deliver attributed text with \`dianjiang session send --harness <target-harness>
+  --session <target-session-uuid> --from-session <your-native-session-uuid>
+  --message-id <stable-message-uuid> "<message>"\`. Sender harness is detected from
+  process ancestry; pass \`--from-harness\` when running outside an agent. Never
+  borrow an inherited environment marker or invent a sender session ID.
+  Use the same shell-safe message transport as \`resume\`.
+- Native endpoints are local sockets: Codex defaults to its shared app-server
+  control socket; Grok requires an existing shared leader. Pass \`--endpoint\`
+  for another local backend or Claude's Peer address (strip \`uds:\`). A session
+  in a separate private backend is not reachable through the default backend.
+  Codex exposes that control socket only while a shared app-server daemon runs.
+  Without one, pass \`--endpoint\` for an existing app-server; neither live
+  delivery nor \`--wake\` can proceed without a reachable server to observe the
+  session state. A missing socket does not prove that the session is stopped.
+  Claude's inbound policy can hold or refuse messages; dianjiang does not change it.
+- \`session send\` returns a receipt, never the target's model response:
+  \`accepted\` means native queue admission, \`written\` means no native ACK,
+  \`unknown\` means delivery is uncertain, and \`rejected\` means no confirmed
+  admission. Read it with \`dianjiang session receipt <message-id>\`. Reusing the
+  same message ID returns the existing receipt and never sends again; changed
+  content under that ID is refused. Do not blindly use a new ID after uncertainty.
+  Default \`--mode queue\` preserves the native queue. \`--mode steer\` requires
+  an active Codex turn on a server that lists turns — the app-server daemon does
+  not, and \`status\` then reports queue only; Grok requests best-effort mid-turn queue promotion;
+  Claude accepts messages between tool calls and does not offer this mode.
+- To continue a stopped external conversation, explicitly add \`--wake --cwd
+  <original-directory>\` (optionally \`--model\` and \`--effort\`). Stop other
+  owners first: state is scoped to the selected backend, not every process on
+  the machine. Unknown state or connection failure never triggers a resume.
+  A \`resumed\` receipt contains \`runId\`; collect that run using the same
+  detached-run collection rule above. This starts a new execution of the
+  existing conversation, not a fresh conversation or a reply receipt.
 - Overriding a preset is allowed ONLY to relay the human's explicit choice in
   their current request: if they name a vendor, harness, model, or effort, pass
   it through — \`dianjiang run --harness <claude|codex|grok> [-m <model>] [--effort <level>] "<task>"\`,
