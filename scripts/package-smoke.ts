@@ -99,12 +99,13 @@ try {
   // Exercise the installed public API and real Unix WebSocket framing in both runtimes.
   if (process.platform !== 'win32') {
     const sessionConsumer = join(installRoot, 'sessions.mjs')
-    writeFileSync(sessionConsumer, `// 验证已安装包的会话传输；仅在测试目录创建临时 socket 和回执。\n
+    writeFileSync(sessionConsumer, `// 验证已安装包的会话传输与历史读取 API；仅在测试目录创建临时 socket 和回执。\n
 import { createRequire } from 'node:module'
 import { dirname, join } from 'node:path'
 import { createServer } from 'node:http'
 import { randomUUID } from 'node:crypto'
-import { sendSessionMessage, getMessageReceipt } from '${packageJson.name}'
+import { sendSessionMessage, getMessageReceipt, findSessions } from '${packageJson.name}'
+if (typeof findSessions !== 'function') throw new Error('Session history API is missing')
 const require = createRequire(import.meta.url)
 const { WebSocketServer } = require(join(dirname(require.resolve('ws/package.json')), 'index.js'))
 const server = createServer()

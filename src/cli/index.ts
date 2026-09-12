@@ -36,6 +36,7 @@ import {
 } from '../core/runner.ts'
 import { renderSkillDoc } from '../core/skill.ts'
 import { computeStats } from '../core/stats.ts'
+import { findSessions, readSession, searchSession, type ReadOptions, type SessionView } from '../core/session-history/index.ts'
 import { getRun, listRuns } from '../core/store.ts'
 import { emit, errorMessage, fail, parseHarnessArg } from './output.ts'
 import { sessionCommand } from './session.ts'
@@ -672,6 +673,154 @@ const stats = defineCommand({
   },
 })
 
+/** Shared read/search flags, parsed into core `ReadOptions`. */
+function readOptions(args: Record<string, unknown>): ReadOptions {
+  const numeric = (value: unknown): number | undefined => {
+    const parsed = Number(value)
+    return Number.isFinite(parsed) && parsed > 0 ? parsed : undefined
+  }
+  return {
+    ...(args.limit !== undefined ? { limit: numeric(args.limit) } : {}),
+    ...(args['max-chars'] !== undefined ? { maxChars: numeric(args['max-chars']) } : {}),
+    ...(args.cursor ? { cursor: String(args.cursor) } : {}),
+    ...(args['include-injected'] ? { includeInjected: true } : {}),
+  }
+}
+
+const sessionFind = defineCommand({
+  meta: { name: 'find', description: 'Find harness sessions by text, working directory, or harness.' },
+  args: {
+    query: { type: 'positional', required: false, description: 'Case-insensitive substring to match in session content' },
+    cwd: { type: 'string', default: process.cwd(), description: 'Only sessions that ran in this directory' },
+    all: { type: 'boolean', default: false, description: 'Search every directory, not just --cwd' },
+    harness: { type: 'string', description: 'Restrict to one harness (claude/codex/grok)' },
+    limit: { type: 'string', default: '10', description: 'Max sessions to return' },
+    'include-injected': {
+      type: 'boolean',
+      default: false,
+      description: 'Also match injected content (prompt frames, skill listings) — matches nearly every session',
+    },
+  },
+  run({ args }) {
+    let harness: HarnessName | undefined
+    if (args.harness) {
+      harness = parseHarnessArg(args.harness, 'harness')
+      if (!harness) return
+    }
+    const limit = Number(args.limit)
+    if (!Number.isFinite(limit) || limit <= 0) return fail(`Invalid --limit "${args.limit}" (expected a positive number).`)
+    emit(
+      findSessions({
+        ...(args.query ? { query: args.query } : {}),
+        cwd: resolve(args.cwd),
+        all: args.all,
+        ...(harness ? { harness } : {}),
+        limit,
+        ...(args['include-injected'] ? { includeInjected: true } : {}),
+      }),
+    )
+  },
+})
+
+/** Resolve the session a command should read: an explicit id, or a run's session. */
+function resolveTarget(sessionId: string | undefined, runId: string | undefined): { id: string; harness?: HarnessName } | undefined {
+  if (runId) {
+    const record = getRun(runId)
+    if (!record) {
+      fail(`Run ${runId} not found.`)
+      return undefined
+    }
+    if (!record.harnessSessionId) {
+      fail(`Run ${runId} has no harness session recorded (status: ${record.status}).`)
+      return undefined
+    }
+    return { id: record.harnessSessionId, harness: record.harness }
+  }
+  if (!sessionId) {
+    fail('Missing session id. Pass one, or use --run <run-id>.')
+    return undefined
+  }
+  return { id: sessionId }
+}
+
+const sessionRead = defineCommand({
+  meta: { name: 'read', description: 'Read a session: overview by default, or requests / around an entry / all.' },
+  args: {
+    sessionId: { type: 'positional', required: false, description: 'Harness session id' },
+    run: { type: 'string', description: 'Read the session behind a dianjiang run id instead' },
+    view: { type: 'string', description: 'overview (default) | requests | around | all' },
+    around: { type: 'string', description: 'Expand around this entry id (implies --view around)' },
+    cursor: { type: 'string', description: 'Continue from a previous response\'s nextCursor' },
+    limit: { type: 'string', description: 'Max entries in the response' },
+    'max-chars': { type: 'string', description: 'Max characters across all entry texts' },
+    'include-injected': {
+      type: 'boolean',
+      default: false,
+      description: 'Include injected content (reminders, attachments, prompt frames)',
+    },
+    harness: { type: 'string', description: 'Skip id probing by naming the harness' },
+  },
+  run({ args }) {
+    let harness: HarnessName | undefined
+    if (args.harness) {
+      harness = parseHarnessArg(args.harness, 'harness')
+      if (!harness) return
+    }
+    const target = resolveTarget(args.sessionId, args.run)
+    if (!target) return
+    const view = args.view as SessionView | undefined
+    if (view && !['overview', 'requests', 'around', 'all'].includes(view)) {
+      return fail(`Unknown --view "${args.view}" (expected overview, requests, around, or all).`)
+    }
+    const result = readSession(
+      target.id,
+      {
+        ...readOptions(args as Record<string, unknown>),
+        ...(view ? { view } : {}),
+        ...(args.around ? { around: args.around } : {}),
+      },
+      harness ?? target.harness,
+    )
+    if (!result) return fail(`Session ${target.id} not found in any local harness store.`)
+    emit(result)
+  },
+})
+
+const sessionSearch = defineCommand({
+  meta: { name: 'search', description: 'Search inside one session; hits carry entry ids for `read --around`.' },
+  args: {
+    sessionId: { type: 'positional', required: false, description: 'Harness session id' },
+    query: { type: 'positional', required: false, description: 'Case-insensitive substring' },
+    run: { type: 'string', description: 'Search the session behind a dianjiang run id instead' },
+    cursor: { type: 'string', description: 'Continue from a previous response\'s nextCursor' },
+    limit: { type: 'string', description: 'Max hits in the response' },
+    'max-chars': { type: 'string', description: 'Max characters across all hit texts' },
+    'include-injected': { type: 'boolean', default: false, description: 'Also search injected content' },
+    harness: { type: 'string', description: 'Skip id probing by naming the harness' },
+  },
+  run({ args }) {
+    // citty assigns the sole positional to sessionId even with --run. In that
+    // form the positional is the query, so resolve it before the target.
+    const query = args.query ?? (args.run ? args.sessionId : undefined)
+    if (!query) return fail('Missing query. Pass a session id and query, or --run <run-id> <query>.')
+    let harness: HarnessName | undefined
+    if (args.harness) {
+      harness = parseHarnessArg(args.harness, 'harness')
+      if (!harness) return
+    }
+    const target = resolveTarget(args.sessionId, args.run)
+    if (!target) return
+    const result = searchSession(target.id, query, readOptions(args as Record<string, unknown>), harness ?? target.harness)
+    if (!result) return fail(`Session ${target.id} not found in any local harness store.`)
+    emit(result)
+  },
+})
+
+const sessionCmd = defineCommand({
+  meta: { name: 'session', description: 'Discover, read, and message native harness sessions.' },
+  subCommands: { ...sessionCommand.subCommands, find: sessionFind, read: sessionRead, search: sessionSearch },
+})
+
 // Internal worker entry used by detached dispatch (the `_` prefix marks it as
 // non-public; citty's CommandMeta has no `hidden` flag). Output goes to a log.
 const exec = defineCommand({
@@ -691,7 +840,7 @@ const main = defineCommand({
     result,
     skill,
     stats,
-    session: sessionCommand,
+    session: sessionCmd,
     config: configCmd,
     _exec: exec,
   },
