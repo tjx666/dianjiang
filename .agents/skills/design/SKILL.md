@@ -56,6 +56,8 @@ dianjiang result <run-id> [--wait [--timeout <sec>]]  # fetch final JSON; --wait
 dianjiang skill [--caller <harness>]     # print the usage doc for a caller (plain text, not JSON)
 dianjiang stats                          # per-agent usage aggregation
 dianjiang config ...                     # agent CRUD + harnesses self-check (config harnesses --json)
+
+dianjiang session find|read|search ...   # read harness sessions — see "Session reading"
 ```
 
 ## Agent registry
@@ -261,8 +263,14 @@ the code twice); the full per-caller renders are pinned by snapshot tests in
    `.status` discipline, self-contained tasks, resume, preset overrides only
    relay the human's explicit in-request choice, YOLO-mode caution, the
    one-JSON/exit-code/log-path contract (operational notes formerly kept in
-   the hand-written static skill file), `DIANJIANG_DEPTH` guard.
-5. The caller's `append`, when set (user extension point; no built-in default
+   the hand-written static skill file), `DIANJIANG_DEPTH` guard (scoped to
+   dispatch: a delegate may still read sessions).
+5. `<session-reading>` — the `dianjiang session` surface (added 2026-09-11):
+   `find` / `read` / `search`, the cursor + `warnings` contract, and the
+   injected-content default. Deliberately OUTSIDE `<rules>`: it is read-only,
+   free, and caller-independent (no `--caller` stamping), so folding it into
+   the dispatch rules would blur what a delegate may do.
+6. The caller's `append`, when set (user extension point; no built-in default
    uses it anymore).
 
 ## `run` JSON output
@@ -499,6 +507,113 @@ Notes:
   this is the moat **only if** we detect breakage first: per-adapter smoke tests
   + a daily CI cron against latest CLI versions.
 
+## Session reading (`dianjiang session`)
+
+Status: designed and implemented 2026-09-11 (`src/core/sessions/`). Reading "what happened in that
+session" is a recurring need (find the session behind a PR, trace who made a
+change, recover the reasoning behind a design, hand off a quota-exhausted
+session) and today every instance ends in a throwaway JSONL parser.
+
+Scope promise, deliberately narrow: **locate + normalize + budget the output**.
+Not faithful replay, not a `context` view claiming to equal what the harness
+will next send the model, not live tailing, and not model-generated summaries —
+the caller already is a model.
+
+```
+dianjiang session find [query] [--cwd <dir>] [--all] [--harness <h>] [--limit n]
+dianjiang session read <session-id> [--view overview|requests|around|all] [--around <entry-id>]
+dianjiang session read --run <run-id>    # resolve a dianjiang run to its harness session
+dianjiang session search <session-id> "<query>"
+# shared on read/search/find: --include-injected, --limit, --max-chars, --cursor, --harness
+```
+
+Shipped as designed, with one deviation (grok, see the table) and one flag the
+design missed (`--include-injected`). `--pr <url>` is NOT implemented: `find`
+takes a plain query, so a PR lookup means passing the branch name. Promote it to
+a flag if the two-step proves annoying in dogfood.
+
+Decided defaults (2026-09-11):
+
+- `find` searches the **current cwd's sessions by default**; `--all` widens to
+  every project across all three harnesses. Most lookups are "a session in this
+  repo", and narrowing by default is what keeps candidate noise and scan cost
+  down.
+- **No dianjiang-built index.** Claude's store is scanned live, cutting the file
+  set by cwd directory and time window first. A private SQLite index would be
+  faster but drags in incremental updates, invalidation and races against
+  sessions still being written — not worth it until dogfooding proves scanning
+  too slow. The design leaves room for one; nothing else depends on its absence.
+- `--run <run-id>` resolves through the existing run store, which already
+  records the harness session id — cheap, and it covers "read what the agent I
+  dispatched actually did".
+- Local sessions only; codex cloud and other remote stores are out of v1.
+- Output is capped by default (entry count + byte budget) and continues via a
+  cursor. Over-budget truncates with an explicit continuation handle; it never
+  errors out, and it never silently implies the caller saw everything.
+
+Flow: **find → overview → search → expand**. Derived from sampling four real
+"read a session" workflows (codex transcripts, 2026-09-06..10): every first
+broad extraction hit the tool output cap (36k–60k token pre-truncation
+estimates) and every one ended up rewriting an ad-hoc parser. v1 acceptance is
+exactly those four flows, reproduced without a scratch script.
+
+### Data sources — official index first, file parsing as fallback
+
+The first design draft assumed "parse each harness's session files". Locally
+verified 2026-09-11, that is only true for claude:
+
+| Harness | Primary source | Notes |
+|---|---|---|
+| codex 0.154.0 | `~/.codex/thread_history_1.sqlite` | Prebuilt index: `thread_items` 746k rows, `thread_turns` 20k, covering 5089 of 5591 rollout files. Typed items (`userMessage` / `agentMessage` / `commandExecution` / `contextCompaction` / `subAgentActivity` / `fileChange` …), native `item_id` + `turn_id`, and `rollout_ordinal` / `rollout_byte_offset` back-pointers into the rollout file. `codex migrate-rollouts` is the official path moving legacy rollouts into it, so the JSONL format is the one being retired. Rollout files stay as the raw view and the fallback for unmigrated threads. |
+| grok 1.0.25 | `~/.grok/sessions/<url-encoded-cwd>/<id>/` | Reversed during implementation: the plan was to wrap `grok sessions list` + `grok export`, but the list command has no `--json` (a human table) and the export is markdown with no per-entry ids, which `--around` needs. The on-disk store turned out to be plainly structured — `summary.json` (id, cwd, timestamps) next to `chat_history.jsonl` — and the directory name IS the url-encoded cwd, so grok is the only harness where cwd filtering costs zero reads. No subprocess either. |
+| claude 2.1.268 | transcript JSONL under `~/.claude/projects/<encoded-cwd>/` | No index at all (2.4 GB locally). This is where v1's real implementation work is. Sub-agent transcripts live in the sibling `<uuid>/subagents/*.jsonl` + `.meta.json`. |
+
+Reading codex's SQLite: open **read-only**, never lock a DB a live codex is
+writing, and probe the schema before querying — the `_1` filename suffix is a
+version counter with no stability promise (`state_5`, `logs_2` show the pattern),
+so schema mismatch must fall back to rollout parsing. The alternative, grepping
+18 GB of rollout JSONL, is a non-starter for `find`.
+
+### Three rules the reader must follow
+
+- **Follow the live branch, not the file.** Claude transcripts are a
+  `parentUuid` tree; a rewind or message edit leaves the abandoned branch in the
+  same file, so a linear read reports withdrawn requests as real ones. Walk up
+  from the `last-prompt` record's `leafUuid` to get the live chain. Apply the
+  filter to the conversation spine (`user`/`assistant`) ONLY: attachments hang
+  off a message as children without being on the chain themselves, so a naive
+  off-chain test flags every attachment as abandoned (52 of 52 in one sampled
+  session — the warning was pure noise until the rule was narrowed).
+- **Drop attachments and injected content by default.** Sampled dianjiang
+  session `707f711e`: 190 `attachment` records against 116 `assistant` and 69
+  `user` — most of a transcript is neither conversation nor tool output. This is
+  the one lever that turns a ~40k-token extraction into a few hundred, so it is
+  an output contract, not an optimization.
+- **Separate "mentioned" from "executed".** Model human input, injected
+  instructions, tool results and queue notifications as distinct kinds — not all
+  `role=user` records are human requests. A resumed or forked session inherits
+  the parent's records, so inherited evidence must be labelled as such. The CLI
+  returns evidence; the caller judges authorship.
+  - Codex's thread history does this classification already: the `userMessage`
+    items of a sampled thread were exactly its 4 human turns, with the AGENTS.md
+    preamble (a user-role record in the rollout) absent.
+  - The same rule governs `find`: injected blocks are byte-identical across
+    sessions, so counting them as evidence makes one query match nearly every
+    session in the store. `--include-injected` opts back in.
+- **Identity comes from the FIRST record, not the last.** A resumed codex
+  rollout holds two `session_meta` records: the first carries this session's own
+  `id` with `session_id` pointing at the PARENT, the second is the parent's
+  metadata copied in. Reading the last one attributes the parent's work to the
+  child — the exact misattribution the find-session skill warns about.
+
+### Relationship to the find-session skill
+
+The skill stays as a thin entry point: which command to call, how to weigh
+evidence, and checking live repo state when taking over. Locating, parsing,
+grouping and truncation control move into the CLI. Rewrite the skill only after
+the commands exist and are verified — a skill teaching commands that do not
+ship yet is worse than the current one.
+
 ## Prior art
 
 Crowded space; two camps, each missing half of this idea:
@@ -551,6 +666,12 @@ Crowded space; two camps, each missing half of this idea:
   review `instructions` make the delegate self-report the reviewed SHA and any
   mid-review drift. Promote to a RunRecord field if self-report proves
   unreliable in dogfood.
+- Does `session` belong in dianjiang at all? It shares only "knows what each
+  harness looks like" with dispatch, grows the command surface by ~40%, and
+  binds the CLI to undocumented on-disk formats that move (codex is mid-
+  migration; claude adds record types per release). Accepted for now because the
+  narrow scope promise above keeps the blast radius small — revisit if schema
+  drift becomes the dominant maintenance cost.
 - Run lifecycle commands, proposed from codex dogfood feedback, awaiting the
   human's go-ahead: `dianjiang logs <runId>` (snapshot of the existing
   `logs/<runId>.log` stream; `--follow` human-only — codex never detaches from

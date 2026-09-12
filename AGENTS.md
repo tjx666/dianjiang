@@ -33,6 +33,11 @@ bun run src/cli/index.ts <command>   # run the CLI without linking
     `skill.ts` — renders the on-demand usage doc printed by `dianjiang skill`
     (per-caller collection strategies live here, in code, not config);
     `sync-defaults.ts` — exact-match config upgrade to current defaults
+  - `sessions/` — read-only session reading (`dianjiang session`), one reader
+    per harness store. Separate from `adapters/`: reading history never needs
+    to start an agent. Each reader normalizes to the same entry shape but only
+    claims what its store backs; test isolation is per-harness home env vars
+    (`CLAUDE_CONFIG_DIR` / `CODEX_HOME` / `GROK_HOME`), not `DIANJIANG_HOME`
 - `src/cli/` — citty frontend; every machine-readable command prints exactly
   one JSON value on stdout (`skill` prints its doc as plain text — the one
   deliberate exception). Exit codes: 0 ok, 1 error, 2 recursion guard.

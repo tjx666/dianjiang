@@ -64,6 +64,25 @@ DIANJIANG_HOME=$T/home $DJ skill --caller codex      # plain-text doc; codex wai
 - `resume` of a failed/running run must fail fast (no silent fresh session).
 - Unknown agent / bad `--harness` / missing runId → JSON error, exit 1.
 
+## Session reading (`dianjiang session`)
+
+No live AI calls: these commands only read local harness stores. Two isolation
+rules, because `DIANJIANG_HOME` does not cover them:
+
+- Point the harness homes at fixtures — `CLAUDE_CONFIG_DIR`, `CODEX_HOME`,
+  `GROK_HOME` — when a check would otherwise write anywhere near a real store.
+  Readers never write, and codex's thread history is opened read-only, but a
+  test that seeds fixtures must not seed them into `~/.codex`.
+- Reading the REAL stores is fine and is the point of dogfooding: `session find
+  "<branch>" --all`, then `read`, `search`, `read --around <entry-id>`. Check
+  the response's `page.truncated` and `warnings` — a scan that stopped early or
+  a session with abandoned branches must say so.
+
+Worth probing: a session id that exists in no store (JSON error, exit 1);
+`read --run <runId>` for a run whose harness session was never recorded (must
+fail, not read a random session); a transcript whose last line is half-written
+(must warn, not throw).
+
 ## Gotchas learned live
 
 - grok's `-p` is `--single <PROMPT>`: the prompt is the flag's VALUE. claude's

@@ -140,7 +140,12 @@ const DEFAULT_COLLECTION = `Run it in the foreground (\`--timeout\` keeps it
  * at the top (before the intro — scoping rules read best before the roster),
  * wrapped in a `<caller-guidance>` element so caller-behavior guidance (e.g.
  * "use your own subagents for X") is not read as a dianjiang usage rule;
- * `append` renders after the rules.
+ * `append` renders last.
+ *
+ * `<session-reading>` sits outside `<rules>` on purpose: `dianjiang session` is
+ * a read-only local capability with no dispatch, no cost, and no caller
+ * stamping, so mixing it into the dispatch rules would blur what a delegate is
+ * and is not allowed to do.
  *
  * Each agent is resolved through `resolveAgent(config, name, caller)` so the
  * rendered `<use-when>`/`<dont-use-when>` reflect any caller-relative
@@ -224,6 +229,34 @@ ${agents}
   logs go to stderr, and the full stream tees to
   \`~/.dianjiang/logs/<runId>.log\`. Exit codes: 0 ok, 1 error/failed run, 2
   recursion-depth limit.
-- If \`DIANJIANG_DEPTH\` is set in your environment, you ARE a delegate — never call dianjiang.
-</rules>${appendSection}`
+- If \`DIANJIANG_DEPTH\` is set in your environment, you ARE a delegate — never
+  dispatch (\`run\`/\`resume\`). The read-only \`session\` commands below stay
+  available when your task needs them.
+</rules>
+
+<session-reading>
+\`dianjiang session\` reads harness session transcripts already on this machine
+(Claude Code / Codex / Grok, including sessions dianjiang never dispatched).
+Read-only, no AI call, no cost. Reach for it when the human points at earlier
+work — "take over that session", "what did I ask it before" — instead of
+grepping the stores yourself.
+- \`dianjiang session find "<query>"\` — sessions whose content matches, limited
+  to the current directory; \`--all\` searches every directory, \`--cwd <dir>\`
+  picks another one, \`--harness <claude|codex|grok>\` narrows the store. Each
+  match carries the session id, title, cwd, matched evidence, and a
+  \`resumeCommand\` for that harness.
+- \`dianjiang session read <sessionId>\` — \`--view overview\` (default: first
+  request, recent requests, last reply), \`requests\` (every human request), or
+  \`all\`; \`--around <entryId>\` expands the neighbourhood of one entry. Use
+  \`--run <runId>\` to read the session behind a dianjiang run instead of a
+  session id.
+- \`dianjiang session search <sessionId> "<query>"\` — matching entries with
+  their ids; feed one back into \`read --around <entryId>\` for context.
+- Responses are capped. Check \`page.truncated\`, pass \`page.nextCursor\` to
+  \`--cursor\` for the next slice, and read \`warnings\` — a scan that stopped
+  early or a session with abandoned branches reports it there.
+- Injected content (system reminders, skill/memory preamble, attachments) is
+  dropped by default because it is identical across sessions; \`--include-injected\`
+  keeps it, at the cost of matching nearly everything.
+</session-reading>${appendSection}`
 }
