@@ -218,10 +218,10 @@ export function defaultConfigJsonc(): string {
       "name": "review",
       // Base is codex; the callers section rebinds it to a different vendor for
       // the codex caller so review is never same-model as the code under review.
-      "useWhen": "you want an independent cross-vendor code review of a diff; in the task, explicitly state the depth you want — a deep comprehensive review (slow on large diffs) or a quick single-pass scan; runs gpt-5.6-sol at high",
+      "useWhen": "you want an independent cross-vendor code review of a diff; in the task, explicitly state the depth you want — a deep comprehensive review (slow on large diffs) or a quick single-pass scan; runs gpt-6-sol at high",
       "dontUseWhen": "a quick lint/style pass your own subagents already cover",
       "harness": "codex",
-      "model": "gpt-5.6-sol",
+      "model": "gpt-6-sol",
       "effort": "high"
       // Deliberately NO "instructions": three dogfood rounds of injected review
       // contracts (2026-07) each over-fit — the caller owns the briefing. Scope,
@@ -230,12 +230,12 @@ export function defaultConfigJsonc(): string {
     },
     {
       "name": "second-opinion",
-      // Consult-only; base is claude/fable, rebound to a different vendor for the
+      // Consult-only; base is claude/opus, rebound to a different vendor for the
       // claude caller so consulting never lands on the caller's own model.
-      "useWhen": "consult-only: a hard debugging hypothesis or an architecture/design decision where you're stuck or the call is expensive to reverse; runs fable — Anthropic's strongest reasoning model",
+      "useWhen": "consult-only: a hard debugging hypothesis or an architecture/design decision where you're stuck or the call is expensive to reverse; runs claude opus at high",
       "dontUseWhen": "the task requires editing code (this agent must not make changes)",
       "harness": "claude",
-      "model": "fable",
+      "model": "opus",
       "effort": "high"
     },
     {
@@ -244,7 +244,7 @@ export function defaultConfigJsonc(): string {
       "useWhen": "live X/Twitter lookups: find tweets, threads, account activity, or what people say about a topic right now — grok's native X search is real-time and extremely fast",
       "dontUseWhen": "general web research (use your own web/search tools) or anything needing code changes",
       "harness": "grok",
-      "model": "grok-4.6",
+      "model": "grok-4.7",
       "effort": "medium",
       // Dates: a "right now" agent must let the caller judge staleness. No-preamble:
       // grok narrates its plan into the result (see design SKILL open questions);
@@ -256,7 +256,7 @@ export function defaultConfigJsonc(): string {
       "useWhen": "UI/UX work needing visual taste: components, layouts, styling, interaction polish, or design review of front-end code",
       "dontUseWhen": "backend logic or refactors with no visual/UX judgment involved",
       "harness": "claude",
-      "model": "fable",
+      "model": "opus",
       "effort": "medium"
     },
     {
@@ -264,7 +264,7 @@ export function defaultConfigJsonc(): string {
       "useWhen": "generating or editing raster images such as photos, illustrations, textures, sprites, mockups, or transparent-background cutouts through Codex's built-in image generation",
       "dontUseWhen": "the visual should be implemented deterministically as SVG, HTML/CSS, canvas, or another code-native format",
       "harness": "codex",
-      "model": "gpt-5.6-luna",
+      "model": "gpt-6-luna",
       "effort": "max",
       "instructions": "Use the imagegen skill, following its built-in image_gen path by default. Complete the requested image generation or edit. For project-bound work, save the final output in the working directory. Return the final artifact path(s), final prompt, and whether built-in or fallback mode was used."
     }
@@ -281,12 +281,12 @@ export function defaultConfigJsonc(): string {
       "agents": {
         "second-opinion": {
           "harness": "codex",
-          "model": "gpt-6-astra",
+          "model": "gpt-6-sol",
           "effort": "high",
-          "useWhen": "consult-only: a hard debugging hypothesis or an architecture/design decision where you're stuck or the call is expensive to reverse; runs gpt-6-astra at high — OpenAI's strongest reasoning model"
+          "useWhen": "consult-only: a hard debugging hypothesis or an architecture/design decision where you're stuck or the call is expensive to reverse; runs gpt-6-sol at high"
         }
       },
-      // design-frontend is claude/fable itself — the claude caller gains nothing over its own subagents.
+      // design-frontend is claude/opus itself — the claude caller gains nothing over its own subagents.
       "exclude": ["design-frontend"],
       // Caller-behavior guidance rendered at the top of this caller's skill doc.
       "prepend": "If your session model is fable, act as an orchestrator to preserve fable tokens: delegate execution work (implementation, mechanical edits, running tests/builds) to your built-in subagents with \`model: opus\`, keeping only planning, task decomposition, tricky debugging, and verification of subagent output for yourself. Delegate coherent, independently verifiable chunks (a new file, a test suite, a bulk edit); keep small in-context edits yourself — the cost of writing the brief must not exceed the task. For cross-vendor perspectives or capabilities your subagents lack, use the dianjiang roster below."

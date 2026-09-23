@@ -32,10 +32,10 @@ failures because Node refuses to execute TypeScript inside `node_modules`.
 Prompt is always a single sentence like `"Reply with exactly: OK"`. Cheapest
 paths per harness:
 
-- grok: `run --harness grok -m grok-4.6 --effort low "..."` (composer-fast was
+- grok: `run --harness grok -m grok-4.7 --effort low "..."` (composer-fast was
   delisted 2026-07-28; check `grok models` if this fails)
 - claude: `run --harness claude --model sonnet --effort low "..."`
-- codex: `run --harness codex --model gpt-5.6-luna --effort low "..."`
+- codex: `run --harness codex --model gpt-6-luna --effort low "..."`
   (`gpt-5.4-mini` was rejected under ChatGPT authentication on 2026-09-11)
 
 ## Standard flow (copy-paste base)
@@ -45,12 +45,12 @@ T=$(mktemp -d) && mkdir -p $T/home $T/work
 DJ="bun run src/cli/index.ts"
 DIANJIANG_HOME=$T/home $DJ config init
 DIANJIANG_HOME=$T/home $DJ config harnesses          # 3x installed:true expected
-DIANJIANG_HOME=$T/home $DJ run --harness grok -m grok-4.6 --effort low "Reply with exactly: OK" --cwd $T/work
+DIANJIANG_HOME=$T/home $DJ run --harness grok -m grok-4.7 --effort low "Reply with exactly: OK" --cwd $T/work
 DIANJIANG_HOME=$T/home $DJ resume <runId> "What word did I ask for? Just that word."
-DIANJIANG_HOME=$T/home $DJ run --harness grok -m grok-4.6 --effort low "Reply with exactly: D-OK" --cwd $T/work --detach
+DIANJIANG_HOME=$T/home $DJ run --harness grok -m grok-4.7 --effort low "Reply with exactly: D-OK" --cwd $T/work --detach
 DIANJIANG_HOME=$T/home $DJ status <runId>            # poll until != running
 DIANJIANG_HOME=$T/home $DJ result <runId>
-DIANJIANG_DEPTH=2 DIANJIANG_HOME=$T/home $DJ run --harness grok -m grok-4.6 --effort low "hi"   # expect exit 2
+DIANJIANG_DEPTH=2 DIANJIANG_HOME=$T/home $DJ run --harness grok -m grok-4.7 --effort low "hi"   # expect exit 2
 DIANJIANG_HOME=$T/home $DJ skill --caller codex      # plain-text doc; codex waiter strategy + stamped --caller codex
 ```
 

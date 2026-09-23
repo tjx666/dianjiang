@@ -11,12 +11,12 @@ from your built-in subagents: default to your own tools and subagents, and
 reach for dianjiang only when an agent below clearly fits.
 
 <agent name="review">
-  <use-when>you want an independent cross-vendor code review of a diff; in the task, explicitly state the depth you want — a deep comprehensive review (slow on large diffs) or a quick single-pass scan; runs gpt-5.6-sol at high</use-when>
+  <use-when>you want an independent cross-vendor code review of a diff; in the task, explicitly state the depth you want — a deep comprehensive review (slow on large diffs) or a quick single-pass scan; runs gpt-6-sol at high</use-when>
   <dont-use-when>a quick lint/style pass your own subagents already cover</dont-use-when>
 </agent>
 
 <agent name="second-opinion">
-  <use-when>consult-only: a hard debugging hypothesis or an architecture/design decision where you're stuck or the call is expensive to reverse; runs fable — Anthropic's strongest reasoning model</use-when>
+  <use-when>consult-only: a hard debugging hypothesis or an architecture/design decision where you're stuck or the call is expensive to reverse; runs claude opus at high</use-when>
   <dont-use-when>the task requires editing code (this agent must not make changes)</dont-use-when>
 </agent>
 
@@ -166,12 +166,12 @@ from your built-in subagents: default to your own tools and subagents, and
 reach for dianjiang only when an agent below clearly fits.
 
 <agent name="review">
-  <use-when>you want an independent cross-vendor code review of a diff; in the task, explicitly state the depth you want — a deep comprehensive review (slow on large diffs) or a quick single-pass scan; runs gpt-5.6-sol at high</use-when>
+  <use-when>you want an independent cross-vendor code review of a diff; in the task, explicitly state the depth you want — a deep comprehensive review (slow on large diffs) or a quick single-pass scan; runs gpt-6-sol at high</use-when>
   <dont-use-when>a quick lint/style pass your own subagents already cover</dont-use-when>
 </agent>
 
 <agent name="second-opinion">
-  <use-when>consult-only: a hard debugging hypothesis or an architecture/design decision where you're stuck or the call is expensive to reverse; runs gpt-6-astra at high — OpenAI's strongest reasoning model</use-when>
+  <use-when>consult-only: a hard debugging hypothesis or an architecture/design decision where you're stuck or the call is expensive to reverse; runs gpt-6-sol at high</use-when>
   <dont-use-when>the task requires editing code (this agent must not make changes)</dont-use-when>
 </agent>
 
@@ -318,7 +318,7 @@ reach for dianjiang only when an agent below clearly fits.
 </agent>
 
 <agent name="second-opinion">
-  <use-when>consult-only: a hard debugging hypothesis or an architecture/design decision where you're stuck or the call is expensive to reverse; runs fable — Anthropic's strongest reasoning model</use-when>
+  <use-when>consult-only: a hard debugging hypothesis or an architecture/design decision where you're stuck or the call is expensive to reverse; runs claude opus at high</use-when>
   <dont-use-when>the task requires editing code (this agent must not make changes)</dont-use-when>
 </agent>
 
@@ -354,7 +354,7 @@ reach for dianjiang only when an agent below clearly fits.
   \`status: "running"\` — just re-run it. That re-run-on-"running" loop belongs INSIDE a waiter subagent —
   never in your own turn. The moment you hold a runId, spawn a waiter —
   \`spawn_agent\` with \`fork_turns: "none"\`. Explicitly choose an available
-  low-cost model and low reasoning effort; prefer \`model: "gpt-5.6-luna"\` and
+  low-cost model and low reasoning effort; prefer \`model: "gpt-6-luna"\` and
   \`reasoning_effort: "low"\` when available. Include this entire collection protocol
   in its message, plus the runId and the command's required cwd/environment
   (including a custom DIANJIANG_HOME or PATH), plus any existing session/cell ID:
@@ -533,12 +533,12 @@ from your built-in subagents: default to your own tools and subagents, and
 reach for dianjiang only when an agent below clearly fits.
 
 <agent name="review">
-  <use-when>you want an independent cross-vendor code review of a diff; in the task, explicitly state the depth you want — a deep comprehensive review (slow on large diffs) or a quick single-pass scan; runs gpt-5.6-sol at high</use-when>
+  <use-when>you want an independent cross-vendor code review of a diff; in the task, explicitly state the depth you want — a deep comprehensive review (slow on large diffs) or a quick single-pass scan; runs gpt-6-sol at high</use-when>
   <dont-use-when>a quick lint/style pass your own subagents already cover</dont-use-when>
 </agent>
 
 <agent name="second-opinion">
-  <use-when>consult-only: a hard debugging hypothesis or an architecture/design decision where you're stuck or the call is expensive to reverse; runs fable — Anthropic's strongest reasoning model</use-when>
+  <use-when>consult-only: a hard debugging hypothesis or an architecture/design decision where you're stuck or the call is expensive to reverse; runs claude opus at high</use-when>
   <dont-use-when>the task requires editing code (this agent must not make changes)</dont-use-when>
 </agent>
 

@@ -41,7 +41,7 @@ const COLLECTION_STRATEGY: Record<HarnessName, string> = {
   codex: `That re-run-on-"running" loop belongs INSIDE a waiter subagent —
   never in your own turn. The moment you hold a runId, spawn a waiter —
   \`spawn_agent\` with \`fork_turns: "none"\`. Explicitly choose an available
-  low-cost model and low reasoning effort; prefer \`model: "gpt-5.6-luna"\` and
+  low-cost model and low reasoning effort; prefer \`model: "gpt-6-luna"\` and
   \`reasoning_effort: "low"\` when available. Include this entire collection protocol
   in its message, plus the runId and the command's required cwd/environment
   (including a custom DIANJIANG_HOME or PATH), plus any existing session/cell ID:

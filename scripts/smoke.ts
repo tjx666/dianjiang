@@ -24,8 +24,8 @@ async function liveCheck(): Promise<void> {
 
   const cases: { harness: HarnessName; model: string; effort?: string }[] = [
     { harness: 'claude', model: 'sonnet', effort: 'low' },
-    { harness: 'codex', model: 'gpt-5.4-mini' },
-    { harness: 'grok', model: 'grok-composer-2.5-fast' },
+    { harness: 'codex', model: 'gpt-6-luna', effort: 'low' },
+    { harness: 'grok', model: 'grok-4.7', effort: 'low' },
   ]
 
   for (const c of cases) {

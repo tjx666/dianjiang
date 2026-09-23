@@ -92,9 +92,9 @@ Opinion/perspective agents are **rules over the caller**, compiled into base
 bindings + sparse `callers` overrides/excludes:
 
 - `review` / `second-opinion` — **always a different vendor than the caller**
-  (avoid same-model blind spots); second-opinion runs the other vendor's
-  flagship at high — fable and gpt-6-astra both deliver at high; higher
-  efforts cost more without a visible consulting gain. review runs gpt-5.6-sol
+  (avoid same-model blind spots); second-opinion runs the other vendor at
+  high — opus and gpt-6-sol both deliver at high; higher efforts cost more
+  without a visible consulting gain. review runs gpt-6-sol
   at high (dropped from xhigh 2026-09-05: review is high-frequency and xhigh
   was not paying for itself) and opus at xhigh for the codex caller.
 
@@ -152,15 +152,14 @@ offload alone didn't justify a roster slot (admission principle).
 
 Cost/strength rationale:
 
-- **fable is reserved for low-frequency, judgment-heavy roles** — second
-  brain (`second-opinion`) and visual taste (`design-frontend`). It is too
-  expensive for `review`, which is high-frequency; review gets the neighbor
-  vendor's review model instead — gpt-5.6-sol at high, or opus at xhigh for
-  the codex caller (opus replaced sonnet on 2026-09-05: sonnet reviews were
-  too shallow to be worth a cross-vendor hop).
+- **opus serves judgment-heavy roles** — second brain (`second-opinion`) and
+  visual taste (`design-frontend`). Opus 5.5 costs less than Fable 5.1 and
+  matches it on most work per Anthropic's release; review gets gpt-6-sol at
+  high, or opus at xhigh for the codex caller. See
+  https://www.anthropic.com/news/claude-opus-5-5.
 - Per-caller character: claude and codex implement with their own flagship;
   grok is fast and has native X search but weak reasoning, so it borrows
-  fable to plan/consult and codex gpt-5.6-sol to review.
+  opus to plan/consult and codex gpt-6-sol to review.
 - `rewrite-prompt` (opus 4.6 [1m], later gpt-6-astra) was dropped on
   2026-09-05: it saw almost no use, and the caller's own model rewrites
   prompts fine. Roster is now 5 agents.
@@ -170,8 +169,8 @@ Cost/strength rationale:
 
 | Agent | Base binding | claude caller | codex caller | grok caller |
 |---|---|---|---|---|
-| `review` | codex / gpt-5.6-sol / high | (base) | claude / opus / xhigh | (base) |
-| `second-opinion` | claude / fable / high | codex / gpt-6-astra / high | (base) | (base) |
+| `review` | codex / gpt-6-sol / high | (base) | claude / opus / xhigh | (base) |
+| `second-opinion` | claude / opus / high | codex / gpt-6-sol / high | (base) | (base) |
 
 Base = the compiled view for the most common callers. Values recalibrate by
 feel — that is exactly what config-time compilation is for.
@@ -182,13 +181,14 @@ Capability agents expose something only one harness can do; they need no
 `callers` binding overrides — they're picked for what they can do, not whose
 opinion they carry (self-vendor dispatch is fine). A capability agent is
 excluded when the caller already exposes that capability natively:
-`design-frontend` for claude and `generate-image` for codex. All verified live:
+`design-frontend` for claude and `generate-image` for codex. Grok 4.7's X
+search path still needs a live check after quota is available:
 
 | Agent | Harness / model / effort | Capability |
 |---|---|---|
-| `search-twitter` | grok / grok-4.6 / medium | grok's native live X/Twitter search tools (verified headless: returns real tweet URLs) |
-| `design-frontend` | claude / fable / medium | strongest visual/UX taste for front-end work |
-| `generate-image` | codex / gpt-5.6-luna / max | codex's built-in `imagegen` skill + `image_gen` tool for raster generation and editing |
+| `search-twitter` | grok / grok-4.7 / medium | grok's native live X/Twitter search tools |
+| `design-frontend` | claude / opus / medium | visual/UX taste for front-end work |
+| `generate-image` | codex / gpt-6-luna / max | codex's built-in `imagegen` skill + `image_gen` tool for raster generation and editing |
 
 The earlier direct-model route remains rejected: codex rejects `gpt-image-2`
 as the session model under ChatGPT-subscription auth (HTTP 400). The shipped
@@ -199,14 +199,15 @@ Locally verified model/effort space:
 
 - claude: aliases `fable` / `opus` / `sonnet` (haiku unconfirmed on this
   machine); effort `low | medium | high | xhigh | max`. Each alias tracks the
-  latest release of its tier — verified 2026-09-05 via `modelUsage`: `fable`
-  → `claude-fable-5-1`, `opus` → `claude-opus-5` — so a same-tier model
+  latest release of its tier — verified via `modelUsage`: `fable`
+  → `claude-fable-5-1` (2026-09-05), `opus` → `claude-opus-5-5`
+  (2026-09-23) — so a same-tier model
   release needs no roster bump.
-- codex: `gpt-6-astra`, `gpt-5.6-sol/-terra/-luna`, `gpt-5.5`, `gpt-5.4(-mini)`,
+- codex: `gpt-6-astra/-sol/-luna`, `gpt-5.6-sol/-terra/-luna`, `gpt-5.5`, `gpt-5.4(-mini)`,
   `gpt-5.3-codex-spark`; effort superset `low…ultra`, but `max`/`ultra` only on
   the 5.6+ series and `ultra` only on astra/sol/terra (adapters must validate
-  per model; verified 2026-09-05 from `~/.codex/models_cache.json`)
-- grok: `grok-4.6` (vendor default since 2026-09) and `grok-4.5` (effort
+  per model; GPT-6 Sol/Luna verified 2026-09-23 from `~/.codex/models_cache.json`)
+- grok: `grok-4.7` (vendor default 2026-09-23), `grok-4.6`, and `grok-4.5` (effort
   `low | medium | high`). `grok-composer-2.5-fast` was delisted by the vendor
   (2026-07-28: "unknown model id")
 
@@ -282,8 +283,8 @@ stdout carries exactly one JSON object; harness process logs go to stderr.
   "runId": "d7f3…",          // dianjiang's unified id (= pre-injected session uuid for claude/grok)
   "agent": "review",
   "harness": "codex",
-  "model": "gpt-5.6-sol",
-  "effort": "xhigh",
+  "model": "gpt-6-sol",
+  "effort": "high",
   "status": "completed",      // completed | failed | detached | running (status/result on an unfinished run)
   "exitCode": 0,
   "durationMs": 183000,
@@ -321,14 +322,13 @@ Single `~/.dianjiang/config.jsonc`; runs metadata in `~/.dianjiang/runs.sqlite`.
       "useWhen": "you want an independent cross-vendor code review of a diff",
       "dontUseWhen": "a quick lint/style pass your own subagents already cover",
       "harness": "codex",
-      "model": "gpt-5.6-sol",
-      "effort": "xhigh",
-      "instructions": "…optional, keep short…"
+      "model": "gpt-6-sol",
+      "effort": "high"
     }
   ],
   "callers": {
     "claude": {
-      "agents": { "second-opinion": { "harness": "codex", "model": "gpt-6-astra", "effort": "high" } },
+      "agents": { "second-opinion": { "harness": "codex", "model": "gpt-6-sol", "effort": "high" } },
       "exclude": ["design-frontend"],
       "prepend": "…caller-behavior guidance rendered at the top of claude's block…"
     }
@@ -347,7 +347,7 @@ Single `~/.dianjiang/config.jsonc`; runs metadata in `~/.dianjiang/runs.sqlite`.
 
 Some agents are defined *relative to* the caller, not absolutely: `review`'s
 definition is literally "a different vendor than the implementer and caller",
-and `second-opinion` from a codex/gpt-5.6-sol session back to gpt-5.6-sol is
+and `second-opinion` from a codex/gpt-6-sol session back to gpt-6-sol is
 self-consultation. The name and useWhen are stable semantics; only the binding
 should vary per caller.
 
@@ -386,7 +386,7 @@ should vary per caller.
   omitted from its rendered skill doc and from `config agents --caller <h>`,
   rejected at dispatch with a clear error. A name in both `exclude` and that
   caller's `agents` overrides is a validation error. User: claude excludes
-  `design-frontend` (it IS claude/fable — the claude caller gains nothing
+  `design-frontend` (it IS claude/opus — the claude caller gains nothing
   over its own subagents); codex excludes `generate-image` because it exposes
   the same `imagegen` capability directly.
 - `callers.<h>.prepend: string` — free-form markdown rendered at the TOP of

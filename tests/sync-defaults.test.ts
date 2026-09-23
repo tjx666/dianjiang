@@ -20,6 +20,8 @@ const V050_REVIEW_USEWHEN =
 const V0130_REVIEW_USEWHEN =
   'you want an independent cross-vendor code review of a diff; in the task, explicitly state the depth you want — a deep comprehensive review (slow on large diffs) or a quick single-pass scan; runs gpt-5.6-sol at xhigh — stronger reasoning than opus, slightly below fable'
 const CURRENT_REVIEW_USEWHEN =
+  'you want an independent cross-vendor code review of a diff; in the task, explicitly state the depth you want — a deep comprehensive review (slow on large diffs) or a quick single-pass scan; runs gpt-6-sol at high'
+const PREVIOUS_REVIEW_USEWHEN =
   'you want an independent cross-vendor code review of a diff; in the task, explicitly state the depth you want — a deep comprehensive review (slow on large diffs) or a quick single-pass scan; runs gpt-5.6-sol at high'
 const V050_CODEX_REVIEW_USEWHEN = 'you want an independent cross-vendor code review of a diff; runs claude opus at xhigh'
 const V0121_CODEX_REVIEW_USEWHEN =
@@ -74,6 +76,43 @@ function expectSameConfig(a: string, b: string): void {
 }
 
 describe('planSyncDefaults / applySyncDefaults', () => {
+  test('the previous shipped roster upgrades every model binding', () => {
+    const fixture = shape([
+      { path: ['agents', idx('review'), 'useWhen'], value: PREVIOUS_REVIEW_USEWHEN },
+      { path: ['agents', idx('review'), 'model'], value: 'gpt-5.6-sol' },
+      {
+        path: ['agents', idx('second-opinion'), 'useWhen'],
+        value:
+          "consult-only: a hard debugging hypothesis or an architecture/design decision where you're stuck or the call is expensive to reverse; runs fable — Anthropic's strongest reasoning model",
+      },
+      { path: ['agents', idx('second-opinion'), 'model'], value: 'fable' },
+      { path: ['agents', idx('search-twitter'), 'model'], value: 'grok-4.6' },
+      { path: ['agents', idx('design-frontend'), 'model'], value: 'fable' },
+      { path: ['agents', idx('generate-image'), 'model'], value: 'gpt-5.6-luna' },
+      { path: ['callers', 'claude', 'agents', 'second-opinion', 'model'], value: 'gpt-6-astra' },
+      {
+        path: ['callers', 'claude', 'agents', 'second-opinion', 'useWhen'],
+        value:
+          "consult-only: a hard debugging hypothesis or an architecture/design decision where you're stuck or the call is expensive to reverse; runs gpt-6-astra at high — OpenAI's strongest reasoning model",
+      },
+    ])
+
+    const plan = planSyncDefaults(fixture)
+    expect(actions(plan)).toEqual(new Set([
+      'set agents.review.useWhen',
+      'set agents.review.model',
+      'set agents.second-opinion.useWhen',
+      'set agents.second-opinion.model',
+      'set agents.search-twitter.model',
+      'set agents.design-frontend.model',
+      'set agents.generate-image.model',
+      'set callers.claude.agents.second-opinion.model',
+      'set callers.claude.agents.second-opinion.useWhen',
+    ]))
+    expect(plan.filter((c) => c.action === 'keep-custom')).toHaveLength(0)
+    expectSameConfig(applySyncDefaults(fixture, plan), defaultConfigJsonc())
+  })
+
   test('the v0.12.2 codex review binding upgrades from sonnet back to opus', () => {
     const fixture = shape([
       { path: ['callers', 'codex', 'agents', 'review', 'model'], value: 'sonnet' },

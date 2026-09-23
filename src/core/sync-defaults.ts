@@ -54,6 +54,7 @@ const OVERRIDE_FIELDS = ['useWhen', 'dontUseWhen', 'harness', 'model', 'effort']
  */
 const LEGACY_DEFAULTS: Record<string, string[]> = {
   'agents.review.useWhen': [
+    'you want an independent cross-vendor code review of a diff; in the task, explicitly state the depth you want — a deep comprehensive review (slow on large diffs) or a quick single-pass scan; runs gpt-5.6-sol at high',
     'you want an independent cross-vendor code review of a diff; in the task, explicitly state the depth you want — a deep comprehensive review (slow on large diffs) or a quick single-pass scan; runs gpt-5.6-sol at xhigh — stronger reasoning than opus, slightly below fable',
     'you want an independent cross-vendor code review of a diff; runs gpt-5.6-sol at xhigh — stronger reasoning than opus, slightly below fable',
     'you want an independent cross-vendor code review of a diff',
@@ -61,6 +62,7 @@ const LEGACY_DEFAULTS: Record<string, string[]> = {
     "you want an independent cross-vendor code review of a diff; focused and findings-only by default — say 'deep review' in the task for a comprehensive audit; runs gpt-5.6-sol at xhigh — stronger reasoning than opus, slightly below fable",
   ],
   'agents.review.dontUseWhen': ['a quick lint/style pass your own subagents already cover'],
+  'agents.review.model': ['gpt-5.6-sol'],
   'agents.review.effort': ['xhigh'],
   'agents.review.instructions': [
     "Default to a FOCUSED review: cover exactly the risks, files, and acceptance criteria the task names. Verifying a specific falsifiable hypothesis in depth is fine; a fixed all-dimension fan-out is not. Run a comprehensive deep review only when the task explicitly asks for one. Output contract: actionable findings only, ordered by severity — each with file:line, impact, how to trigger it, and a suggested fix; if nothing qualifies, output 'clean' plus one line on what you checked. Do not restate background or emit process narration, statistics, workflow/skill feedback, or non-blocking nits unless the task asks for them. Record `git rev-parse HEAD` (and whether the tree is dirty) before reading code and name that state in your verdict; if the tree changes mid-review, report 'snapshot changed' and state which state each finding applies to — never claim you covered a moving target. When resumed to verify fixes, check only the named findings and the fix delta — report each as fixed or still open, plus any regression the fix itself introduced; do not re-run the full review.",
@@ -71,6 +73,7 @@ const LEGACY_DEFAULTS: Record<string, string[]> = {
     'consult-only: hard debugging hypotheses or architecture/design review needing maximum firepower',
   ],
   'agents.second-opinion.dontUseWhen': ['the task requires editing code (this agent must not make changes)'],
+  'agents.second-opinion.model': ['fable'],
   'agents.search-twitter.useWhen': [
     "live X/Twitter lookups: find tweets, threads, account activity, or what people say about a topic right now — grok's native X search is real-time and extremely fast",
     'live X/Twitter lookups: find tweets, threads, account activity, or what people say about a topic right now',
@@ -95,10 +98,12 @@ const LEGACY_DEFAULTS: Record<string, string[]> = {
   'agents.rewrite-prompt.dontUseWhen': ['ordinary coding tasks'],
   'agents.rewrite-prompt.harness': ['claude'],
   'agents.rewrite-prompt.model': ['claude-opus-4-6[1m]'],
-  'agents.search-twitter.model': ['grok-4.5'],
+  'agents.search-twitter.model': ['grok-4.6', 'grok-4.5'],
   'agents.search-twitter.effort': ['high'],
   'agents.design-frontend.effort': ['high'],
+  'agents.design-frontend.model': ['fable'],
   'agents.generate-image.effort': ['low'],
+  'agents.generate-image.model': ['gpt-5.6-luna'],
   'agents.generate-image.useWhen': [
     "generating or editing raster images such as photos, illustrations, textures, sprites, mockups, or transparent-background cutouts through Codex's built-in image generation, especially when the caller is Claude Code",
   ],
@@ -109,9 +114,10 @@ const LEGACY_DEFAULTS: Record<string, string[]> = {
     'If your session model is fable, act as an orchestrator to preserve fable tokens: delegate execution work (implementation, mechanical edits, broad searches, running tests/builds) to your built-in subagents with model: opus, keeping only planning, task decomposition, tricky debugging, and verification of subagent output for yourself.',
   ],
   'callers.claude.agents.second-opinion.useWhen': [
+    "consult-only: a hard debugging hypothesis or an architecture/design decision where you're stuck or the call is expensive to reverse; runs gpt-6-astra at high — OpenAI's strongest reasoning model",
     "consult-only: a hard debugging hypothesis or an architecture/design decision where you're stuck or the call is expensive to reverse; runs gpt-5.6-sol at xhigh — stronger reasoning than opus, slightly below fable",
   ],
-  'callers.claude.agents.second-opinion.model': ['gpt-5.6-sol'],
+  'callers.claude.agents.second-opinion.model': ['gpt-6-astra', 'gpt-5.6-sol'],
   'callers.claude.agents.second-opinion.effort': ['xhigh'],
   'callers.codex.append': [
     'Your shell sessions do NOT wake you when a background command finishes, and polling is easy to forget. To collect a dianjiang run without blocking, use your subagent notification channel: `spawn_agent` with `fork_turns: "none"` and the message "Run `dianjiang result <runId> --wait --timeout 300`. If it prints status \'running\', run it again. When the status is terminal, return the full JSON verbatim." — its completion notification wakes you with the result while you keep working. If you have nothing else to do, just run `dianjiang result <runId> --wait --timeout 300` in the foreground. Either way, never end your turn with a dispatched run uncollected.',

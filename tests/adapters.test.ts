@@ -461,8 +461,8 @@ describe('knownModels invariants', () => {
         }
       })
 
-      test('exactly one default model', () => {
-        expect(adapter.knownModels.filter((m) => m.isDefault === true)).toHaveLength(1)
+      test('default metadata reflects what the harness exposes', () => {
+        expect(adapter.knownModels.filter((m) => m.isDefault === true)).toHaveLength(adapter.name === 'claude' ? 0 : 1)
       })
 
       test('modelsVerifiedAt is a date stamp', () => {
@@ -478,13 +478,13 @@ describe('describeHarness / mergeLiveModels', () => {
     expect(d.name).toBe('claude')
     expect(d.efforts).toEqual(adapters.claude.efforts)
     expect(d.models.source).toBe('curated')
-    expect(d.models.verifiedAt).toBe('2026-09-05')
+    expect(d.models.verifiedAt).toBe('2026-09-23')
     expect(d.models.list.map((m) => m.name)).toEqual(['fable', 'opus', 'sonnet'])
   })
 
   test('mergeLiveModels keeps curated efforts for a matched name', () => {
-    const merged = mergeLiveModels(['grok-4.6'], adapters.grok)
-    expect(merged).toEqual([{ name: 'grok-4.6', efforts: adapters.grok.efforts, isDefault: true }])
+    const merged = mergeLiveModels(['grok-4.7'], adapters.grok)
+    expect(merged).toEqual([{ name: 'grok-4.7', efforts: adapters.grok.efforts, isDefault: true }])
   })
 
   test('mergeLiveModels flags an unmatched live name as efforts-unverified', () => {

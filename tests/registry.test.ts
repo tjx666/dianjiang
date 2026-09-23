@@ -18,12 +18,12 @@ describe('defaultConfigJsonc', () => {
     expect(config.callers?.claude?.agents?.implement).toBeUndefined()
     expect(config.callers?.claude?.agents?.['second-opinion']).toEqual({
       harness: 'codex',
-      model: 'gpt-6-astra',
+      model: 'gpt-6-sol',
       effort: 'high',
-      useWhen: expect.stringContaining('runs gpt-6-astra at high'),
+      useWhen: expect.stringContaining('runs gpt-6-sol at high'),
     })
     expect(config.callers?.claude?.prepend).toContain('built-in subagents')
-    // design-frontend is claude/fable itself — hidden from the claude caller.
+    // design-frontend is claude/opus itself — hidden from the claude caller.
     expect(config.callers?.claude?.exclude).toEqual(['design-frontend'])
     expect(config.callers?.codex?.agents?.review).toEqual({
       harness: 'claude',
@@ -37,13 +37,17 @@ describe('defaultConfigJsonc', () => {
       useWhen: expect.stringContaining('generating or editing raster images'),
       dontUseWhen: expect.stringContaining('SVG, HTML/CSS, canvas'),
       harness: 'codex',
-      model: 'gpt-5.6-luna',
+      model: 'gpt-6-luna',
       effort: 'max',
       instructions: expect.stringContaining('imagegen skill'),
     })
     // explore was dropped from the roster (callers ship built-in explore
     // subagents), taking the grok caller entry with it.
     expect(config.callers?.grok).toBeUndefined()
+    expect(config.agents.find((agent) => agent.name === 'review')?.model).toBe('gpt-6-sol')
+    expect(config.agents.find((agent) => agent.name === 'second-opinion')?.model).toBe('opus')
+    expect(config.agents.find((agent) => agent.name === 'search-twitter')?.model).toBe('grok-4.7')
+    expect(config.agents.find((agent) => agent.name === 'design-frontend')?.model).toBe('opus')
   })
 
   test('review ships no instructions — the caller authors the briefing in the task', () => {

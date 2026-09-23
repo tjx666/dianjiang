@@ -181,7 +181,7 @@ describe('renderSkillDoc collection-strategy conflict freedom', () => {
     const doc = renderSkillDoc(defaultConfig, 'codex')
     expect(doc).toContain('spawn_agent')
     expect(doc).toContain('`fork_turns: "none"`')
-    expect(doc).toContain('`model: "gpt-5.6-luna"`')
+    expect(doc).toContain('`model: "gpt-6-luna"`')
     expect(doc).toContain('`reasoning_effort: "low"`')
     expect(doc).toMatch(/Do not wait in the\s+foreground first/)
     expect(doc).not.toContain('run_in_background')

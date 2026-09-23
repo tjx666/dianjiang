@@ -17,23 +17,24 @@ import { asRecord, num, withInstructions } from './shared.ts'
 
 export const CODEX_EFFORTS = ['low', 'medium', 'high', 'xhigh', 'max', 'ultra'] as const
 
-/** Effort set for the 5.6 series minus `ultra` (luna). */
-const CODEX_56_NO_ULTRA = ['low', 'medium', 'high', 'xhigh', 'max'] as const
+/** Effort set for Luna models without `ultra`. */
+const CODEX_LUNA_EFFORTS = ['low', 'medium', 'high', 'xhigh', 'max'] as const
 /** Effort set for pre-5.6 models (no `max`/`ultra`). */
 const CODEX_PRE_56 = ['low', 'medium', 'high', 'xhigh'] as const
 
 /**
- * Locally-verified codex models (2026-09-05, from `~/.codex/models_cache.json`
- * on codex-cli 0.153.4). gpt-6-astra (2026-09 release) shares the full sol/terra
- * effort set incl. `ultra`; `max` exists only on the 5.6+ series. The CLI has no
- * model-list command exposed under ChatGPT-subscription auth, so there is no
+ * Locally-verified codex models (2026-09-23, from `~/.codex/models_cache.json`
+ * on codex-cli 0.156.1). GPT-6 Sol supports `ultra`; Luna supports up to `max`.
+ * The CLI has no model-list command exposed under ChatGPT-subscription auth, so there is no
  * `listModels`.
  */
 export const CODEX_MODELS: readonly KnownModel[] = [
+  { name: 'gpt-6-sol', efforts: CODEX_EFFORTS, isDefault: true },
+  { name: 'gpt-6-luna', efforts: CODEX_LUNA_EFFORTS },
   { name: 'gpt-6-astra', efforts: CODEX_EFFORTS },
-  { name: 'gpt-5.6-sol', efforts: CODEX_EFFORTS, isDefault: true },
+  { name: 'gpt-5.6-sol', efforts: CODEX_EFFORTS },
   { name: 'gpt-5.6-terra', efforts: CODEX_EFFORTS },
-  { name: 'gpt-5.6-luna', efforts: CODEX_56_NO_ULTRA },
+  { name: 'gpt-5.6-luna', efforts: CODEX_LUNA_EFFORTS },
   { name: 'gpt-5.5', efforts: CODEX_PRE_56 },
   { name: 'gpt-5.4', efforts: CODEX_PRE_56 },
   { name: 'gpt-5.4-mini', efforts: CODEX_PRE_56 },
@@ -116,7 +117,7 @@ export const codexAdapter: HarnessAdapter = {
   name: 'codex',
   efforts: CODEX_EFFORTS,
   knownModels: CODEX_MODELS,
-  modelsVerifiedAt: '2026-09-05',
+  modelsVerifiedAt: '2026-09-23',
   versionArgs: ['--version'],
 
   buildCommand(spec: DispatchSpec) {
