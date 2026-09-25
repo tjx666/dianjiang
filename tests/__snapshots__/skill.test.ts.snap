@@ -35,6 +35,11 @@ reach for dianjiang only when an agent below clearly fits.
   <dont-use-when>the visual should be implemented deterministically as SVG, HTML/CSS, canvas, or another code-native format</dont-use-when>
 </agent>
 
+<agent name="operate-desktop">
+  <use-when>a task requires operating the user's signed-in Chrome or another desktop app through Codex computer use; tell the user to leave the target app untouched while the delegate works and review its final screenshot before reporting</use-when>
+  <dont-use-when>the task can be completed through a CLI, API, or your own available browser/computer-use tools</dont-use-when>
+</agent>
+
 <rules>
 - \`dianjiang run <agent> "<task>" --detach\` prints one JSON object immediately — save \`.runId\`.
   Always dispatch detached: never try to predict how long a task will take, and
@@ -183,6 +188,11 @@ reach for dianjiang only when an agent below clearly fits.
 <agent name="generate-image">
   <use-when>generating or editing raster images such as photos, illustrations, textures, sprites, mockups, or transparent-background cutouts through Codex's built-in image generation</use-when>
   <dont-use-when>the visual should be implemented deterministically as SVG, HTML/CSS, canvas, or another code-native format</dont-use-when>
+</agent>
+
+<agent name="operate-desktop">
+  <use-when>a task requires operating the user's signed-in Chrome or another desktop app through Codex computer use; tell the user to leave the target app untouched while the delegate works and review its final screenshot before reporting</use-when>
+  <dont-use-when>the task can be completed through a CLI, API, or your own available browser/computer-use tools</dont-use-when>
 </agent>
 
 <rules>
@@ -555,6 +565,11 @@ reach for dianjiang only when an agent below clearly fits.
 <agent name="generate-image">
   <use-when>generating or editing raster images such as photos, illustrations, textures, sprites, mockups, or transparent-background cutouts through Codex's built-in image generation</use-when>
   <dont-use-when>the visual should be implemented deterministically as SVG, HTML/CSS, canvas, or another code-native format</dont-use-when>
+</agent>
+
+<agent name="operate-desktop">
+  <use-when>a task requires operating the user's signed-in Chrome or another desktop app through Codex computer use; tell the user to leave the target app untouched while the delegate works and review its final screenshot before reporting</use-when>
+  <dont-use-when>the task can be completed through a CLI, API, or your own available browser/computer-use tools</dont-use-when>
 </agent>
 
 <rules>

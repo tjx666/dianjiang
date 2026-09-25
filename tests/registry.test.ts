@@ -12,6 +12,7 @@ describe('defaultConfigJsonc', () => {
       'search-twitter',
       'design-frontend',
       'generate-image',
+      'operate-desktop',
     ])
     // Caller-relative rules compile into base + sparse overrides + caller exclusions.
     // implement is no longer a dianjiang agent; claude carries a `prepend` instead.
@@ -31,7 +32,7 @@ describe('defaultConfigJsonc', () => {
       effort: 'xhigh',
       useWhen: expect.stringContaining('runs claude opus at xhigh'),
     })
-    expect(config.callers?.codex?.exclude).toEqual(['generate-image'])
+    expect(config.callers?.codex?.exclude).toEqual(['generate-image', 'operate-desktop'])
     expect(config.agents.find((agent) => agent.name === 'generate-image')).toEqual({
       name: 'generate-image',
       useWhen: expect.stringContaining('generating or editing raster images'),
@@ -40,6 +41,15 @@ describe('defaultConfigJsonc', () => {
       model: 'gpt-6-luna',
       effort: 'max',
       instructions: expect.stringContaining('imagegen skill'),
+    })
+    expect(config.agents.find((agent) => agent.name === 'operate-desktop')).toEqual({
+      name: 'operate-desktop',
+      useWhen: expect.stringContaining('signed-in Chrome'),
+      dontUseWhen: expect.stringContaining('CLI, API'),
+      harness: 'codex',
+      model: 'gpt-6-sol',
+      effort: 'medium',
+      instructions: expect.stringContaining('Stop before submitting'),
     })
     // explore was dropped from the roster (callers ship built-in explore
     // subagents), taking the grok caller entry with it.

@@ -278,7 +278,24 @@ describe('planSyncDefaults / applySyncDefaults', () => {
     )
 
     const applied = applySyncDefaults(fixture, plan)
-    expectSameConfig(applied, defaultConfigJsonc())
+    const parsed = parseConfig(applied)
+    const defaults = parseConfig(defaultConfigJsonc())
+    expect(parsed.agents.find((a) => a.name === 'generate-image')).toEqual(
+      defaults.agents.find((a) => a.name === 'generate-image'),
+    )
+    expect(parsed.callers?.codex?.exclude).toEqual(defaults.callers?.codex?.exclude)
+  })
+
+  test('a config predating operate-desktop gains the agent and extends the default codex exclusion', () => {
+    const fixture = shape([
+      { path: ['agents', idx('operate-desktop')], value: undefined },
+      { path: ['callers', 'codex', 'exclude'], value: ['generate-image'] },
+    ])
+    const plan = planSyncDefaults(fixture)
+    expect(actions(plan)).toEqual(
+      new Set(['add agents.operate-desktop', 'set callers.codex.exclude']),
+    )
+    expectSameConfig(applySyncDefaults(fixture, plan), defaultConfigJsonc())
   })
 
   test('JSONC comments survive an apply', () => {
