@@ -212,7 +212,7 @@ export function defaultConfigJsonc(): string {
   "maxDepth": 2,
 
   // The roster. The delegating AI picks an agent by task shape — never a model.
-  // Names are verb/deliverable-style; keep the roster small (v1: 5, hard cap ~8).
+  // Names are verb/deliverable-style; keep the roster small (v1: 6, hard cap ~8).
   "agents": [
     {
       "name": "review",
@@ -267,6 +267,15 @@ export function defaultConfigJsonc(): string {
       "model": "gpt-6-luna",
       "effort": "max",
       "instructions": "Use the imagegen skill, following its built-in image_gen path by default. Complete the requested image generation or edit. For project-bound work, save the final output in the working directory. Return the final artifact path(s), final prompt, and whether built-in or fallback mode was used."
+    },
+    {
+      "name": "operate-desktop",
+      "useWhen": "a task requires operating the user's signed-in Chrome or another desktop app through Codex computer use; tell the user to leave the target app untouched while the delegate works and review its final screenshot before reporting",
+      "dontUseWhen": "the task can be completed through a CLI, API, or your own available browser/computer-use tools",
+      "harness": "codex",
+      "model": "gpt-6-sol",
+      "effort": "medium",
+      "instructions": "Use the available computer-use tools to operate the target app. Stop before submitting, sending, paying, deleting, or any other irreversible action; return for user approval before continuing. Capture and save screenshots of the final state, inspect them, and return their paths with a concise account of the state reached. If computer use or screenshots are unavailable, say so instead of claiming completion."
     }
   ],
 
@@ -300,9 +309,8 @@ export function defaultConfigJsonc(): string {
           "useWhen": "you want an independent cross-vendor code review of a diff; in the task, explicitly state the depth you want — a deep comprehensive review (slow on large diffs) or a quick single-pass scan; runs claude opus at xhigh"
         }
       },
-      // Codex already exposes imagegen directly — dispatching another Codex
-      // process would add a hop without adding capability.
-      "exclude": ["generate-image"]
+      // Codex already exposes imagegen and computer use directly.
+      "exclude": ["generate-image", "operate-desktop"]
       // The codex wait discipline (waiter subagent via spawn_agent) is no longer
       // config text: per-caller collection strategies render structurally inside
       // <rules> (see skill.ts COLLECTION_STRATEGY). \`append\` stays available as

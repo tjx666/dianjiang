@@ -52,7 +52,7 @@ const OVERRIDE_FIELDS = ['useWhen', 'dontUseWhen', 'harness', 'model', 'effort']
  * `instructions`, and the codex `append` variant with the multi-runId waiter
  * sentence.
  */
-const LEGACY_DEFAULTS: Record<string, string[]> = {
+const LEGACY_DEFAULTS: Record<string, unknown[]> = {
   'agents.review.useWhen': [
     'you want an independent cross-vendor code review of a diff; in the task, explicitly state the depth you want — a deep comprehensive review (slow on large diffs) or a quick single-pass scan; runs gpt-5.6-sol at high',
     'you want an independent cross-vendor code review of a diff; in the task, explicitly state the depth you want — a deep comprehensive review (slow on large diffs) or a quick single-pass scan; runs gpt-5.6-sol at xhigh — stronger reasoning than opus, slightly below fable',
@@ -131,6 +131,7 @@ const LEGACY_DEFAULTS: Record<string, string[]> = {
     'you want an independent cross-vendor code review of a diff; in the task, explicitly state the depth you want — a deep comprehensive review (slow on large diffs) or a quick single-pass scan; runs claude opus 5 at xhigh',
   ],
   'callers.codex.agents.review.model': ['opus', 'sonnet'],
+  'callers.codex.exclude': [['generate-image']],
   'agents.explore.useWhen': [
     'broad codebase search, research, or summarization',
     'broad codebase search, research, or summarization where cheap and fast matters',

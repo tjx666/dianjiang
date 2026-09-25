@@ -162,7 +162,7 @@ Cost/strength rationale:
   opus to plan/consult and codex gpt-6-sol to review.
 - `rewrite-prompt` (opus 4.6 [1m], later gpt-6-astra) was dropped on
   2026-09-05: it saw almost no use, and the caller's own model rewrites
-  prompts fine. Roster is now 5 agents.
+  prompts fine.
 - Effort is graded by task shape, not prestige: `search-twitter` and
   `design-frontend` run medium (2026-09-05) — X lookups and UI taste do not
   benefit from deep reasoning budgets.
@@ -181,7 +181,7 @@ Capability agents expose something only one harness can do; they need no
 `callers` binding overrides — they're picked for what they can do, not whose
 opinion they carry (self-vendor dispatch is fine). A capability agent is
 excluded when the caller already exposes that capability natively:
-`design-frontend` for claude and `generate-image` for codex. Grok 4.7's X
+`design-frontend` for claude and `generate-image` / `operate-desktop` for codex. Grok 4.7's X
 search path still needs a live check after quota is available:
 
 | Agent | Harness / model / effort | Capability |
@@ -189,6 +189,11 @@ search path still needs a live check after quota is available:
 | `search-twitter` | grok / grok-4.7 / medium | grok's native live X/Twitter search tools |
 | `design-frontend` | claude / opus / medium | visual/UX taste for front-end work |
 | `generate-image` | codex / gpt-6-luna / max | codex's built-in `imagegen` skill + `image_gen` tool for raster generation and editing |
+| `operate-desktop` | codex / gpt-6-sol / medium | Codex computer use for the user's signed-in Chrome or desktop apps; caller checks screenshots and authorizes irreversible actions |
+
+The installed Codex CLI's `exec` path exposed `mcp__cua_repl.js` in a live
+probe on 2026-09-26. Codex app computer use is documented at
+https://developers.openai.com/codex/app/browser.
 
 The earlier direct-model route remains rejected: codex rejects `gpt-image-2`
 as the session model under ChatGPT-subscription auth (HTTP 400). The shipped
