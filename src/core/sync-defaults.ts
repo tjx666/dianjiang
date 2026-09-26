@@ -114,11 +114,12 @@ const LEGACY_DEFAULTS: Record<string, unknown[]> = {
     'If your session model is fable, act as an orchestrator to preserve fable tokens: delegate execution work (implementation, mechanical edits, broad searches, running tests/builds) to your built-in subagents with model: opus, keeping only planning, task decomposition, tricky debugging, and verification of subagent output for yourself.',
   ],
   'callers.claude.agents.second-opinion.useWhen': [
+    "consult-only: a hard debugging hypothesis or an architecture/design decision where you're stuck or the call is expensive to reverse; runs gpt-6-sol at high",
     "consult-only: a hard debugging hypothesis or an architecture/design decision where you're stuck or the call is expensive to reverse; runs gpt-6-astra at high — OpenAI's strongest reasoning model",
     "consult-only: a hard debugging hypothesis or an architecture/design decision where you're stuck or the call is expensive to reverse; runs gpt-5.6-sol at xhigh — stronger reasoning than opus, slightly below fable",
   ],
-  'callers.claude.agents.second-opinion.model': ['gpt-6-astra', 'gpt-5.6-sol'],
-  'callers.claude.agents.second-opinion.effort': ['xhigh'],
+  'callers.claude.agents.second-opinion.model': ['gpt-6-sol', 'gpt-6-astra', 'gpt-5.6-sol'],
+  'callers.claude.agents.second-opinion.effort': ['high', 'xhigh'],
   'callers.codex.append': [
     'Your shell sessions do NOT wake you when a background command finishes, and polling is easy to forget. To collect a dianjiang run without blocking, use your subagent notification channel: `spawn_agent` with `fork_turns: "none"` and the message "Run `dianjiang result <runId> --wait --timeout 300`. If it prints status \'running\', run it again. When the status is terminal, return the full JSON verbatim." — its completion notification wakes you with the result while you keep working. If you have nothing else to do, just run `dianjiang result <runId> --wait --timeout 300` in the foreground. Either way, never end your turn with a dispatched run uncollected.',
     'Your shell sessions do NOT wake you when a background command finishes, and polling is easy to forget. To collect a dianjiang run without blocking, use your subagent notification channel: `spawn_agent` with `fork_turns: "none"` and the message "Run `dianjiang result <runId> --wait --timeout 300`. If it prints status \'running\', run it again. When the status is terminal, return the full JSON verbatim." — its completion notification wakes you with the result while you keep working. One waiter can collect several runIds — list them all in its message rather than spawning one waiter per run. If you have nothing else to do, just run `dianjiang result <runId> --wait --timeout 300` in the foreground. Either way, never end your turn with a dispatched run uncollected.',

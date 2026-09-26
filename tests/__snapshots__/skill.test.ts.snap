@@ -176,7 +176,7 @@ reach for dianjiang only when an agent below clearly fits.
 </agent>
 
 <agent name="second-opinion">
-  <use-when>consult-only: a hard debugging hypothesis or an architecture/design decision where you're stuck or the call is expensive to reverse; runs gpt-6-sol at high</use-when>
+  <use-when>consult-only: a hard debugging hypothesis or an architecture/design decision where you're stuck or the call is expensive to reverse; runs gpt-5.6-sol at xhigh</use-when>
   <dont-use-when>the task requires editing code (this agent must not make changes)</dont-use-when>
 </agent>
 

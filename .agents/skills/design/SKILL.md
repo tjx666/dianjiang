@@ -92,9 +92,8 @@ Opinion/perspective agents are **rules over the caller**, compiled into base
 bindings + sparse `callers` overrides/excludes:
 
 - `review` / `second-opinion` — **always a different vendor than the caller**
-  (avoid same-model blind spots); second-opinion runs the other vendor at
-  high — opus and gpt-6-sol both deliver at high; higher efforts cost more
-  without a visible consulting gain. review runs gpt-6-sol
+  (avoid same-model blind spots); second-opinion runs opus at high, or the
+  user-preferred gpt-5.6-sol at xhigh for the claude caller. Review runs gpt-6-sol
   at high (dropped from xhigh 2026-09-05: review is high-frequency and xhigh
   was not paying for itself) and opus at xhigh for the codex caller.
 
@@ -170,7 +169,7 @@ Cost/strength rationale:
 | Agent | Base binding | claude caller | codex caller | grok caller |
 |---|---|---|---|---|
 | `review` | codex / gpt-6-sol / high | (base) | claude / opus / xhigh | (base) |
-| `second-opinion` | claude / opus / high | codex / gpt-6-sol / high | (base) | (base) |
+| `second-opinion` | claude / opus / high | codex / gpt-5.6-sol / xhigh | (base) | (base) |
 
 Base = the compiled view for the most common callers. Values recalibrate by
 feel — that is exactly what config-time compilation is for.

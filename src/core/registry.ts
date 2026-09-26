@@ -290,9 +290,9 @@ export function defaultConfigJsonc(): string {
       "agents": {
         "second-opinion": {
           "harness": "codex",
-          "model": "gpt-6-sol",
-          "effort": "high",
-          "useWhen": "consult-only: a hard debugging hypothesis or an architecture/design decision where you're stuck or the call is expensive to reverse; runs gpt-6-sol at high"
+          "model": "gpt-5.6-sol",
+          "effort": "xhigh",
+          "useWhen": "consult-only: a hard debugging hypothesis or an architecture/design decision where you're stuck or the call is expensive to reverse; runs gpt-5.6-sol at xhigh"
         }
       },
       // design-frontend is claude/opus itself — the claude caller gains nothing over its own subagents.
