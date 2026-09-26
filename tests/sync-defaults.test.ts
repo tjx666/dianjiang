@@ -157,13 +157,31 @@ describe('planSyncDefaults / applySyncDefaults', () => {
         'set agents.search-twitter.effort',
         'set agents.design-frontend.effort',
         'set agents.generate-image.effort',
-        'set callers.claude.agents.second-opinion.model',
-        'set callers.claude.agents.second-opinion.effort',
         'set callers.claude.agents.second-opinion.useWhen',
         'set callers.codex.agents.review.useWhen',
       ]),
     )
     expect(plan.filter((c) => c.action === 'keep-custom')).toHaveLength(0)
+    expectSameConfig(applySyncDefaults(fixture, plan), defaultConfigJsonc())
+  })
+
+  test('the v0.16.0 second-opinion binding upgrades to gpt-5.6-sol at xhigh', () => {
+    const fixture = shape([
+      { path: ['callers', 'claude', 'agents', 'second-opinion', 'model'], value: 'gpt-6-sol' },
+      { path: ['callers', 'claude', 'agents', 'second-opinion', 'effort'], value: 'high' },
+      {
+        path: ['callers', 'claude', 'agents', 'second-opinion', 'useWhen'],
+        value:
+          "consult-only: a hard debugging hypothesis or an architecture/design decision where you're stuck or the call is expensive to reverse; runs gpt-6-sol at high",
+      },
+    ])
+
+    const plan = planSyncDefaults(fixture)
+    expect(actions(plan)).toEqual(new Set([
+      'set callers.claude.agents.second-opinion.model',
+      'set callers.claude.agents.second-opinion.effort',
+      'set callers.claude.agents.second-opinion.useWhen',
+    ]))
     expectSameConfig(applySyncDefaults(fixture, plan), defaultConfigJsonc())
   })
 

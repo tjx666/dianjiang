@@ -19,9 +19,9 @@ describe('defaultConfigJsonc', () => {
     expect(config.callers?.claude?.agents?.implement).toBeUndefined()
     expect(config.callers?.claude?.agents?.['second-opinion']).toEqual({
       harness: 'codex',
-      model: 'gpt-6-sol',
-      effort: 'high',
-      useWhen: expect.stringContaining('runs gpt-6-sol at high'),
+      model: 'gpt-5.6-sol',
+      effort: 'xhigh',
+      useWhen: expect.stringContaining('runs gpt-5.6-sol at xhigh'),
     })
     expect(config.callers?.claude?.prepend).toContain('built-in subagents')
     // design-frontend is claude/opus itself — hidden from the claude caller.
