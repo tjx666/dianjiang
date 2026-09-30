@@ -54,6 +54,7 @@ const OVERRIDE_FIELDS = ['useWhen', 'dontUseWhen', 'harness', 'model', 'effort']
  */
 const LEGACY_DEFAULTS: Record<string, unknown[]> = {
   'agents.review.useWhen': [
+    'you want an independent cross-vendor code review of a diff; in the task, explicitly state the depth you want — a deep comprehensive review (slow on large diffs) or a quick single-pass scan; runs gpt-6-sol at high',
     'you want an independent cross-vendor code review of a diff; in the task, explicitly state the depth you want — a deep comprehensive review (slow on large diffs) or a quick single-pass scan; runs gpt-5.6-sol at high',
     'you want an independent cross-vendor code review of a diff; in the task, explicitly state the depth you want — a deep comprehensive review (slow on large diffs) or a quick single-pass scan; runs gpt-5.6-sol at xhigh — stronger reasoning than opus, slightly below fable',
     'you want an independent cross-vendor code review of a diff; runs gpt-5.6-sol at xhigh — stronger reasoning than opus, slightly below fable',
@@ -62,7 +63,7 @@ const LEGACY_DEFAULTS: Record<string, unknown[]> = {
     "you want an independent cross-vendor code review of a diff; focused and findings-only by default — say 'deep review' in the task for a comprehensive audit; runs gpt-5.6-sol at xhigh — stronger reasoning than opus, slightly below fable",
   ],
   'agents.review.dontUseWhen': ['a quick lint/style pass your own subagents already cover'],
-  'agents.review.model': ['gpt-5.6-sol'],
+  'agents.review.model': ['gpt-5.6-sol', 'gpt-6-sol'],
   'agents.review.effort': ['xhigh'],
   'agents.review.instructions': [
     "Default to a FOCUSED review: cover exactly the risks, files, and acceptance criteria the task names. Verifying a specific falsifiable hypothesis in depth is fine; a fixed all-dimension fan-out is not. Run a comprehensive deep review only when the task explicitly asks for one. Output contract: actionable findings only, ordered by severity — each with file:line, impact, how to trigger it, and a suggested fix; if nothing qualifies, output 'clean' plus one line on what you checked. Do not restate background or emit process narration, statistics, workflow/skill feedback, or non-blocking nits unless the task asks for them. Record `git rev-parse HEAD` (and whether the tree is dirty) before reading code and name that state in your verdict; if the tree changes mid-review, report 'snapshot changed' and state which state each finding applies to — never claim you covered a moving target. When resumed to verify fixes, check only the named findings and the fix delta — report each as fixed or still open, plus any regression the fix itself introduced; do not re-run the full review.",
@@ -102,8 +103,9 @@ const LEGACY_DEFAULTS: Record<string, unknown[]> = {
   'agents.search-twitter.effort': ['high'],
   'agents.design-frontend.effort': ['high'],
   'agents.design-frontend.model': ['fable'],
-  'agents.generate-image.effort': ['low'],
-  'agents.generate-image.model': ['gpt-5.6-luna'],
+  'agents.generate-image.effort': ['low', 'max'],
+  'agents.generate-image.model': ['gpt-5.6-luna', 'gpt-6-luna'],
+  'agents.operate-desktop.model': ['gpt-6-sol'],
   'agents.generate-image.useWhen': [
     "generating or editing raster images such as photos, illustrations, textures, sprites, mockups, or transparent-background cutouts through Codex's built-in image generation, especially when the caller is Claude Code",
   ],
@@ -115,6 +117,7 @@ const LEGACY_DEFAULTS: Record<string, unknown[]> = {
   ],
   'callers.claude.agents.second-opinion.useWhen': [
     "consult-only: a hard debugging hypothesis or an architecture/design decision where you're stuck or the call is expensive to reverse; runs gpt-6-sol at high",
+    "consult-only: a hard debugging hypothesis or an architecture/design decision where you're stuck or the call is expensive to reverse; runs gpt-5.6-sol at xhigh",
     "consult-only: a hard debugging hypothesis or an architecture/design decision where you're stuck or the call is expensive to reverse; runs gpt-6-astra at high — OpenAI's strongest reasoning model",
     "consult-only: a hard debugging hypothesis or an architecture/design decision where you're stuck or the call is expensive to reverse; runs gpt-5.6-sol at xhigh — stronger reasoning than opus, slightly below fable",
   ],

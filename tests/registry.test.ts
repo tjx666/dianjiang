@@ -19,18 +19,18 @@ describe('defaultConfigJsonc', () => {
     expect(config.callers?.claude?.agents?.implement).toBeUndefined()
     expect(config.callers?.claude?.agents?.['second-opinion']).toEqual({
       harness: 'codex',
-      model: 'gpt-5.6-sol',
+      model: 'gpt-6.1-sol',
       effort: 'xhigh',
-      useWhen: expect.stringContaining('runs gpt-5.6-sol at xhigh'),
+      useWhen: expect.stringContaining('runs gpt-6.1-sol at xhigh'),
     })
     expect(config.callers?.claude?.prepend).toContain('built-in subagents')
     // design-frontend is claude/opus itself — hidden from the claude caller.
     expect(config.callers?.claude?.exclude).toEqual(['design-frontend'])
     expect(config.callers?.codex?.agents?.review).toEqual({
       harness: 'claude',
-      model: 'opus',
+      model: 'sonnet',
       effort: 'xhigh',
-      useWhen: expect.stringContaining('runs claude opus at xhigh'),
+      useWhen: expect.stringContaining('runs claude sonnet at xhigh'),
     })
     expect(config.callers?.codex?.exclude).toEqual(['generate-image', 'operate-desktop'])
     expect(config.agents.find((agent) => agent.name === 'generate-image')).toEqual({
@@ -38,8 +38,8 @@ describe('defaultConfigJsonc', () => {
       useWhen: expect.stringContaining('generating or editing raster images'),
       dontUseWhen: expect.stringContaining('SVG, HTML/CSS, canvas'),
       harness: 'codex',
-      model: 'gpt-6-luna',
-      effort: 'max',
+      model: 'gpt-6.1-sol',
+      effort: 'medium',
       instructions: expect.stringContaining('imagegen skill'),
     })
     expect(config.agents.find((agent) => agent.name === 'operate-desktop')).toEqual({
@@ -47,14 +47,14 @@ describe('defaultConfigJsonc', () => {
       useWhen: expect.stringContaining('signed-in Chrome'),
       dontUseWhen: expect.stringContaining('CLI, API'),
       harness: 'codex',
-      model: 'gpt-6-sol',
+      model: 'gpt-6.1-sol',
       effort: 'medium',
       instructions: expect.stringContaining('Stop before submitting'),
     })
     // explore was dropped from the roster (callers ship built-in explore
     // subagents), taking the grok caller entry with it.
     expect(config.callers?.grok).toBeUndefined()
-    expect(config.agents.find((agent) => agent.name === 'review')?.model).toBe('gpt-6-sol')
+    expect(config.agents.find((agent) => agent.name === 'review')?.model).toBe('gpt-6.1-sol')
     expect(config.agents.find((agent) => agent.name === 'second-opinion')?.model).toBe('opus')
     expect(config.agents.find((agent) => agent.name === 'search-twitter')?.model).toBe('grok-4.7')
     expect(config.agents.find((agent) => agent.name === 'design-frontend')?.model).toBe('opus')
@@ -68,7 +68,7 @@ describe('defaultConfigJsonc', () => {
     // writes. Guard against a contract creeping back into the default roster.
     expect(review?.instructions).toBeUndefined()
     expect(review?.useWhen).toContain('independent cross-vendor code review')
-    expect(config.callers?.codex?.agents?.review?.useWhen).toContain('claude opus at xhigh')
+    expect(config.callers?.codex?.agents?.review?.useWhen).toContain('claude sonnet at xhigh')
     // The codex wait discipline moved into skill.ts's structural collection
     // strategies; the default config no longer ships a codex append.
     expect(config.callers?.codex?.append).toBeUndefined()
@@ -109,13 +109,13 @@ describe('validateConfig', () => {
     expect(() => validateConfig(cfg)).toThrow(/invalid effort/)
   })
 
-  test('rejects an effort a known model does not support (gpt-5.4-mini + ultra)', () => {
+  test('rejects an effort a known model does not support (gpt-5.5 + ultra)', () => {
     const cfg: DianjiangConfig = {
       maxDepth: 2,
-      agents: [{ name: 'a', useWhen: 'x', harness: 'codex', model: 'gpt-5.4-mini', effort: 'ultra' }],
+      agents: [{ name: 'a', useWhen: 'x', harness: 'codex', model: 'gpt-5.5', effort: 'ultra' }],
     }
-    // Model-aware: ultra is a valid codex effort but not for gpt-5.4-mini.
-    expect(() => validateConfig(cfg)).toThrow(/invalid effort "ultra" for model "gpt-5.4-mini"/)
+    // Model-aware: ultra is a valid codex effort but not for gpt-5.5.
+    expect(() => validateConfig(cfg)).toThrow(/invalid effort "ultra" for model "gpt-5.5"/)
   })
 
   test('accepts an unknown model with a harness-valid effort (permissive pass-through)', () => {

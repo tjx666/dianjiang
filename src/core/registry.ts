@@ -218,10 +218,10 @@ export function defaultConfigJsonc(): string {
       "name": "review",
       // Base is codex; the callers section rebinds it to a different vendor for
       // the codex caller so review is never same-model as the code under review.
-      "useWhen": "you want an independent cross-vendor code review of a diff; in the task, explicitly state the depth you want — a deep comprehensive review (slow on large diffs) or a quick single-pass scan; runs gpt-6-sol at high",
+      "useWhen": "you want an independent cross-vendor code review of a diff; in the task, explicitly state the depth you want — a deep comprehensive review (slow on large diffs) or a quick single-pass scan; runs gpt-6.1-sol at high",
       "dontUseWhen": "a quick lint/style pass your own subagents already cover",
       "harness": "codex",
-      "model": "gpt-6-sol",
+      "model": "gpt-6.1-sol",
       "effort": "high"
       // Deliberately NO "instructions": three dogfood rounds of injected review
       // contracts (2026-07) each over-fit — the caller owns the briefing. Scope,
@@ -264,8 +264,8 @@ export function defaultConfigJsonc(): string {
       "useWhen": "generating or editing raster images such as photos, illustrations, textures, sprites, mockups, or transparent-background cutouts through Codex's built-in image generation",
       "dontUseWhen": "the visual should be implemented deterministically as SVG, HTML/CSS, canvas, or another code-native format",
       "harness": "codex",
-      "model": "gpt-6-luna",
-      "effort": "max",
+      "model": "gpt-6.1-sol",
+      "effort": "medium",
       "instructions": "Use the imagegen skill, following its built-in image_gen path by default. Complete the requested image generation or edit. For project-bound work, save the final output in the working directory. Return the final artifact path(s), final prompt, and whether built-in or fallback mode was used."
     },
     {
@@ -273,7 +273,7 @@ export function defaultConfigJsonc(): string {
       "useWhen": "a task requires operating the user's signed-in Chrome or another desktop app through Codex computer use; tell the user to leave the target app untouched while the delegate works and review its final screenshot before reporting",
       "dontUseWhen": "the task can be completed through a CLI, API, or your own available browser/computer-use tools",
       "harness": "codex",
-      "model": "gpt-6-sol",
+      "model": "gpt-6.1-sol",
       "effort": "medium",
       "instructions": "Use the available computer-use tools to operate the target app. Stop before submitting, sending, paying, deleting, or any other irreversible action; return for user approval before continuing. Capture and save screenshots of the final state, inspect them, and return their paths with a concise account of the state reached. If computer use or screenshots are unavailable, say so instead of claiming completion."
     }
@@ -290,9 +290,9 @@ export function defaultConfigJsonc(): string {
       "agents": {
         "second-opinion": {
           "harness": "codex",
-          "model": "gpt-5.6-sol",
+          "model": "gpt-6.1-sol",
           "effort": "xhigh",
-          "useWhen": "consult-only: a hard debugging hypothesis or an architecture/design decision where you're stuck or the call is expensive to reverse; runs gpt-5.6-sol at xhigh"
+          "useWhen": "consult-only: a hard debugging hypothesis or an architecture/design decision where you're stuck or the call is expensive to reverse; runs gpt-6.1-sol at xhigh"
         }
       },
       // design-frontend is claude/opus itself — the claude caller gains nothing over its own subagents.
@@ -304,9 +304,9 @@ export function defaultConfigJsonc(): string {
       "agents": {
         "review": {
           "harness": "claude",
-          "model": "opus",
+          "model": "sonnet",
           "effort": "xhigh",
-          "useWhen": "you want an independent cross-vendor code review of a diff; in the task, explicitly state the depth you want — a deep comprehensive review (slow on large diffs) or a quick single-pass scan; runs claude opus at xhigh"
+          "useWhen": "you want an independent cross-vendor code review of a diff; in the task, explicitly state the depth you want — a deep comprehensive review (slow on large diffs) or a quick single-pass scan; runs claude sonnet at xhigh"
         }
       },
       // Codex already exposes imagegen and computer use directly.

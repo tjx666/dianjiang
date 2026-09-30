@@ -23,22 +23,22 @@ const CODEX_LUNA_EFFORTS = ['low', 'medium', 'high', 'xhigh', 'max'] as const
 const CODEX_PRE_56 = ['low', 'medium', 'high', 'xhigh'] as const
 
 /**
- * Locally-verified codex models (2026-09-23, from `~/.codex/models_cache.json`
- * on codex-cli 0.156.1). GPT-6 Sol supports `ultra`; Luna supports up to `max`.
+ * Locally-verified codex models (2026-09-30, from `~/.codex/models_cache.json`
+ * on codex-cli 0.161.0-alpha.4). GPT-6.1 Sol (2026-09-29) is the vendor default
+ * and, like the other Sol/Astra models, supports `ultra`; Luna supports up to
+ * `max`. gpt-5.4, gpt-5.4-mini, and gpt-5.3-codex-spark left the catalog.
  * The CLI has no model-list command exposed under ChatGPT-subscription auth, so there is no
  * `listModels`.
  */
 export const CODEX_MODELS: readonly KnownModel[] = [
-  { name: 'gpt-6-sol', efforts: CODEX_EFFORTS, isDefault: true },
+  { name: 'gpt-6.1-sol', efforts: CODEX_EFFORTS, isDefault: true },
+  { name: 'gpt-6-sol', efforts: CODEX_EFFORTS },
   { name: 'gpt-6-luna', efforts: CODEX_LUNA_EFFORTS },
   { name: 'gpt-6-astra', efforts: CODEX_EFFORTS },
   { name: 'gpt-5.6-sol', efforts: CODEX_EFFORTS },
   { name: 'gpt-5.6-terra', efforts: CODEX_EFFORTS },
   { name: 'gpt-5.6-luna', efforts: CODEX_LUNA_EFFORTS },
   { name: 'gpt-5.5', efforts: CODEX_PRE_56 },
-  { name: 'gpt-5.4', efforts: CODEX_PRE_56 },
-  { name: 'gpt-5.4-mini', efforts: CODEX_PRE_56 },
-  { name: 'gpt-5.3-codex-spark', efforts: CODEX_PRE_56 },
 ]
 
 /** Temp file codex writes its final message to (read + deleted after exit). */
@@ -117,7 +117,7 @@ export const codexAdapter: HarnessAdapter = {
   name: 'codex',
   efforts: CODEX_EFFORTS,
   knownModels: CODEX_MODELS,
-  modelsVerifiedAt: '2026-09-23',
+  modelsVerifiedAt: '2026-09-30',
   versionArgs: ['--version'],
 
   buildCommand(spec: DispatchSpec) {

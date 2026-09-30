@@ -93,9 +93,13 @@ bindings + sparse `callers` overrides/excludes:
 
 - `review` / `second-opinion` — **always a different vendor than the caller**
   (avoid same-model blind spots); second-opinion runs opus at high, or the
-  user-preferred gpt-5.6-sol at xhigh for the claude caller. Review runs gpt-6-sol
+  user-preferred gpt-6.1-sol at xhigh for the claude caller. Review runs gpt-6.1-sol
   at high (dropped from xhigh 2026-09-05: review is high-frequency and xhigh
-  was not paying for itself) and opus at xhigh for the codex caller.
+  was not paying for itself) and sonnet at xhigh for the codex caller (moved from
+  opus 2026-09-30: Sonnet 5.5 is cheaper and faster for high-frequency review). Codex
+  bindings moved to gpt-6.1-sol on 2026-09-30: OpenAI positions it near
+  gpt-6-astra on agentic coding and computer use at one-fifth of Astra's
+  price (https://openai.com/index/introducing-gpt-6-1-sol).
 
 `review` deliberately ships **no `instructions`** (decided 2026-07-21 after
 three dogfood rounds of injected review contracts, each corrected by the
@@ -153,12 +157,12 @@ Cost/strength rationale:
 
 - **opus serves judgment-heavy roles** — second brain (`second-opinion`) and
   visual taste (`design-frontend`). Opus 5.5 costs less than Fable 5.1 and
-  matches it on most work per Anthropic's release; review gets gpt-6-sol at
-  high, or opus at xhigh for the codex caller. See
+  matches it on most work per Anthropic's release; review gets gpt-6.1-sol at
+  high, or sonnet at xhigh for the codex caller. See
   https://www.anthropic.com/news/claude-opus-5-5.
 - Per-caller character: claude and codex implement with their own flagship;
   grok is fast and has native X search but weak reasoning, so it borrows
-  opus to plan/consult and codex gpt-6-sol to review.
+  opus to plan/consult and codex gpt-6.1-sol to review.
 - `rewrite-prompt` (opus 4.6 [1m], later gpt-6-astra) was dropped on
   2026-09-05: it saw almost no use, and the caller's own model rewrites
   prompts fine.
@@ -168,8 +172,8 @@ Cost/strength rationale:
 
 | Agent | Base binding | claude caller | codex caller | grok caller |
 |---|---|---|---|---|
-| `review` | codex / gpt-6-sol / high | (base) | claude / opus / xhigh | (base) |
-| `second-opinion` | claude / opus / high | codex / gpt-5.6-sol / xhigh | (base) | (base) |
+| `review` | codex / gpt-6.1-sol / high | (base) | claude / sonnet / xhigh | (base) |
+| `second-opinion` | claude / opus / high | codex / gpt-6.1-sol / xhigh | (base) | (base) |
 
 Base = the compiled view for the most common callers. Values recalibrate by
 feel — that is exactly what config-time compilation is for.
@@ -187,8 +191,8 @@ search path still needs a live check after quota is available:
 |---|---|---|
 | `search-twitter` | grok / grok-4.7 / medium | grok's native live X/Twitter search tools |
 | `design-frontend` | claude / opus / medium | visual/UX taste for front-end work |
-| `generate-image` | codex / gpt-6-luna / max | codex's built-in `imagegen` skill + `image_gen` tool for raster generation and editing |
-| `operate-desktop` | codex / gpt-6-sol / medium | Codex computer use for the user's signed-in Chrome or desktop apps; caller checks screenshots and authorizes irreversible actions |
+| `generate-image` | codex / gpt-6.1-sol / medium | codex's built-in `imagegen` skill + `image_gen` tool for raster generation and editing |
+| `operate-desktop` | codex / gpt-6.1-sol / medium | Codex computer use for the user's signed-in Chrome or desktop apps; caller checks screenshots and authorizes irreversible actions |
 
 The installed Codex CLI's `exec` path exposed `mcp__cua_repl.js` in a live
 probe on 2026-09-26. Codex app computer use is documented at
@@ -196,7 +200,7 @@ https://developers.openai.com/codex/app/browser.
 
 The earlier direct-model route remains rejected: codex rejects `gpt-image-2`
 as the session model under ChatGPT-subscription auth (HTTP 400). The shipped
-agent instead runs a cheap general Codex model and invokes Codex's built-in
+agent instead runs a general Codex model and invokes Codex's built-in
 image-generation tool, which requires no API-key auth.
 
 Locally verified model/effort space:
@@ -205,12 +209,13 @@ Locally verified model/effort space:
   machine); effort `low | medium | high | xhigh | max`. Each alias tracks the
   latest release of its tier — verified via `modelUsage`: `fable`
   → `claude-fable-5-1` (2026-09-05), `opus` → `claude-opus-5-5`
-  (2026-09-23) — so a same-tier model
+  (2026-09-23), `sonnet` → `claude-sonnet-5-5` (2026-09-30) — so a same-tier model
   release needs no roster bump.
-- codex: `gpt-6-astra/-sol/-luna`, `gpt-5.6-sol/-terra/-luna`, `gpt-5.5`, `gpt-5.4(-mini)`,
-  `gpt-5.3-codex-spark`; effort superset `low…ultra`, but `max`/`ultra` only on
+- codex: `gpt-6.1-sol` (vendor default 2026-09-30), `gpt-6-astra/-sol/-luna`,
+  `gpt-5.6-sol/-terra/-luna`, `gpt-5.5` (`gpt-5.4(-mini)` and
+  `gpt-5.3-codex-spark` left the catalog by 2026-09-30); effort superset `low…ultra`, but `max`/`ultra` only on
   the 5.6+ series and `ultra` only on astra/sol/terra (adapters must validate
-  per model; GPT-6 Sol/Luna verified 2026-09-23 from `~/.codex/models_cache.json`)
+  per model; GPT-6.1 Sol verified 2026-09-30 from `~/.codex/models_cache.json`)
 - grok: `grok-4.7` (vendor default 2026-09-23), `grok-4.6`, and `grok-4.5` (effort
   `low | medium | high`). `grok-composer-2.5-fast` was delisted by the vendor
   (2026-07-28: "unknown model id")
