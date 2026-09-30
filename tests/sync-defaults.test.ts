@@ -20,6 +20,8 @@ const V050_REVIEW_USEWHEN =
 const V0130_REVIEW_USEWHEN =
   'you want an independent cross-vendor code review of a diff; in the task, explicitly state the depth you want — a deep comprehensive review (slow on large diffs) or a quick single-pass scan; runs gpt-5.6-sol at xhigh — stronger reasoning than opus, slightly below fable'
 const CURRENT_REVIEW_USEWHEN =
+  'you want an independent cross-vendor code review of a diff; in the task, explicitly state the depth you want — a deep comprehensive review (slow on large diffs) or a quick single-pass scan; runs gpt-6.1-sol at high'
+const V0161_REVIEW_USEWHEN =
   'you want an independent cross-vendor code review of a diff; in the task, explicitly state the depth you want — a deep comprehensive review (slow on large diffs) or a quick single-pass scan; runs gpt-6-sol at high'
 const PREVIOUS_REVIEW_USEWHEN =
   'you want an independent cross-vendor code review of a diff; in the task, explicitly state the depth you want — a deep comprehensive review (slow on large diffs) or a quick single-pass scan; runs gpt-5.6-sol at high'
@@ -157,6 +159,7 @@ describe('planSyncDefaults / applySyncDefaults', () => {
         'set agents.search-twitter.effort',
         'set agents.design-frontend.effort',
         'set agents.generate-image.effort',
+        'set callers.claude.agents.second-opinion.model',
         'set callers.claude.agents.second-opinion.useWhen',
         'set callers.codex.agents.review.useWhen',
       ]),
@@ -165,7 +168,32 @@ describe('planSyncDefaults / applySyncDefaults', () => {
     expectSameConfig(applySyncDefaults(fixture, plan), defaultConfigJsonc())
   })
 
-  test('the v0.16.0 second-opinion binding upgrades to gpt-5.6-sol at xhigh', () => {
+  test('the v0.16.1 codex bindings upgrade to gpt-6.1-sol', () => {
+    const fixture = shape([
+      { path: ['agents', idx('review'), 'model'], value: 'gpt-6-sol' },
+      { path: ['agents', idx('review'), 'useWhen'], value: V0161_REVIEW_USEWHEN },
+      { path: ['agents', idx('operate-desktop'), 'model'], value: 'gpt-6-sol' },
+      { path: ['callers', 'claude', 'agents', 'second-opinion', 'model'], value: 'gpt-5.6-sol' },
+      {
+        path: ['callers', 'claude', 'agents', 'second-opinion', 'useWhen'],
+        value:
+          "consult-only: a hard debugging hypothesis or an architecture/design decision where you're stuck or the call is expensive to reverse; runs gpt-5.6-sol at xhigh",
+      },
+    ])
+
+    const plan = planSyncDefaults(fixture)
+    expect(actions(plan)).toEqual(new Set([
+      'set agents.review.model',
+      'set agents.review.useWhen',
+      'set agents.operate-desktop.model',
+      'set callers.claude.agents.second-opinion.model',
+      'set callers.claude.agents.second-opinion.useWhen',
+    ]))
+    expect(plan.filter((c) => c.action === 'keep-custom')).toHaveLength(0)
+    expectSameConfig(applySyncDefaults(fixture, plan), defaultConfigJsonc())
+  })
+
+  test('the v0.16.0 second-opinion binding upgrades to gpt-6.1-sol at xhigh', () => {
     const fixture = shape([
       { path: ['callers', 'claude', 'agents', 'second-opinion', 'model'], value: 'gpt-6-sol' },
       { path: ['callers', 'claude', 'agents', 'second-opinion', 'effort'], value: 'high' },

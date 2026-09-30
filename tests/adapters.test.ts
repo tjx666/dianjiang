@@ -478,7 +478,7 @@ describe('describeHarness / mergeLiveModels', () => {
     expect(d.name).toBe('claude')
     expect(d.efforts).toEqual(adapters.claude.efforts)
     expect(d.models.source).toBe('curated')
-    expect(d.models.verifiedAt).toBe('2026-09-23')
+    expect(d.models.verifiedAt).toBe('2026-09-30')
     expect(d.models.list.map((m) => m.name)).toEqual(['fable', 'opus', 'sonnet'])
   })
 
