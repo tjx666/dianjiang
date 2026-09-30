@@ -28,8 +28,6 @@ const PREVIOUS_REVIEW_USEWHEN =
 const V050_CODEX_REVIEW_USEWHEN = 'you want an independent cross-vendor code review of a diff; runs claude opus at xhigh'
 const V0121_CODEX_REVIEW_USEWHEN =
   'you want an independent cross-vendor code review of a diff; in the task, explicitly state the depth you want — a deep comprehensive review (slow on large diffs) or a quick single-pass scan; runs claude opus at xhigh'
-const V0122_CODEX_REVIEW_USEWHEN =
-  'you want an independent cross-vendor code review of a diff; in the task, explicitly state the depth you want — a deep comprehensive review (slow on large diffs) or a quick single-pass scan; runs claude sonnet at xhigh'
 const V0130_CODEX_REVIEW_USEWHEN =
   'you want an independent cross-vendor code review of a diff; in the task, explicitly state the depth you want — a deep comprehensive review (slow on large diffs) or a quick single-pass scan; runs claude opus 5 at xhigh'
 const V050_CODEX_APPEND =
@@ -115,10 +113,10 @@ describe('planSyncDefaults / applySyncDefaults', () => {
     expectSameConfig(applySyncDefaults(fixture, plan), defaultConfigJsonc())
   })
 
-  test('the v0.12.2 codex review binding upgrades from sonnet back to opus', () => {
+  test('the opus codex review binding (v0.12.1, v0.13.1–v0.16.1) upgrades to sonnet', () => {
     const fixture = shape([
-      { path: ['callers', 'codex', 'agents', 'review', 'model'], value: 'sonnet' },
-      { path: ['callers', 'codex', 'agents', 'review', 'useWhen'], value: V0122_CODEX_REVIEW_USEWHEN },
+      { path: ['callers', 'codex', 'agents', 'review', 'model'], value: 'opus' },
+      { path: ['callers', 'codex', 'agents', 'review', 'useWhen'], value: V0121_CODEX_REVIEW_USEWHEN },
     ])
 
     const plan = planSyncDefaults(fixture)
@@ -173,6 +171,8 @@ describe('planSyncDefaults / applySyncDefaults', () => {
       { path: ['agents', idx('review'), 'model'], value: 'gpt-6-sol' },
       { path: ['agents', idx('review'), 'useWhen'], value: V0161_REVIEW_USEWHEN },
       { path: ['agents', idx('operate-desktop'), 'model'], value: 'gpt-6-sol' },
+      { path: ['agents', idx('generate-image'), 'model'], value: 'gpt-6-luna' },
+      { path: ['agents', idx('generate-image'), 'effort'], value: 'max' },
       { path: ['callers', 'claude', 'agents', 'second-opinion', 'model'], value: 'gpt-5.6-sol' },
       {
         path: ['callers', 'claude', 'agents', 'second-opinion', 'useWhen'],
@@ -186,6 +186,8 @@ describe('planSyncDefaults / applySyncDefaults', () => {
       'set agents.review.model',
       'set agents.review.useWhen',
       'set agents.operate-desktop.model',
+      'set agents.generate-image.model',
+      'set agents.generate-image.effort',
       'set callers.claude.agents.second-opinion.model',
       'set callers.claude.agents.second-opinion.useWhen',
     ]))

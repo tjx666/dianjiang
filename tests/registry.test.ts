@@ -28,9 +28,9 @@ describe('defaultConfigJsonc', () => {
     expect(config.callers?.claude?.exclude).toEqual(['design-frontend'])
     expect(config.callers?.codex?.agents?.review).toEqual({
       harness: 'claude',
-      model: 'opus',
+      model: 'sonnet',
       effort: 'xhigh',
-      useWhen: expect.stringContaining('runs claude opus at xhigh'),
+      useWhen: expect.stringContaining('runs claude sonnet at xhigh'),
     })
     expect(config.callers?.codex?.exclude).toEqual(['generate-image', 'operate-desktop'])
     expect(config.agents.find((agent) => agent.name === 'generate-image')).toEqual({
@@ -38,8 +38,8 @@ describe('defaultConfigJsonc', () => {
       useWhen: expect.stringContaining('generating or editing raster images'),
       dontUseWhen: expect.stringContaining('SVG, HTML/CSS, canvas'),
       harness: 'codex',
-      model: 'gpt-6-luna',
-      effort: 'max',
+      model: 'gpt-6.1-sol',
+      effort: 'medium',
       instructions: expect.stringContaining('imagegen skill'),
     })
     expect(config.agents.find((agent) => agent.name === 'operate-desktop')).toEqual({
@@ -68,7 +68,7 @@ describe('defaultConfigJsonc', () => {
     // writes. Guard against a contract creeping back into the default roster.
     expect(review?.instructions).toBeUndefined()
     expect(review?.useWhen).toContain('independent cross-vendor code review')
-    expect(config.callers?.codex?.agents?.review?.useWhen).toContain('claude opus at xhigh')
+    expect(config.callers?.codex?.agents?.review?.useWhen).toContain('claude sonnet at xhigh')
     // The codex wait discipline moved into skill.ts's structural collection
     // strategies; the default config no longer ships a codex append.
     expect(config.callers?.codex?.append).toBeUndefined()

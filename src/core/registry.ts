@@ -264,8 +264,8 @@ export function defaultConfigJsonc(): string {
       "useWhen": "generating or editing raster images such as photos, illustrations, textures, sprites, mockups, or transparent-background cutouts through Codex's built-in image generation",
       "dontUseWhen": "the visual should be implemented deterministically as SVG, HTML/CSS, canvas, or another code-native format",
       "harness": "codex",
-      "model": "gpt-6-luna",
-      "effort": "max",
+      "model": "gpt-6.1-sol",
+      "effort": "medium",
       "instructions": "Use the imagegen skill, following its built-in image_gen path by default. Complete the requested image generation or edit. For project-bound work, save the final output in the working directory. Return the final artifact path(s), final prompt, and whether built-in or fallback mode was used."
     },
     {
@@ -304,9 +304,9 @@ export function defaultConfigJsonc(): string {
       "agents": {
         "review": {
           "harness": "claude",
-          "model": "opus",
+          "model": "sonnet",
           "effort": "xhigh",
-          "useWhen": "you want an independent cross-vendor code review of a diff; in the task, explicitly state the depth you want — a deep comprehensive review (slow on large diffs) or a quick single-pass scan; runs claude opus at xhigh"
+          "useWhen": "you want an independent cross-vendor code review of a diff; in the task, explicitly state the depth you want — a deep comprehensive review (slow on large diffs) or a quick single-pass scan; runs claude sonnet at xhigh"
         }
       },
       // Codex already exposes imagegen and computer use directly.

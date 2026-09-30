@@ -103,8 +103,8 @@ const LEGACY_DEFAULTS: Record<string, unknown[]> = {
   'agents.search-twitter.effort': ['high'],
   'agents.design-frontend.effort': ['high'],
   'agents.design-frontend.model': ['fable'],
-  'agents.generate-image.effort': ['low'],
-  'agents.generate-image.model': ['gpt-5.6-luna'],
+  'agents.generate-image.effort': ['low', 'max'],
+  'agents.generate-image.model': ['gpt-5.6-luna', 'gpt-6-luna'],
   'agents.operate-desktop.model': ['gpt-6-sol'],
   'agents.generate-image.useWhen': [
     "generating or editing raster images such as photos, illustrations, textures, sprites, mockups, or transparent-background cutouts through Codex's built-in image generation, especially when the caller is Claude Code",

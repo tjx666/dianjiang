@@ -95,7 +95,8 @@ bindings + sparse `callers` overrides/excludes:
   (avoid same-model blind spots); second-opinion runs opus at high, or the
   user-preferred gpt-6.1-sol at xhigh for the claude caller. Review runs gpt-6.1-sol
   at high (dropped from xhigh 2026-09-05: review is high-frequency and xhigh
-  was not paying for itself) and opus at xhigh for the codex caller. Codex
+  was not paying for itself) and sonnet at xhigh for the codex caller (moved from
+  opus 2026-09-30: Sonnet 5.5 is cheaper and faster for high-frequency review). Codex
   bindings moved to gpt-6.1-sol on 2026-09-30: OpenAI positions it near
   gpt-6-astra on agentic coding and computer use at one-fifth of Astra's
   price (https://openai.com/index/introducing-gpt-6-1-sol).
@@ -157,7 +158,7 @@ Cost/strength rationale:
 - **opus serves judgment-heavy roles** — second brain (`second-opinion`) and
   visual taste (`design-frontend`). Opus 5.5 costs less than Fable 5.1 and
   matches it on most work per Anthropic's release; review gets gpt-6.1-sol at
-  high, or opus at xhigh for the codex caller. See
+  high, or sonnet at xhigh for the codex caller. See
   https://www.anthropic.com/news/claude-opus-5-5.
 - Per-caller character: claude and codex implement with their own flagship;
   grok is fast and has native X search but weak reasoning, so it borrows
@@ -171,7 +172,7 @@ Cost/strength rationale:
 
 | Agent | Base binding | claude caller | codex caller | grok caller |
 |---|---|---|---|---|
-| `review` | codex / gpt-6.1-sol / high | (base) | claude / opus / xhigh | (base) |
+| `review` | codex / gpt-6.1-sol / high | (base) | claude / sonnet / xhigh | (base) |
 | `second-opinion` | claude / opus / high | codex / gpt-6.1-sol / xhigh | (base) | (base) |
 
 Base = the compiled view for the most common callers. Values recalibrate by
@@ -190,7 +191,7 @@ search path still needs a live check after quota is available:
 |---|---|---|
 | `search-twitter` | grok / grok-4.7 / medium | grok's native live X/Twitter search tools |
 | `design-frontend` | claude / opus / medium | visual/UX taste for front-end work |
-| `generate-image` | codex / gpt-6-luna / max | codex's built-in `imagegen` skill + `image_gen` tool for raster generation and editing |
+| `generate-image` | codex / gpt-6.1-sol / medium | codex's built-in `imagegen` skill + `image_gen` tool for raster generation and editing |
 | `operate-desktop` | codex / gpt-6.1-sol / medium | Codex computer use for the user's signed-in Chrome or desktop apps; caller checks screenshots and authorizes irreversible actions |
 
 The installed Codex CLI's `exec` path exposed `mcp__cua_repl.js` in a live
@@ -199,7 +200,7 @@ https://developers.openai.com/codex/app/browser.
 
 The earlier direct-model route remains rejected: codex rejects `gpt-image-2`
 as the session model under ChatGPT-subscription auth (HTTP 400). The shipped
-agent instead runs a cheap general Codex model and invokes Codex's built-in
+agent instead runs a general Codex model and invokes Codex's built-in
 image-generation tool, which requires no API-key auth.
 
 Locally verified model/effort space:
