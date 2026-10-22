@@ -159,6 +159,10 @@ describe('renderSkillDoc default-config snapshots', () => {
   test('grok render', () => {
     expect(renderSkillDoc(defaultConfig, 'grok')).toMatchSnapshot()
   })
+
+  test('agy render', () => {
+    expect(renderSkillDoc(defaultConfig, 'agy')).toMatchSnapshot()
+  })
 })
 
 describe('renderSkillDoc collection-strategy conflict freedom', () => {

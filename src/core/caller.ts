@@ -36,6 +36,7 @@ export function matchHarnessCommand(command: string): HarnessName | undefined {
   const base = argv0.split('/').pop() ?? ''
   if (base === 'claude') return 'claude'
   if (base === 'grok') return 'grok'
+  if (base === 'agy') return 'agy'
   if (base === 'codex' || base.startsWith('codex-')) return 'codex'
   if (command.includes('@openai/codex')) return 'codex'
   return undefined

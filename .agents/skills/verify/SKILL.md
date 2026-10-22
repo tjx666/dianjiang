@@ -37,6 +37,9 @@ paths per harness:
 - claude: `run --harness claude --model sonnet --effort low "..."`
 - codex: `run --harness codex --model gpt-6-luna --effort low "..."`
   (`gpt-5.4-mini` was rejected under ChatGPT authentication on 2026-09-11)
+- agy: `run --harness agy --model gemini-3.8-flash --effort low "..."`. Its
+  subscription quota is small; an `Individual quota reached` failure is a
+  quota block, not a dispatch bug.
 
 ## Standard flow (copy-paste base)
 
@@ -88,8 +91,11 @@ fail, not read a random session); a transcript whose last line is half-written
 
 - grok's `-p` is `--single <PROMPT>`: the prompt is the flag's VALUE. claude's
   `-p` is a boolean with a positional prompt. Don't "fix" one to match the other.
-- codex `harnessSessionId` ≠ runId (parsed from `thread.started` events);
-  claude/grok equal runId (pre-injected `--session-id`).
+- agy's `-p` also consumes the prompt as its value; the adapter passes
+  `--print=<prompt>`. agy rejects `--effort` on effort-suffixed or Claude model
+  ids (`gemini-3.8-flash-low`, `claude-sonnet-4-6`).
+- codex/agy `harnessSessionId` ≠ runId (codex: `thread.started` events; agy:
+  `conversation_id`); claude/grok equal runId (pre-injected `--session-id`).
 - Every run (sync included) has a worker log at `$DIANJIANG_HOME/logs/<runId>.log`
   containing the full harness stdout/stderr stream — the run's artifact path.
   The parsed result lives in sqlite, not the log.

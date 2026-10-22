@@ -219,6 +219,11 @@ Locally verified model/effort space:
 - grok: `grok-4.7` (vendor default 2026-09-23), `grok-4.6`, and `grok-4.5` (effort
   `low | medium | high`). `grok-composer-2.5-fast` was delisted by the vendor
   (2026-07-28: "unknown model id")
+- agy: `gemini-3.8-flash` (`low | medium | high`), its `-low/-medium/-high`
+  variants (no `--effort`), `claude-sonnet-4-6` and `claude-opus-4-6-thinking`
+  (no `--effort`), `gpt-oss-120b` (`medium` only) and `gpt-oss-120b-medium`
+  (2026-10-22). The default model is the user's agy setting, not a vendor
+  constant.
 
 ## Skill doc (`dianjiang skill`)
 
@@ -497,18 +502,24 @@ layer 2 retires for codex.
 
 ## Harness capability matrix (verified locally)
 
-| | claude 2.1.211 | codex 0.144.4 | grok 0.2.101 |
-|---|---|---|---|
-| One-shot | `claude -p "..."` | `codex exec "..."` | `grok -p "..."` |
-| Model / effort | `--model` + `--effort` | `-m` + `-c model_reasoning_effort=...` | `-m` + `--reasoning-effort` |
-| Session id | `--session-id <uuid>` (pre-inject) | parse `thread.started.thread_id` from `--json` | `--session-id <uuid>` (pre-inject) |
-| Resume | `claude -p --resume <id>` | `codex exec resume <id>` | `grok -p --resume <id>` |
-| YOLO | `--dangerously-skip-permissions` | `--dangerously-bypass-approvals-and-sandbox` | `--always-approve` |
-| Final message | `--output-format json`, `.result` | `-o <file>` (easiest) or scan JSONL | `--output-format json` |
-| Global instructions | `~/.claude/CLAUDE.md` | `~/.codex/AGENTS.md` | `~/.grok/AGENTS.md` |
-| Agent-side background shell | `run_in_background` + completion notification (push) | `exec_command` returns a session id; poll/continue via `write_stdin` (pull, no push wake). Push exists one layer up: `spawn_agent` completion notifies the parent (waiter pattern, see `callers.codex.append`) | `run_terminal_command` `background: true` → task_id + completion notification (push) |
+| | claude 2.1.211 | codex 0.144.4 | grok 0.2.101 | agy 1.4.4 |
+|---|---|---|---|---|
+| One-shot | `claude -p "..."` | `codex exec "..."` | `grok -p "..."` | `agy --print="..."` |
+| Model / effort | `--model` + `--effort` | `-m` + `-c model_reasoning_effort=...` | `-m` + `--reasoning-effort` | `--model` + `--effort` (per model; suffixed ids bake effort in) |
+| Session id | `--session-id <uuid>` (pre-inject) | parse `thread.started.thread_id` from `--json` | `--session-id <uuid>` (pre-inject) | parse `conversation_id` from the JSON result |
+| Resume | `claude -p --resume <id>` | `codex exec resume <id>` | `grok -p --resume <id>` | `agy --print="..." --conversation <id>` |
+| YOLO | `--dangerously-skip-permissions` | `--dangerously-bypass-approvals-and-sandbox` | `--always-approve` | `--dangerously-skip-permissions` |
+| Final message | `--output-format json`, `.result` | `-o <file>` (easiest) or scan JSONL | `--output-format json` | `--output-format json`, `.response` |
+| Global instructions | `~/.claude/CLAUDE.md` | `~/.codex/AGENTS.md` | `~/.grok/AGENTS.md` | not verified |
+| Agent-side background shell | `run_in_background` + completion notification (push) | `exec_command` returns a session id; poll/continue via `write_stdin` (pull, no push wake). Push exists one layer up: `spawn_agent` completion notifies the parent (waiter pattern, see `callers.codex.append`) | `run_terminal_command` `background: true` → task_id + completion notification (push) | `run_command` backgrounds after `WaitMsBeforeAsync` → completion notification (push) |
 
 Notes:
+- agy (Antigravity CLI, added 2026-10-22) dispatches, resumes, and acts as a
+  caller. `dianjiang session` does not read its conversations: each
+  `~/.gemini/antigravity-cli/conversations/<id>.db` stores steps as
+  undocumented protobuf blobs, and session messaging has no verified entry
+  point. The default roster gains no agy agent; admission follows the roster
+  principle above.
 - Grok's claude-compat is OFF in local config — it will not read `~/.claude/*`;
   each harness needs its own thin skill/instruction hook for the skill doc.
 - Codex renamed `session.created`/`session_id` → `thread.started`/`thread_id`

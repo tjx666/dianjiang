@@ -32,7 +32,11 @@ export * from './types.ts'
 export { encodeProjectDir } from './claude.ts'
 export { DEFAULT_LIMIT, DEFAULT_MAX_CHARS, ENTRY_TEXT_CAP } from './shared.ts'
 
-export const sessionReaders: Record<HarnessName, SessionReader> = {
+/**
+ * agy has no reader: its conversation stores keep each step as an undocumented
+ * protobuf blob, so `--all` and id lookups skip it rather than guess.
+ */
+export const sessionReaders: Partial<Record<HarnessName, SessionReader>> = {
   claude: claudeReader,
   codex: codexReader,
   grok: grokReader,
@@ -77,6 +81,10 @@ export function findSessions(options: FindOptions): FindResult {
 
   for (const harness of harnesses) {
     const reader = sessionReaders[harness]
+    if (!reader) {
+      if (options.harness) warnings.push(`Reading ${harness} sessions is not supported.`)
+      continue
+    }
     if (!reader.available()) {
       warnings.push(`No ${harness} session store on this machine; skipped.`)
       continue
@@ -106,7 +114,7 @@ export function loadSession(sessionId: string, harness?: HarnessName): LoadedSes
   const harnesses = harness ? [harness] : HARNESS_NAMES
   for (const name of harnesses) {
     const reader = sessionReaders[name]
-    if (!reader.available()) continue
+    if (!reader?.available()) continue
     try {
       const loaded = reader.load(sessionId)
       if (loaded) return loaded

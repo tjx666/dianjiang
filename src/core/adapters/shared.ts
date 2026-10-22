@@ -24,6 +24,7 @@ export function quotaExhaustedFailure(harness: HarnessName, detail: string): Run
     claude: 'Claude Code',
     codex: 'Codex',
     grok: 'Grok Build',
+    agy: 'Antigravity CLI',
   }
   return {
     code: 'quota_exhausted',
@@ -52,7 +53,7 @@ export function finalizeUsage(usage: RunUsage): RunUsage | undefined {
 }
 
 /**
- * Cross-vendor baseline for harnesses with no system-prompt flag (codex, grok):
+ * Cross-vendor baseline for harnesses with no system-prompt flag (codex, grok, agy):
  * prepend the agent instructions to the prompt. claude uses its native
  * --append-system-prompt instead and never calls this.
  */
