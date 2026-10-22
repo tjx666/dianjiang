@@ -5,27 +5,42 @@ description: Publish a new dianjiang version to npm, tag it, and upgrade the loc
 
 # Releasing dianjiang
 
-Finish everything except the upload before asking for an npm OTP. Ask for the
-code exactly once, when publishing is the only step left. An OTP lives about
-30 seconds, so a code that arrives while checks are still running is wasted.
+Pushing a `vX.Y.Z` tag publishes the package.
+`.github/workflows/publish.yml` uploads it through npm trusted publishing
+(OIDC), so a normal release needs no npm token or OTP from the user.
 
-## 1. Prepare (no OTP yet)
+## 1. Prepare
 
 1. Merge the feature PRs being released. Bump the version on a
    `release/vX.Y.Z` branch, using semver: a new harness or command is a minor
    bump; fixes are a patch bump. The release commit changes only
    `package.json`, as `chore: release vX.Y.Z`.
 2. In that worktree, run `bun run check`, `bun test`, and
-   `bun run test:package`. The package test runs `prepack`, which leaves a
-   fresh `dist/` behind.
-3. Open and merge the release PR, then ask the user for the OTP.
+   `bun run test:package`.
+3. Open and merge the release PR.
 
-## 2. Publish (the moment the OTP arrives)
+## 2. Publish
 
-Checks already ran on this commit, so skip `prepublishOnly` and upload directly.
-Authenticated registry requests intermittently hang or return 503 while
-anonymous ones succeed. A hung `npm whoami` does not mean the token is bad, so
-do not ask the user to `npm login`. Retry fast within the OTP window:
+1. Tag the release merge commit with `git tag -a vX.Y.Z origin/main -m vX.Y.Z`,
+   then push the tag. The repository publishes no GitHub Releases.
+2. Watch the `Publish` run in the background with
+   `gh run watch <id> --exit-status`. The workflow fails before uploading
+   when the tag does not match `package.json`.
+3. Poll `https://registry.npmjs.org/dianjiang` in the background until
+   `dist-tags.latest` changes. The registry can lag about a minute.
+
+If the run fails, read its log before acting. Fix test or build failures on
+`main` with a new patch version, because a pushed tag is never moved. An
+OIDC or `E404`/`ENEEDAUTH` failure at `npm publish` means the trusted
+publisher on npmjs.com is missing, expired, or does not allow `npm publish`.
+Only the user can fix that there. Otherwise use the manual fallback below.
+
+## Manual fallback (OTP)
+
+Finish everything else first, then ask for the OTP exactly once, together
+with any other blocker. An OTP lives about 30 seconds. Checks already ran, so
+skip `prepublishOnly` and retry fast within the window. A hung `npm whoami`
+does not mean the token is bad, so do not ask the user to `npm login`:
 
 ```zsh
 start=$SECONDS
@@ -37,17 +52,11 @@ while (( SECONDS - start < 45 )); do
 done
 ```
 
-Only an `EOTP` result needs a new code. Ask for it in one message, together
-with any other blocker.
+Run it from a worktree at the tagged commit after `bun run build`, because
+`--ignore-scripts` skips `prepack`.
 
-## 3. Finish
+## 3. Upgrade the local install
 
-- Tag the release merge commit: `git tag -a vX.Y.Z origin/main -m vX.Y.Z`,
-  then push the tag. The repository publishes no GitHub Releases.
-- The registry can take about a minute to show the new version. Poll
-  `https://registry.npmjs.org/dianjiang` in the background until
-  `dist-tags.latest` changes.
-- Upgrade the local install yourself. Resolve it with
-  `readlink -f "$(which dianjiang)"` before choosing a command. Today it is a
-  `bun link` to the primary checkout, so run `git pull --ff-only && bun run build`
-  there.
+Upgrade it yourself. Resolve it with `readlink -f "$(which dianjiang)"`
+before choosing a command. Today it is a `bun link` to the primary checkout,
+so run `git pull --ff-only && bun run build` there.
