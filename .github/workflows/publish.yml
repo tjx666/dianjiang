@@ -1,0 +1,52 @@
+# Publishes to npm through trusted publishing (OIDC): no npm token or OTP.
+# npmjs.com trusts this exact filename; renaming it breaks publishing.
+# https://docs.npmjs.com/trusted-publishers
+name: Publish
+
+on:
+  push:
+    tags: ['v*']
+  # Manual runs check and pack without uploading, to test the pipeline.
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  id-token: write # Required for npm's OIDC token exchange
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: actions/setup-node@v6
+        with:
+          # Trusted publishing needs npm >= 11.5.1, which Node 24 bundles.
+          node-version: '24'
+          registry-url: 'https://registry.npmjs.org'
+          package-manager-cache: false
+
+      # prepack and prepublishOnly run bun scripts.
+      - uses: oven-sh/setup-bun@v2
+
+      - run: bun install --frozen-lockfile
+
+      - name: Check tag matches package.json version
+        if: github.event_name == 'push'
+        run: |
+          version="v$(node -p 'require("./package.json").version')"
+          if [ "$version" != "$GITHUB_REF_NAME" ]; then
+            echo "Tag $GITHUB_REF_NAME does not match package.json $version" >&2
+            exit 1
+          fi
+
+      # prepublishOnly runs check, unit tests, and the packed-install smoke test.
+      - name: Publish
+        if: github.event_name == 'push'
+        run: npm publish
+
+      # `npm publish --dry-run` rejects a version that is already on npm, so
+      # manual runs on main rerun the same checks and pack instead.
+      - name: Check and pack
+        if: github.event_name != 'push'
+        run: npm run prepublishOnly && npm pack --dry-run
