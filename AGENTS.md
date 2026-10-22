@@ -47,6 +47,8 @@ bun run src/cli/index.ts <command>   # run the CLI without linking
 - Read `.agents/skills/design/SKILL.md` before architecture, naming, or
   CLI-surface changes — terminology (agent/roster/harness/adapter) is frozen
   and trade-offs are recorded there.
+- Release with `.agents/skills/release/SKILL.md`: prepare everything before
+  asking for the npm OTP.
 - Verify changes end-to-end with `.agents/skills/verify/SKILL.md`. Hard
   isolation rules: always set `DIANJIANG_HOME=<tempdir>`; live AI calls must
   use the cheapest paths listed there.
