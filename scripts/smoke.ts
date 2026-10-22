@@ -26,6 +26,7 @@ async function liveCheck(): Promise<void> {
     { harness: 'claude', model: 'sonnet', effort: 'low' },
     { harness: 'codex', model: 'gpt-6-luna', effort: 'low' },
     { harness: 'grok', model: 'grok-4.7', effort: 'low' },
+    { harness: 'agy', model: 'gemini-3.8-flash', effort: 'low' },
   ]
 
   for (const c of cases) {

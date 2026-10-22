@@ -20,7 +20,8 @@ import { resolveAgent } from './registry.ts'
  * <rules>. Structural rationale (2026-07 dogfood): a generic "block on result
  * --wait" rule plus a codex-only append produced conflicting guidance, and
  * codex blocked 300s in the foreground before spawning its waiter. claude and
- * grok shells push completion notifications for background commands; codex
+ * grok shells push completion notifications for background commands (as does
+ * agy's \`run_command\`, which backgrounds a command once its wait elapses); codex
  * shells never do, but its spawn_agent completion notifies the parent, so
  * codex routes the wait through a waiter subagent instead. A second incident
  * (2026-07): the generic "on timeout, re-run it" rule was misread as license
@@ -119,6 +120,11 @@ const COLLECTION_STRATEGY: Record<HarnessName, string> = {
   immediately after dispatching — its completion notification delivers the
   result while you keep working. Run it in the foreground only when the result
   is the last thing you need before you can proceed.`,
+  agy: `Start that command with \`run_command\` and \`WaitMsBeforeAsync: 500\`
+  immediately after dispatching — it continues as a background task whose
+  completion notification delivers the result while you keep working. Do not
+  poll it or set timers: \`WaitMsBeforeAsync\` caps at 10 seconds, so even when
+  the result is the last thing you need, wait for that notification.`,
 }
 
 /** Caller-less renders can't assume shell capabilities; stay neutral. */
@@ -172,11 +178,11 @@ export function renderSkillDoc(config: DianjiangConfig, caller?: HarnessName): s
   const appendSection = callerConfig?.append ? `\n\n${callerConfig.append}` : ''
 
   return `${prependSection}\`dianjiang\` is a CLI on this machine that dispatches self-contained tasks to
-other coding-agent CLIs (Claude Code / Codex / Grok). Each <agent> below is a
-preset the human already compiled — its harness, model, and effort are fixed;
-never override or re-route them. Pick an agent by task shape. Model notes
-inside <use-when> only calibrate whether a dispatch is worth making — they are
-not an invitation to second-guess the binding. dianjiang agents are separate
+other coding-agent CLIs (Claude Code / Codex / Grok / Antigravity). Each
+<agent> below is a preset the human already compiled — its harness, model, and
+effort are fixed; never override or re-route them. Pick an agent by task shape.
+Model notes inside <use-when> only calibrate whether a dispatch is worth making
+— they are not an invitation to second-guess the binding. dianjiang agents are separate
 from your built-in subagents: default to your own tools and subagents, and
 reach for dianjiang only when an agent below clearly fits.
 
@@ -256,7 +262,7 @@ ${agents}
   existing conversation, not a fresh conversation or a reply receipt.
 - Overriding a preset is allowed ONLY to relay the human's explicit choice in
   their current request: if they name a vendor, harness, model, or effort, pass
-  it through — \`dianjiang run --harness <claude|codex|grok> [-m <model>] [--effort <level>] "<task>"\`,
+  it through — \`dianjiang run --harness <claude|codex|grok|agy> [-m <model>] [--effort <level>] "<task>"\`,
   or \`-m\`/\`--effort\` on an agent dispatch. Never override on your own judgment.
 - Dispatched harnesses run in YOLO mode (permission-bypass flags) — only
   dispatch tasks safe for an unattended agent in that working directory.

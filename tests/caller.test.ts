@@ -11,6 +11,7 @@ describe('matchHarnessCommand', () => {
     expect(matchHarnessCommand('claude --dangerously-skip-permissions')).toBe('claude')
     expect(matchHarnessCommand('grok -p Run this and paste raw output')).toBe('grok')
     expect(matchHarnessCommand('codex exec --json "task"')).toBe('codex')
+    expect(matchHarnessCommand('agy --conversation c0ffee --print=task')).toBe('agy')
   })
 
   test('matches codex platform binaries and package-path shims', () => {

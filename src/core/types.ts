@@ -6,9 +6,9 @@
  * - run:     one dispatched execution, persisted in SQLite
  */
 
-export type HarnessName = 'claude' | 'codex' | 'grok'
+export type HarnessName = 'claude' | 'codex' | 'grok' | 'agy'
 
-export const HARNESS_NAMES: readonly HarnessName[] = ['claude', 'codex', 'grok']
+export const HARNESS_NAMES: readonly HarnessName[] = ['claude', 'codex', 'grok', 'agy']
 
 /** Run IDs and native session IDs are canonical UUIDs, never names or slugs. */
 export function isUuid(value: string): boolean {

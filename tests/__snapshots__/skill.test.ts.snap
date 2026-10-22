@@ -2,11 +2,11 @@
 
 exports[`renderSkillDoc default-config snapshots caller-less render 1`] = `
 "\`dianjiang\` is a CLI on this machine that dispatches self-contained tasks to
-other coding-agent CLIs (Claude Code / Codex / Grok). Each <agent> below is a
-preset the human already compiled — its harness, model, and effort are fixed;
-never override or re-route them. Pick an agent by task shape. Model notes
-inside <use-when> only calibrate whether a dispatch is worth making — they are
-not an invitation to second-guess the binding. dianjiang agents are separate
+other coding-agent CLIs (Claude Code / Codex / Grok / Antigravity). Each
+<agent> below is a preset the human already compiled — its harness, model, and
+effort are fixed; never override or re-route them. Pick an agent by task shape.
+Model notes inside <use-when> only calibrate whether a dispatch is worth making
+— they are not an invitation to second-guess the binding. dianjiang agents are separate
 from your built-in subagents: default to your own tools and subagents, and
 reach for dianjiang only when an agent below clearly fits.
 
@@ -116,7 +116,7 @@ reach for dianjiang only when an agent below clearly fits.
   existing conversation, not a fresh conversation or a reply receipt.
 - Overriding a preset is allowed ONLY to relay the human's explicit choice in
   their current request: if they name a vendor, harness, model, or effort, pass
-  it through — \`dianjiang run --harness <claude|codex|grok> [-m <model>] [--effort <level>] "<task>"\`,
+  it through — \`dianjiang run --harness <claude|codex|grok|agy> [-m <model>] [--effort <level>] "<task>"\`,
   or \`-m\`/\`--effort\` on an agent dispatch. Never override on your own judgment.
 - Dispatched harnesses run in YOLO mode (permission-bypass flags) — only
   dispatch tasks safe for an unattended agent in that working directory.
@@ -162,11 +162,11 @@ If your session model is fable, act as an orchestrator to preserve fable tokens:
 </caller-guidance>
 
 \`dianjiang\` is a CLI on this machine that dispatches self-contained tasks to
-other coding-agent CLIs (Claude Code / Codex / Grok). Each <agent> below is a
-preset the human already compiled — its harness, model, and effort are fixed;
-never override or re-route them. Pick an agent by task shape. Model notes
-inside <use-when> only calibrate whether a dispatch is worth making — they are
-not an invitation to second-guess the binding. dianjiang agents are separate
+other coding-agent CLIs (Claude Code / Codex / Grok / Antigravity). Each
+<agent> below is a preset the human already compiled — its harness, model, and
+effort are fixed; never override or re-route them. Pick an agent by task shape.
+Model notes inside <use-when> only calibrate whether a dispatch is worth making
+— they are not an invitation to second-guess the binding. dianjiang agents are separate
 from your built-in subagents: default to your own tools and subagents, and
 reach for dianjiang only when an agent below clearly fits.
 
@@ -272,7 +272,7 @@ reach for dianjiang only when an agent below clearly fits.
   existing conversation, not a fresh conversation or a reply receipt.
 - Overriding a preset is allowed ONLY to relay the human's explicit choice in
   their current request: if they name a vendor, harness, model, or effort, pass
-  it through — \`dianjiang run --harness <claude|codex|grok> [-m <model>] [--effort <level>] "<task>"\`,
+  it through — \`dianjiang run --harness <claude|codex|grok|agy> [-m <model>] [--effort <level>] "<task>"\`,
   or \`-m\`/\`--effort\` on an agent dispatch. Never override on your own judgment.
 - Dispatched harnesses run in YOLO mode (permission-bypass flags) — only
   dispatch tasks safe for an unattended agent in that working directory.
@@ -314,11 +314,11 @@ grepping the stores yourself.
 
 exports[`renderSkillDoc default-config snapshots codex render 1`] = `
 "\`dianjiang\` is a CLI on this machine that dispatches self-contained tasks to
-other coding-agent CLIs (Claude Code / Codex / Grok). Each <agent> below is a
-preset the human already compiled — its harness, model, and effort are fixed;
-never override or re-route them. Pick an agent by task shape. Model notes
-inside <use-when> only calibrate whether a dispatch is worth making — they are
-not an invitation to second-guess the binding. dianjiang agents are separate
+other coding-agent CLIs (Claude Code / Codex / Grok / Antigravity). Each
+<agent> below is a preset the human already compiled — its harness, model, and
+effort are fixed; never override or re-route them. Pick an agent by task shape.
+Model notes inside <use-when> only calibrate whether a dispatch is worth making
+— they are not an invitation to second-guess the binding. dianjiang agents are separate
 from your built-in subagents: default to your own tools and subagents, and
 reach for dianjiang only when an agent below clearly fits.
 
@@ -492,7 +492,7 @@ reach for dianjiang only when an agent below clearly fits.
   existing conversation, not a fresh conversation or a reply receipt.
 - Overriding a preset is allowed ONLY to relay the human's explicit choice in
   their current request: if they name a vendor, harness, model, or effort, pass
-  it through — \`dianjiang run --harness <claude|codex|grok> [-m <model>] [--effort <level>] "<task>"\`,
+  it through — \`dianjiang run --harness <claude|codex|grok|agy> [-m <model>] [--effort <level>] "<task>"\`,
   or \`-m\`/\`--effort\` on an agent dispatch. Never override on your own judgment.
 - Dispatched harnesses run in YOLO mode (permission-bypass flags) — only
   dispatch tasks safe for an unattended agent in that working directory.
@@ -534,11 +534,11 @@ grepping the stores yourself.
 
 exports[`renderSkillDoc default-config snapshots grok render 1`] = `
 "\`dianjiang\` is a CLI on this machine that dispatches self-contained tasks to
-other coding-agent CLIs (Claude Code / Codex / Grok). Each <agent> below is a
-preset the human already compiled — its harness, model, and effort are fixed;
-never override or re-route them. Pick an agent by task shape. Model notes
-inside <use-when> only calibrate whether a dispatch is worth making — they are
-not an invitation to second-guess the binding. dianjiang agents are separate
+other coding-agent CLIs (Claude Code / Codex / Grok / Antigravity). Each
+<agent> below is a preset the human already compiled — its harness, model, and
+effort are fixed; never override or re-route them. Pick an agent by task shape.
+Model notes inside <use-when> only calibrate whether a dispatch is worth making
+— they are not an invitation to second-guess the binding. dianjiang agents are separate
 from your built-in subagents: default to your own tools and subagents, and
 reach for dianjiang only when an agent below clearly fits.
 
@@ -649,7 +649,165 @@ reach for dianjiang only when an agent below clearly fits.
   existing conversation, not a fresh conversation or a reply receipt.
 - Overriding a preset is allowed ONLY to relay the human's explicit choice in
   their current request: if they name a vendor, harness, model, or effort, pass
-  it through — \`dianjiang run --harness <claude|codex|grok> [-m <model>] [--effort <level>] "<task>"\`,
+  it through — \`dianjiang run --harness <claude|codex|grok|agy> [-m <model>] [--effort <level>] "<task>"\`,
+  or \`-m\`/\`--effort\` on an agent dispatch. Never override on your own judgment.
+- Dispatched harnesses run in YOLO mode (permission-bypass flags) — only
+  dispatch tasks safe for an unattended agent in that working directory.
+- Machine-readable commands print exactly one JSON value on stdout; harness
+  logs go to stderr, and the full stream tees to
+  \`~/.dianjiang/logs/<runId>.log\`. Exit codes: 0 ok, 1 error/failed run, 2
+  recursion-depth limit.
+- If \`DIANJIANG_DEPTH\` is set in your environment, you ARE a delegate — never
+  dispatch (\`run\`/\`resume\`). The read-only \`session\` commands below stay
+  available when your task needs them.
+</rules>
+
+<session-reading>
+\`dianjiang session\` reads harness session transcripts already on this machine
+(Claude Code / Codex / Grok, including sessions dianjiang never dispatched).
+Read-only, no AI call, no cost. Reach for it when the human points at earlier
+work — "take over that session", "what did I ask it before" — instead of
+grepping the stores yourself.
+- \`dianjiang session find "<query>"\` — sessions whose content matches, limited
+  to the current directory; \`--all\` searches every directory, \`--cwd <dir>\`
+  picks another one, \`--harness <claude|codex|grok>\` narrows the store. Each
+  match carries the session id, title, cwd, matched evidence, and a
+  \`resumeCommand\` for that harness.
+- \`dianjiang session read <sessionId>\` — \`--view overview\` (default: first
+  request, recent requests, last reply), \`requests\` (every human request), or
+  \`all\`; \`--around <entryId>\` expands the neighbourhood of one entry. Use
+  \`--run <runId>\` to read the session behind a dianjiang run instead of a
+  session id.
+- \`dianjiang session search <sessionId> "<query>"\` — matching entries with
+  their ids; feed one back into \`read --around <entryId>\` for context.
+- Responses are capped. Check \`page.truncated\`, pass \`page.nextCursor\` to
+  \`--cursor\` for the next slice, and read \`warnings\` — a scan that stopped
+  early or a session with abandoned branches reports it there.
+- Injected content (system reminders, skill/memory preamble, attachments) is
+  dropped by default because it is identical across sessions; \`--include-injected\`
+  keeps it, at the cost of matching nearly everything.
+</session-reading>"
+`;
+
+exports[`renderSkillDoc default-config snapshots agy render 1`] = `
+"\`dianjiang\` is a CLI on this machine that dispatches self-contained tasks to
+other coding-agent CLIs (Claude Code / Codex / Grok / Antigravity). Each
+<agent> below is a preset the human already compiled — its harness, model, and
+effort are fixed; never override or re-route them. Pick an agent by task shape.
+Model notes inside <use-when> only calibrate whether a dispatch is worth making
+— they are not an invitation to second-guess the binding. dianjiang agents are separate
+from your built-in subagents: default to your own tools and subagents, and
+reach for dianjiang only when an agent below clearly fits.
+
+<agent name="review">
+  <use-when>you want an independent cross-vendor code review of a diff; in the task, explicitly state the depth you want — a deep comprehensive review (slow on large diffs) or a quick single-pass scan; runs gpt-6.1-sol at high</use-when>
+  <dont-use-when>a quick lint/style pass your own subagents already cover</dont-use-when>
+</agent>
+
+<agent name="second-opinion">
+  <use-when>consult-only: a hard debugging hypothesis or an architecture/design decision where you're stuck or the call is expensive to reverse; runs claude opus at high</use-when>
+  <dont-use-when>the task requires editing code (this agent must not make changes)</dont-use-when>
+</agent>
+
+<agent name="search-twitter">
+  <use-when>live X/Twitter lookups: find tweets, threads, account activity, or what people say about a topic right now — grok's native X search is real-time and extremely fast</use-when>
+  <dont-use-when>general web research (use your own web/search tools) or anything needing code changes</dont-use-when>
+</agent>
+
+<agent name="design-frontend">
+  <use-when>UI/UX work needing visual taste: components, layouts, styling, interaction polish, or design review of front-end code</use-when>
+  <dont-use-when>backend logic or refactors with no visual/UX judgment involved</dont-use-when>
+</agent>
+
+<agent name="generate-image">
+  <use-when>generating or editing raster images such as photos, illustrations, textures, sprites, mockups, or transparent-background cutouts through Codex's built-in image generation</use-when>
+  <dont-use-when>the visual should be implemented deterministically as SVG, HTML/CSS, canvas, or another code-native format</dont-use-when>
+</agent>
+
+<agent name="operate-desktop">
+  <use-when>a task requires operating the user's signed-in Chrome or another desktop app through Codex computer use; tell the user to leave the target app untouched while the delegate works and review its final screenshot before reporting</use-when>
+  <dont-use-when>the task can be completed through a CLI, API, or your own available browser/computer-use tools</dont-use-when>
+</agent>
+
+<rules>
+- \`dianjiang run --caller agy <agent> "<task>" --detach\` prints one JSON object immediately — save \`.runId\`.
+  Always dispatch detached: never try to predict how long a task will take, and
+  never wait with \`sleep N\`. The run survives even if you or the wait command
+  die — \`dianjiang result <runId>\` recovers it any time.
+- \`"<task>"\` and \`"<message>"\` are placeholders, not shell-quoting recipes.
+  For long, multiline, or quote-containing text, load it from a single-quoted
+  heredoc and pass the variable double-quoted:
+  \`\`\`sh
+  task=$(cat <<'DIANJIANG_TASK'
+  ...task text exactly as written...
+  DIANJIANG_TASK
+  )
+  dianjiang run --caller agy <agent> "$task" --detach
+  \`\`\`
+  Choose a delimiter absent from the text. Use the same pattern with a
+  \`message\` variable for \`resume\`; never hand-escape it inside shell quotes.
+- Collect every run with \`dianjiang result <runId> --wait --timeout 300\`: it
+  exits with the final JSON the moment the run finishes; on timeout it prints
+  \`status: "running"\` — just re-run it. Start that command with \`run_command\` and \`WaitMsBeforeAsync: 500\`
+  immediately after dispatching — it continues as a background task whose
+  completion notification delivers the result while you keep working. Do not
+  poll it or set timers: \`WaitMsBeforeAsync\` caps at 10 seconds, so even when
+  the result is the last thing you need, wait for that notification.
+- Check \`.status\` first: read \`.result\` only when it is "completed". On
+  "failed", inspect \`.failure\` before \`.result\`; \`code: "quota_exhausted"\`
+  means the selected harness has no available quota — recommend another
+  harness, and never treat \`.result\` as the task's answer. When \`.failure\`
+  is null, \`.result\` is still a diagnostic summary, not a task answer.
+- Write tasks self-contained (background, file paths, acceptance criteria,
+  expected output): the delegate starts fresh in your cwd — it sees your files,
+  not your conversation.
+- For \`review\`, \`second-opinion\`, and adversarial or comparative discussions
+  (including battle-style debates), brief the delegate as an independent
+  evaluator: separate evidence (diffs, logs, measurements) from your
+  interpretation, and present any conclusion you have reached as a hypothesis
+  to test, not as the answer. Require the delegate to examine the strongest
+  counterarguments to that hypothesis and disagree plainly when the evidence
+  warrants it.
+- Follow up in the same session with \`dianjiang resume <runId> "<message>"\` —
+  it takes \`--detach\` too; use the same detach-and-collect flow.
+- For an external native session, use \`dianjiang session list --harness <harness>\`
+  and \`dianjiang session status --harness <harness> --session <native-session-uuid>\`.
+  These inspect native sessions; \`status <runId>\` still inspects a dianjiang run.
+- Deliver attributed text with \`dianjiang session send --harness <target-harness>
+  --session <target-session-uuid> --from-session <your-native-session-uuid>
+  --message-id <stable-message-uuid> "<message>"\`. Sender harness is detected from
+  process ancestry; pass \`--from-harness\` when running outside an agent. Never
+  borrow an inherited environment marker or invent a sender session ID.
+  Use the same shell-safe message transport as \`resume\`.
+- Native endpoints are local sockets: Codex defaults to its shared app-server
+  control socket; Grok requires an existing shared leader. Pass \`--endpoint\`
+  for another local backend or Claude's Peer address (strip \`uds:\`). A session
+  in a separate private backend is not reachable through the default backend.
+  Codex exposes that control socket only while a shared app-server daemon runs.
+  Without one, pass \`--endpoint\` for an existing app-server; neither live
+  delivery nor \`--wake\` can proceed without a reachable server to observe the
+  session state. A missing socket does not prove that the session is stopped.
+  Claude's inbound policy can hold or refuse messages; dianjiang does not change it.
+- \`session send\` returns a receipt, never the target's model response:
+  \`accepted\` means native queue admission, \`written\` means no native ACK,
+  \`unknown\` means delivery is uncertain, and \`rejected\` means no confirmed
+  admission. Read it with \`dianjiang session receipt <message-id>\`. Reusing the
+  same message ID returns the existing receipt and never sends again; changed
+  content under that ID is refused. Do not blindly use a new ID after uncertainty.
+  Default \`--mode queue\` preserves the native queue. \`--mode steer\` requires
+  an active Codex turn on a server that lists turns — the app-server daemon does
+  not, and \`status\` then reports queue only; Grok requests best-effort mid-turn queue promotion;
+  Claude accepts messages between tool calls and does not offer this mode.
+- To continue a stopped external conversation, explicitly add \`--wake --cwd
+  <original-directory>\` (optionally \`--model\` and \`--effort\`). Stop other
+  owners first: state is scoped to the selected backend, not every process on
+  the machine. Unknown state or connection failure never triggers a resume.
+  A \`resumed\` receipt contains \`runId\`; collect that run using the same
+  detached-run collection rule above. This starts a new execution of the
+  existing conversation, not a fresh conversation or a reply receipt.
+- Overriding a preset is allowed ONLY to relay the human's explicit choice in
+  their current request: if they name a vendor, harness, model, or effort, pass
+  it through — \`dianjiang run --harness <claude|codex|grok|agy> [-m <model>] [--effort <level>] "<task>"\`,
   or \`-m\`/\`--effort\` on an agent dispatch. Never override on your own judgment.
 - Dispatched harnesses run in YOLO mode (permission-bypass flags) — only
   dispatch tasks safe for an unattended agent in that working directory.

@@ -427,6 +427,110 @@ describe('grok adapter', () => {
   })
 })
 
+describe('agy adapter', () => {
+  /** Real `agy -p ... --output-format json` envelopes captured on agy 1.4.4. */
+  const SUCCESS = JSON.stringify({
+    conversation_id: 'c0ffee00-0000-4000-8000-000000000001',
+    status: 'SUCCESS',
+    response: 'pong\n',
+    duration_seconds: 2.8,
+    num_turns: 1,
+    usage: { input_tokens: 6528, output_tokens: 1, thinking_tokens: 0, cache_read_tokens: 0, total_tokens: 6529 },
+  })
+  const MODEL_ERROR = JSON.stringify({
+    conversation_id: '',
+    status: 'ERROR',
+    response: '',
+    error: 'invalid model selection (--model "bogus"): model bogus is not recognized',
+    duration_seconds: 0,
+    num_turns: 0,
+    usage: { input_tokens: 0, output_tokens: 0, thinking_tokens: 0, cache_read_tokens: 0, total_tokens: 0 },
+  })
+
+  test('new session buildCommand passes the prompt as --print=<value>', () => {
+    // agy's -p consumes the next argv as the prompt, so the `=` form keeps a
+    // leading-dash prompt from being parsed as a flag.
+    const { cmd } = adapters.agy.buildCommand(spec({ prompt: '--PROMPT', model: 'gemini-3.8-flash', effort: 'low' }))
+    expect(cmd).toEqual([
+      'agy',
+      '--print=--PROMPT',
+      '--output-format',
+      'json',
+      '--dangerously-skip-permissions',
+      '--model',
+      'gemini-3.8-flash',
+      '--effort',
+      'low',
+    ])
+  })
+
+  test('resume adds --conversation and prepends instructions', () => {
+    const { cmd } = adapters.agy.buildCommand(spec({ resumeSessionId: RESUME, instructions: 'INSTR' }))
+    expect(cmd).toEqual([
+      'agy',
+      '--print=INSTR\n\n---\n\nPROMPT',
+      '--output-format',
+      'json',
+      '--conversation',
+      RESUME,
+      '--dangerously-skip-permissions',
+    ])
+  })
+
+  test('parseResult reads response, conversation id, and usage', () => {
+    expect(adapters.agy.parseResult(spec(), SUCCESS)).toEqual({
+      result: 'pong',
+      harnessSessionId: 'c0ffee00-0000-4000-8000-000000000001',
+      usage: { inputTokens: 6528, outputTokens: 1, cacheReadTokens: 0, totalTokens: 6529, turns: 1 },
+    })
+  })
+
+  test('parseResult surfaces the error and keeps the resumed id on failure', () => {
+    const parsed = adapters.agy.parseResult(spec({ resumeSessionId: RESUME }), MODEL_ERROR)
+    expect(parsed.result).toContain('invalid model selection')
+    expect(parsed.harnessSessionId).toBe(RESUME)
+  })
+
+  test('parseResult falls back to raw stdout', () => {
+    expect(adapters.agy.parseResult(spec(), 'plain text\n')).toEqual({ result: 'plain text', harnessSessionId: '' })
+  })
+
+  test('classifyFailure recognizes quota wording in the error envelope', () => {
+    const stdout = JSON.stringify({ status: 'ERROR', response: '', error: 'You have reached your usage limit.' })
+    expect(adapters.agy.classifyFailure?.(stdout, '', 1)).toEqual({
+      code: 'quota_exhausted',
+      message: 'The selected Antigravity CLI harness has no available quota. Choose another harness.',
+      detail: 'You have reached your usage limit.',
+    })
+  })
+
+  test('classifyFailure recognizes the live Individual-quota payload', () => {
+    const error = 'Individual quota reached. Please upgrade your subscription to increase your limits. Resets in 131h11m22s.'
+    const stdout = JSON.stringify({ conversation_id: 'c1', status: 'ERROR', response: '', error, num_turns: 1 })
+    const stderr = `Error: ${error}\nAGY_ERROR: {"status":"RESOURCE_EXHAUSTED","error_code":429}`
+    expect(adapters.agy.classifyFailure?.(stdout, stderr, 1)).toEqual({
+      code: 'quota_exhausted',
+      message: 'The selected Antigravity CLI harness has no available quota. Choose another harness.',
+      detail: error,
+    })
+  })
+
+  test('classifyFailure does not treat a bare RESOURCE_EXHAUSTED rate limit as quota', () => {
+    const error = 'RESOURCE_EXHAUSTED (code 429): Resource has been exhausted, try again later.'
+    expect(adapters.agy.classifyFailure?.(JSON.stringify({ status: 'ERROR', error }), '', 1)).toBeUndefined()
+  })
+
+  test('classifyFailure ignores model prose in a SUCCESS envelope', () => {
+    const stdout = JSON.stringify({ status: 'SUCCESS', response: 'You have reached your usage limit.' })
+    expect(adapters.agy.classifyFailure?.(stdout, '', 0)).toBeUndefined()
+    expect(adapters.agy.classifyFailure?.(stdout, '', 1)).toBeUndefined()
+  })
+
+  test('classifyFailure leaves unrelated errors unclassified', () => {
+    expect(adapters.agy.classifyFailure?.(MODEL_ERROR, '', 1)).toBeUndefined()
+  })
+})
+
 describe('parseGrokModels', () => {
   test('parses default + plain bullets past an unauthenticated-warning preamble', () => {
     const stdout = [
@@ -462,7 +566,10 @@ describe('knownModels invariants', () => {
       })
 
       test('default metadata reflects what the harness exposes', () => {
-        expect(adapter.knownModels.filter((m) => m.isDefault === true)).toHaveLength(adapter.name === 'claude' ? 0 : 1)
+        expect(adapter.knownModels.filter((m) => m.isDefault === true)).toHaveLength(
+          // claude aliases and agy's settings-chosen model expose no fixed vendor default.
+          adapter.name === 'claude' || adapter.name === 'agy' ? 0 : 1,
+        )
       })
 
       test('modelsVerifiedAt is a date stamp', () => {

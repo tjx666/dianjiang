@@ -3,6 +3,7 @@
 import type { HarnessAdapter, HarnessName, KnownModel } from '../types.ts'
 import { HARNESS_NAMES } from '../types.ts'
 import { runSync } from '../exec.ts'
+import { agyAdapter } from './agy.ts'
 import { claudeAdapter } from './claude.ts'
 import { codexAdapter } from './codex.ts'
 import { grokAdapter } from './grok.ts'
@@ -11,9 +12,10 @@ export const adapters: Record<HarnessName, HarnessAdapter> = {
   claude: claudeAdapter,
   codex: codexAdapter,
   grok: grokAdapter,
+  agy: agyAdapter,
 }
 
-export { claudeAdapter, codexAdapter, grokAdapter }
+export { agyAdapter, claudeAdapter, codexAdapter, grokAdapter }
 
 export interface HarnessVersion {
   name: HarnessName
