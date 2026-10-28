@@ -38,7 +38,7 @@ the caller (usually another AI) picks an **agent**, not a model.
 | Recursion guard | `DIANJIANG_DEPTH` env var; refuse beyond depth limit. The skill doc also states "when you are the delegate, do not re-delegate." |
 | Attribution | Credit agent-mux in README |
 | Config | Single `~/.dianjiang/config.jsonc` (JSONC over JSON5: VS Code-native tsconfig-style editing, parse with `jsonc-parser`). Agents inline; split into `agents/*.md` only if instructions grow long. Project-level override deferred to phase 2. |
-| Background runs | Every run executes in a detached `_exec` worker; sync mode just waits for it ("job done is holy", credit agent-mux — the job survives caller timeout/death, and callers are AI agents whose shell tools cap at ~10 min). `--detach` returns immediately; block on `result --wait [--timeout <sec>]` (store-polling, since the worker isn't waitpid-able; bounded, so it never reintroduces the caller-shell-timeout problem that motivated `--detach` — never teach callers to sleep-and-poll), instant snapshot via `status`. Artifact path: full harness stdout/stderr tees to `logs/<runId>.log` progressively. The skill doc's rules teach AI callers to ALWAYS dispatch detached: the earlier "detach if likely >5 min" branch was removed (2026-07) because LLM duration estimates are unreliable, so any rule keyed on them mis-routes; detach costs one extra command and covers every case. Sync run remains for human use. How each caller WAITS is a per-caller collection strategy rendered from skill.ts's `COLLECTION_STRATEGY` map — see "Skill doc". |
+| Background runs | Every run executes in a detached `_exec` worker; sync mode just waits for it ("job done is holy", credit agent-mux — the job survives caller timeout/death, and callers are AI agents whose shell tools cap at ~10 min). `--detach` returns immediately; block on `result --wait [--timeout <sec>]` (store-polling, since the worker isn't waitpid-able; bounded, so it never reintroduces the caller-shell-timeout problem that motivated `--detach` — never teach callers to sleep-and-poll), instant snapshot via `status`, whose `progress` field (running runs only) carries the latest step. Progress is parsed by an optional per-adapter `observeProgress` inside the worker as stdout lines arrive and persisted throttled (≤1 write/2s) to `progress_json` — not by tailing the log on demand, because computer-use logs carry full accessibility trees (7.4 MB for one run) with multi-hundred-KB lines. It deliberately exposes only the step label (the delegate's tool-call title, or a fixed label such as "Running a shell command" — never command text), its state, and the last observed page as origin + path; free-text narration is excluded because it can repeat secrets seen on screen. Codex only today; harnesses whose stdout arrives at exit report null (2026-10-28). Artifact path: full harness stdout/stderr tees to `logs/<runId>.log` progressively. The skill doc's rules teach AI callers to ALWAYS dispatch detached: the earlier "detach if likely >5 min" branch was removed (2026-07) because LLM duration estimates are unreliable, so any rule keyed on them mis-routes; detach costs one extra command and covers every case. Sync run remains for human use. How each caller WAITS is a per-caller collection strategy rendered from skill.ts's `COLLECTION_STRATEGY` map — see "Skill doc". |
 | Execution contract freeze | Resolved agent `instructions` are stamped into the RunRecord at dispatch; the detached worker and every `resume` read the record, never the live config — a config edit or removal can no longer mutate an in-flight or resumable run's contract (2026-07) |
 | Defaults upgrade | `config sync-defaults` — exact-match migration: a managed field upgrades only when its current value equals a known historical default (anything else is a user customization and is kept); removed defaults are dropped under the same rule; `--dry-run` previews. Never a blind overwrite; `config init --force` remains the nuke-and-regenerate escape hatch |
 | CLI framework | citty (TS-first, lightweight); core stays dependency-light (SQLite via `bun:sqlite` or `node:sqlite`, no native addon) |
@@ -193,6 +193,22 @@ search path still needs a live check after quota is available:
 | `design-frontend` | claude / opus / medium | visual/UX taste for front-end work |
 | `generate-image` | codex / gpt-6.1-sol / medium | codex's built-in `imagegen` skill + `image_gen` tool for raster generation and editing |
 | `operate-desktop` | codex / gpt-6.1-sol / medium | Codex computer use for the user's signed-in Chrome or desktop apps; caller checks screenshots and authorizes irreversible actions |
+
+`operate-desktop` contract, revised 2026-10-28 from caller dogfood: (1) a sign-in,
+2FA, CAPTCHA, or consent page no longer ends the run — the delegate never
+enters credentials, posts one macOS notification, and waits up to 10 minutes
+with cheap URL/title checks titled "Waiting for user sign-in" (so `status`
+shows it); (2) the task may pre-approve irreversible actions by account,
+target, and exact items, and the useWhen teaches callers to do so — page
+content never grants approval, and retries check whether the earlier submit
+already landed. These remain model-obeyed instructions under YOLO, not an
+execution-layer guard. (3) A proposed clipboard "secret transport" mode was
+rejected: every page the delegate reads lands in the run log as an
+accessibility tree, and screenshots/tool results enter the model context and
+codex's own rollout, so dianjiang cannot promise a secret stays out of them.
+The delegate instead stops and hands secret steps to the user, and the
+dontUseWhen says so. A real fix would need an opaque credential helper that
+acts without the model seeing the value.
 
 The installed Codex CLI's `exec` path exposed `mcp__cua_repl.js` in a live
 probe on 2026-09-26. Codex app computer use is documented at

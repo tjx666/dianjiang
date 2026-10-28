@@ -621,3 +621,51 @@ describe('describeHarness / mergeLiveModels', () => {
     expect(list[1]?.note).toBe('not in curated set — efforts unverified')
   })
 })
+
+describe('codex observeProgress', () => {
+  const observe = adapters.codex.observeProgress!
+  const at = '2026-10-28T04:00:00.000Z'
+  const line = (evt: unknown) => JSON.stringify(evt)
+  const cua = (type: string, status: string, result?: unknown) =>
+    line({
+      type,
+      item: { id: 'i1', type: 'mcp_tool_call', server: 'cua_repl', tool: 'js', status, error: null, arguments: { code: 'await tab.click(68)', title: 'Submit domain' }, result },
+    })
+
+  test('a started computer-use call reports its title and keeps the last page', () => {
+    const previous = { step: 'Open', stepState: 'completed' as const, observedPage: 'https://resend.com/domains', observedAt: at }
+    expect(observe(cua('item.started', 'in_progress'), previous, at)).toEqual({
+      step: 'Submit domain',
+      stepState: 'started',
+      observedPage: 'https://resend.com/domains',
+      observedAt: at,
+    })
+  })
+
+  test('a completed call reads the page from its result and drops query and hash', () => {
+    const result = {
+      content: [{ type: 'text', text: 'Browser tab: 1, Title: "Add domain · Resend", URL: "https://resend.com/domains/add?token=secret#x".\n0 AXWebArea' }],
+    }
+    expect(observe(cua('item.completed', 'completed', result), undefined, at)).toEqual({
+      step: 'Submit domain',
+      stepState: 'completed',
+      observedPage: 'https://resend.com/domains/add',
+      observedAt: at,
+    })
+  })
+
+  test('a failed call is reported as failed', () => {
+    expect(observe(cua('item.completed', 'failed'), undefined, at)?.stepState).toBe('failed')
+  })
+
+  test('shell commands get a fixed label, never the command text', () => {
+    const evt = line({ type: 'item.started', item: { id: 'c1', type: 'command_execution', command: 'export TOKEN=abc', status: 'in_progress' } })
+    expect(observe(evt, undefined, at)).toEqual({ step: 'Running a shell command', stepState: 'started', observedAt: at })
+  })
+
+  test('narration, turn events, and non-JSON lines carry no step', () => {
+    expect(observe(line({ type: 'item.completed', item: { type: 'agent_message', text: 'key is abc' } }), undefined, at)).toBeUndefined()
+    expect(observe(line({ type: 'turn.completed', usage: {} }), undefined, at)).toBeUndefined()
+    expect(observe('not json', undefined, at)).toBeUndefined()
+  })
+})

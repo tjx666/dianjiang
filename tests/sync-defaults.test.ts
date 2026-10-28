@@ -195,6 +195,25 @@ describe('planSyncDefaults / applySyncDefaults', () => {
     expectSameConfig(applySyncDefaults(fixture, plan), defaultConfigJsonc())
   })
 
+  test('the v0.17.0 operate-desktop wording upgrades while a custom model is kept', () => {
+    const fixture = shape([
+      { path: ['agents', idx('operate-desktop'), 'useWhen'], value: "a task requires operating the user's signed-in Chrome or another desktop app through Codex computer use; tell the user to leave the target app untouched while the delegate works and review its final screenshot before reporting" },
+      { path: ['agents', idx('operate-desktop'), 'dontUseWhen'], value: "the task can be completed through a CLI, API, or your own available browser/computer-use tools" },
+      { path: ['agents', idx('operate-desktop'), 'instructions'], value: "Use the available computer-use tools to operate the target app. Stop before submitting, sending, paying, deleting, or any other irreversible action; return for user approval before continuing. Capture and save screenshots of the final state, inspect them, and return their paths with a concise account of the state reached. If computer use or screenshots are unavailable, say so instead of claiming completion." },
+      { path: ['agents', idx('operate-desktop'), 'model'], value: 'gpt-6.1-terra' },
+    ])
+
+    const plan = planSyncDefaults(fixture)
+    expect(actions(plan)).toEqual(new Set([
+      'set agents.operate-desktop.useWhen',
+      'set agents.operate-desktop.dontUseWhen',
+      'set agents.operate-desktop.instructions',
+    ]))
+    expect(plan.filter((c) => c.action === 'keep-custom').map((c) => c.path)).toEqual([
+      'agents.operate-desktop.model',
+    ])
+  })
+
   test('the v0.16.0 second-opinion binding upgrades to gpt-6.1-sol at xhigh', () => {
     const fixture = shape([
       { path: ['callers', 'claude', 'agents', 'second-opinion', 'model'], value: 'gpt-6-sol' },

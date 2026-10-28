@@ -10,7 +10,7 @@ import {
 import { platform, tmpdir } from 'node:os'
 import { delimiter, join } from 'node:path'
 import type { DianjiangConfig, RunRecord } from '../src/core/types.ts'
-import { dispatch, specFromRecord, waitForRun } from '../src/core/runner.ts'
+import { buildReport, dispatch, specFromRecord, waitForRun } from '../src/core/runner.ts'
 import { opLogPath } from '../src/core/paths.ts'
 import { insertRun, updateRun } from '../src/core/store.ts'
 
@@ -225,4 +225,11 @@ process.exit(1)
     contentChanged: true,
     modelChanged: true,
   })
+})
+
+test('the report exposes progress only while the run is running', () => {
+  const progress = { step: 'Submit domain', stepState: 'started' as const, observedAt: '2026-10-28T04:00:00.000Z' }
+  expect(buildReport(record({ status: 'running', progress })).progress).toEqual(progress)
+  expect(buildReport(record({ status: 'completed', progress })).progress).toBeNull()
+  expect(buildReport(record({ status: 'running' })).progress).toBeNull()
 })

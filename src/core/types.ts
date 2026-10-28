@@ -151,6 +151,26 @@ export interface RunFailure {
   detail?: string
 }
 
+/**
+ * Latest step a running harness reported, parsed from its live event stream.
+ * Deliberately narrow: never the delegate's free-text narration, which may
+ * repeat secrets it saw on screen.
+ */
+export interface RunProgress {
+  /** Label of the most recent step: the delegate's own tool-call title when it gave one. */
+  step: string
+  /** That step's state when last observed; a completed step is not proof the action succeeded. */
+  stepState: 'started' | 'completed' | 'failed'
+  /**
+   * Origin + path of the page the latest computer-use step observed (query and
+   * hash dropped, since they can carry tokens). The last page seen, not a
+   * guarantee of the current one.
+   */
+  observedPage?: string
+  /** ISO-8601 time the step was observed. */
+  observedAt: string
+}
+
 export interface HarnessResult {
   /** Final assistant message. */
   result: string
@@ -201,6 +221,12 @@ export interface HarnessAdapter {
    * command declared one) into the unified result.
    */
   parseResult(spec: DispatchSpec, stdout: string, outputFileContents?: string): HarnessResult
+  /**
+   * Fold one complete stdout line of a running harness into its progress.
+   * Returns the new progress, or undefined when the line carries no step.
+   * Optional: harnesses whose stdout only arrives at exit have nothing to report.
+   */
+  observeProgress?(line: string, previous: RunProgress | undefined, observedAt: string): RunProgress | undefined
   /** argv appended to the binary for the `config harnesses` self-check. */
   versionArgs: string[]
 }
@@ -239,6 +265,8 @@ export interface RunRecord {
   usage?: RunUsage
   /** Actionable structured failure; omitted for unclassified failures. */
   failure?: RunFailure
+  /** Latest observed step, persisted by the worker while the run is live. */
+  progress?: RunProgress
 }
 
 /** The single JSON object `run`/`resume`/`result` print on stdout. */
@@ -260,4 +288,6 @@ export interface RunReport {
   usage: RunUsage | null
   /** Actionable structured failure; null when the failure was not classified. */
   failure: RunFailure | null
+  /** Latest observed step while `status` is "running"; null otherwise or when the harness reports none. */
+  progress: RunProgress | null
 }

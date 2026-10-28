@@ -106,6 +106,14 @@ const LEGACY_DEFAULTS: Record<string, unknown[]> = {
   'agents.generate-image.effort': ['low', 'max'],
   'agents.generate-image.model': ['gpt-5.6-luna', 'gpt-6-luna'],
   'agents.operate-desktop.model': ['gpt-6-sol'],
+  // Pre-2026-10-28 wording: before pre-approval, in-run sign-in waits, and the secret-handling rule.
+  'agents.operate-desktop.useWhen': [
+    "a task requires operating the user's signed-in Chrome or another desktop app through Codex computer use; tell the user to leave the target app untouched while the delegate works and review its final screenshot before reporting",
+  ],
+  'agents.operate-desktop.dontUseWhen': ["the task can be completed through a CLI, API, or your own available browser/computer-use tools"],
+  'agents.operate-desktop.instructions': [
+    "Use the available computer-use tools to operate the target app. Stop before submitting, sending, paying, deleting, or any other irreversible action; return for user approval before continuing. Capture and save screenshots of the final state, inspect them, and return their paths with a concise account of the state reached. If computer use or screenshots are unavailable, say so instead of claiming completion.",
+  ],
   'agents.generate-image.useWhen': [
     "generating or editing raster images such as photos, illustrations, textures, sprites, mockups, or transparent-background cutouts through Codex's built-in image generation, especially when the caller is Claude Code",
   ],

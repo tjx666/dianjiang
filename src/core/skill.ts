@@ -213,6 +213,10 @@ ${agents}
   means the selected harness has no available quota — recommend another
   harness, and never treat \`.result\` as the task's answer. When \`.failure\`
   is null, \`.result\` is still a diagnostic summary, not a task answer.
+- When the user asks where a running run is, \`dianjiang status <runId>\`
+  answers instantly: \`.progress\` holds its latest step (and, for computer
+  use, the last page it saw) when the harness reports one, else null. It is
+  for answering that question, not for polling — collection stays as above.
 - Write tasks self-contained (background, file paths, acceptance criteria,
   expected output): the delegate starts fresh in your cwd — it sees your files,
   not your conversation.
