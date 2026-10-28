@@ -27,11 +27,13 @@ const CODEX_PRE_56 = ['low', 'medium', 'high', 'xhigh'] as const
  * on codex-cli 0.161.0-alpha.4). GPT-6.1 Sol (2026-09-29) is the vendor default
  * and, like the other Sol/Astra models, supports `ultra`; Luna supports up to
  * `max`. gpt-5.4, gpt-5.4-mini, and gpt-5.3-codex-spark left the catalog.
+ * gpt-6.1-terra (supports `ultra`) verified 2026-10-28 on codex-cli 0.165.0-alpha.1.
  * The CLI has no model-list command exposed under ChatGPT-subscription auth, so there is no
  * `listModels`.
  */
 export const CODEX_MODELS: readonly KnownModel[] = [
   { name: 'gpt-6.1-sol', efforts: CODEX_EFFORTS, isDefault: true },
+  { name: 'gpt-6.1-terra', efforts: CODEX_EFFORTS },
   { name: 'gpt-6-sol', efforts: CODEX_EFFORTS },
   { name: 'gpt-6-luna', efforts: CODEX_LUNA_EFFORTS },
   { name: 'gpt-6-astra', efforts: CODEX_EFFORTS },

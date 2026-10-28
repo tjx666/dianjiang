@@ -191,8 +191,11 @@ search path still needs a live check after quota is available:
 |---|---|---|
 | `search-twitter` | grok / grok-4.7 / medium | grok's native live X/Twitter search tools |
 | `design-frontend` | claude / opus / medium | visual/UX taste for front-end work |
-| `generate-image` | codex / gpt-6.1-sol / medium | codex's built-in `imagegen` skill + `image_gen` tool for raster generation and editing |
-| `operate-desktop` | codex / gpt-6.1-sol / medium | Codex computer use for the user's signed-in Chrome or desktop apps; caller checks screenshots and authorizes irreversible actions |
+| `generate-image` | codex / gpt-6.1-terra / medium | codex's built-in `imagegen` skill + `image_gen` tool for raster generation and editing |
+| `operate-desktop` | codex / gpt-6.1-terra / medium | Codex computer use for the user's signed-in Chrome or desktop apps; caller checks screenshots and authorizes irreversible actions |
+
+`generate-image` and `operate-desktop` moved from gpt-6.1-sol to
+gpt-6.1-terra on 2026-10-28 at the user's choice; opinion agents stay on Sol.
 
 `operate-desktop` contract, revised 2026-10-28 from caller dogfood: (1) a sign-in,
 2FA, CAPTCHA, or consent page no longer ends the run — the delegate never
@@ -227,7 +230,7 @@ Locally verified model/effort space:
   → `claude-fable-5-1` (2026-09-05), `opus` → `claude-opus-5-5`
   (2026-09-23), `sonnet` → `claude-sonnet-5-5` (2026-09-30) — so a same-tier model
   release needs no roster bump.
-- codex: `gpt-6.1-sol` (vendor default 2026-09-30), `gpt-6-astra/-sol/-luna`,
+- codex: `gpt-6.1-sol` (vendor default 2026-09-30), `gpt-6.1-terra` (2026-10-28), `gpt-6-astra/-sol/-luna`,
   `gpt-5.6-sol/-terra/-luna`, `gpt-5.5` (`gpt-5.4(-mini)` and
   `gpt-5.3-codex-spark` left the catalog by 2026-09-30); effort superset `low…ultra`, but `max`/`ultra` only on
   the 5.6+ series and `ultra` only on astra/sol/terra (adapters must validate

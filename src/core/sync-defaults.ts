@@ -104,8 +104,8 @@ const LEGACY_DEFAULTS: Record<string, unknown[]> = {
   'agents.design-frontend.effort': ['high'],
   'agents.design-frontend.model': ['fable'],
   'agents.generate-image.effort': ['low', 'max'],
-  'agents.generate-image.model': ['gpt-5.6-luna', 'gpt-6-luna'],
-  'agents.operate-desktop.model': ['gpt-6-sol'],
+  'agents.generate-image.model': ['gpt-5.6-luna', 'gpt-6-luna', 'gpt-6.1-sol'],
+  'agents.operate-desktop.model': ['gpt-6-sol', 'gpt-6.1-sol'],
   // Pre-2026-10-28 wording: before pre-approval, in-run sign-in waits, and the secret-handling rule.
   'agents.operate-desktop.useWhen': [
     "a task requires operating the user's signed-in Chrome or another desktop app through Codex computer use; tell the user to leave the target app untouched while the delegate works and review its final screenshot before reporting",

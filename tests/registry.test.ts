@@ -38,7 +38,7 @@ describe('defaultConfigJsonc', () => {
       useWhen: expect.stringContaining('generating or editing raster images'),
       dontUseWhen: expect.stringContaining('SVG, HTML/CSS, canvas'),
       harness: 'codex',
-      model: 'gpt-6.1-sol',
+      model: 'gpt-6.1-terra',
       effort: 'medium',
       instructions: expect.stringContaining('imagegen skill'),
     })
@@ -47,7 +47,7 @@ describe('defaultConfigJsonc', () => {
       useWhen: expect.stringContaining('signed-in Chrome'),
       dontUseWhen: expect.stringContaining('CLI, API'),
       harness: 'codex',
-      model: 'gpt-6.1-sol',
+      model: 'gpt-6.1-terra',
       effort: 'medium',
       instructions: expect.stringContaining('Stop before submitting'),
     })
