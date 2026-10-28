@@ -36,8 +36,8 @@ reach for dianjiang only when an agent below clearly fits.
 </agent>
 
 <agent name="operate-desktop">
-  <use-when>a task requires operating the user's signed-in Chrome or another desktop app through Codex computer use; tell the user to leave the target app untouched while the delegate works and review its final screenshot before reporting</use-when>
-  <dont-use-when>the task can be completed through a CLI, API, or your own available browser/computer-use tools</dont-use-when>
+  <use-when>a task requires operating the user's signed-in Chrome or another desktop app through Codex computer use; in the task, pre-approve each irreversible action the user already authorized by account, target, and exact items (for example, create these two DNS records in zone example.com), since anything unnamed stops for approval; tell the user to leave the target app untouched except to sign in when notified; dianjiang status <runId> shows its latest step in .progress; review its final screenshot before reporting</use-when>
+  <dont-use-when>the task can be completed through a CLI, API, or your own available browser/computer-use tools; or it must move a secret such as an API key or token between pages, since anything shown on screen lands in the run log and model context, so leave that step to the user</dont-use-when>
 </agent>
 
 <rules>
@@ -67,6 +67,10 @@ reach for dianjiang only when an agent below clearly fits.
   means the selected harness has no available quota — recommend another
   harness, and never treat \`.result\` as the task's answer. When \`.failure\`
   is null, \`.result\` is still a diagnostic summary, not a task answer.
+- When the user asks where a running run is, \`dianjiang status <runId>\`
+  answers instantly: \`.progress\` holds its latest step (and, for computer
+  use, the last page it saw) when the harness reports one, else null. It is
+  for answering that question, not for polling — collection stays as above.
 - Write tasks self-contained (background, file paths, acceptance criteria,
   expected output): the delegate starts fresh in your cwd — it sees your files,
   not your conversation.
@@ -191,8 +195,8 @@ reach for dianjiang only when an agent below clearly fits.
 </agent>
 
 <agent name="operate-desktop">
-  <use-when>a task requires operating the user's signed-in Chrome or another desktop app through Codex computer use; tell the user to leave the target app untouched while the delegate works and review its final screenshot before reporting</use-when>
-  <dont-use-when>the task can be completed through a CLI, API, or your own available browser/computer-use tools</dont-use-when>
+  <use-when>a task requires operating the user's signed-in Chrome or another desktop app through Codex computer use; in the task, pre-approve each irreversible action the user already authorized by account, target, and exact items (for example, create these two DNS records in zone example.com), since anything unnamed stops for approval; tell the user to leave the target app untouched except to sign in when notified; dianjiang status <runId> shows its latest step in .progress; review its final screenshot before reporting</use-when>
+  <dont-use-when>the task can be completed through a CLI, API, or your own available browser/computer-use tools; or it must move a secret such as an API key or token between pages, since anything shown on screen lands in the run log and model context, so leave that step to the user</dont-use-when>
 </agent>
 
 <rules>
@@ -223,6 +227,10 @@ reach for dianjiang only when an agent below clearly fits.
   means the selected harness has no available quota — recommend another
   harness, and never treat \`.result\` as the task's answer. When \`.failure\`
   is null, \`.result\` is still a diagnostic summary, not a task answer.
+- When the user asks where a running run is, \`dianjiang status <runId>\`
+  answers instantly: \`.progress\` holds its latest step (and, for computer
+  use, the last page it saw) when the harness reports one, else null. It is
+  for answering that question, not for polling — collection stays as above.
 - Write tasks self-contained (background, file paths, acceptance criteria,
   expected output): the delegate starts fresh in your cwd — it sees your files,
   not your conversation.
@@ -443,6 +451,10 @@ reach for dianjiang only when an agent below clearly fits.
   means the selected harness has no available quota — recommend another
   harness, and never treat \`.result\` as the task's answer. When \`.failure\`
   is null, \`.result\` is still a diagnostic summary, not a task answer.
+- When the user asks where a running run is, \`dianjiang status <runId>\`
+  answers instantly: \`.progress\` holds its latest step (and, for computer
+  use, the last page it saw) when the harness reports one, else null. It is
+  for answering that question, not for polling — collection stays as above.
 - Write tasks self-contained (background, file paths, acceptance criteria,
   expected output): the delegate starts fresh in your cwd — it sees your files,
   not your conversation.
@@ -568,8 +580,8 @@ reach for dianjiang only when an agent below clearly fits.
 </agent>
 
 <agent name="operate-desktop">
-  <use-when>a task requires operating the user's signed-in Chrome or another desktop app through Codex computer use; tell the user to leave the target app untouched while the delegate works and review its final screenshot before reporting</use-when>
-  <dont-use-when>the task can be completed through a CLI, API, or your own available browser/computer-use tools</dont-use-when>
+  <use-when>a task requires operating the user's signed-in Chrome or another desktop app through Codex computer use; in the task, pre-approve each irreversible action the user already authorized by account, target, and exact items (for example, create these two DNS records in zone example.com), since anything unnamed stops for approval; tell the user to leave the target app untouched except to sign in when notified; dianjiang status <runId> shows its latest step in .progress; review its final screenshot before reporting</use-when>
+  <dont-use-when>the task can be completed through a CLI, API, or your own available browser/computer-use tools; or it must move a secret such as an API key or token between pages, since anything shown on screen lands in the run log and model context, so leave that step to the user</dont-use-when>
 </agent>
 
 <rules>
@@ -600,6 +612,10 @@ reach for dianjiang only when an agent below clearly fits.
   means the selected harness has no available quota — recommend another
   harness, and never treat \`.result\` as the task's answer. When \`.failure\`
   is null, \`.result\` is still a diagnostic summary, not a task answer.
+- When the user asks where a running run is, \`dianjiang status <runId>\`
+  answers instantly: \`.progress\` holds its latest step (and, for computer
+  use, the last page it saw) when the harness reports one, else null. It is
+  for answering that question, not for polling — collection stays as above.
 - Write tasks self-contained (background, file paths, acceptance criteria,
   expected output): the delegate starts fresh in your cwd — it sees your files,
   not your conversation.
@@ -725,8 +741,8 @@ reach for dianjiang only when an agent below clearly fits.
 </agent>
 
 <agent name="operate-desktop">
-  <use-when>a task requires operating the user's signed-in Chrome or another desktop app through Codex computer use; tell the user to leave the target app untouched while the delegate works and review its final screenshot before reporting</use-when>
-  <dont-use-when>the task can be completed through a CLI, API, or your own available browser/computer-use tools</dont-use-when>
+  <use-when>a task requires operating the user's signed-in Chrome or another desktop app through Codex computer use; in the task, pre-approve each irreversible action the user already authorized by account, target, and exact items (for example, create these two DNS records in zone example.com), since anything unnamed stops for approval; tell the user to leave the target app untouched except to sign in when notified; dianjiang status <runId> shows its latest step in .progress; review its final screenshot before reporting</use-when>
+  <dont-use-when>the task can be completed through a CLI, API, or your own available browser/computer-use tools; or it must move a secret such as an API key or token between pages, since anything shown on screen lands in the run log and model context, so leave that step to the user</dont-use-when>
 </agent>
 
 <rules>
@@ -758,6 +774,10 @@ reach for dianjiang only when an agent below clearly fits.
   means the selected harness has no available quota — recommend another
   harness, and never treat \`.result\` as the task's answer. When \`.failure\`
   is null, \`.result\` is still a diagnostic summary, not a task answer.
+- When the user asks where a running run is, \`dianjiang status <runId>\`
+  answers instantly: \`.progress\` holds its latest step (and, for computer
+  use, the last page it saw) when the harness reports one, else null. It is
+  for answering that question, not for polling — collection stays as above.
 - Write tasks self-contained (background, file paths, acceptance criteria,
   expected output): the delegate starts fresh in your cwd — it sees your files,
   not your conversation.

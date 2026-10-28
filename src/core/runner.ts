@@ -19,6 +19,8 @@ import type {
   DianjiangConfig,
   DispatchSpec,
   HarnessName,
+  HarnessAdapter,
+  RunProgress,
   RunRecord,
   RunReport,
 } from './types.ts'
@@ -105,6 +107,7 @@ export function buildReport(record: RunRecord): RunReport {
     finishedAt: record.finishedAt ?? null,
     usage: record.usage ?? null,
     failure: record.failure ?? null,
+    progress: record.status === 'running' ? (record.progress ?? null) : null,
   }
 }
 
@@ -113,14 +116,69 @@ export function buildReport(record: RunRecord): RunReport {
  * process.stdout/stderr ARE the run's log file, so the harness output is
  * persisted progressively — partial output survives even a killed worker.
  */
-async function tee(stream: Readable, sink: { write(chunk: string): unknown }): Promise<string> {
+async function tee(
+  stream: Readable,
+  sink: { write(chunk: string): unknown },
+  onLine?: (line: string) => void,
+): Promise<string> {
   let text = ''
+  let pending = ''
   for await (const chunk of stream) {
     const part = typeof chunk === 'string' ? chunk : Buffer.from(chunk).toString()
     text += part
     sink.write(part)
+    if (!onLine) continue
+    pending += part
+    const lines = pending.split('\n')
+    pending = lines.pop() ?? ''
+    for (const line of lines) if (line.trim()) onLine(line)
   }
+  if (onLine && pending.trim()) onLine(pending)
   return text
+}
+
+/** Minimum gap between progress writes; a trailing write lands the latest step. */
+const PROGRESS_WRITE_INTERVAL_MS = 2000
+
+/**
+ * Track a live run's progress from its stdout lines and persist it, throttled,
+ * so `status` reads a stored snapshot instead of re-parsing a multi-megabyte
+ * log (computer-use runs log full accessibility trees per step).
+ */
+function createProgressRecorder(runId: string, adapter: HarnessAdapter) {
+  const observe = adapter.observeProgress
+  let latest: RunProgress | undefined
+  let written: RunProgress | undefined
+  let lastWriteAt = 0
+  let timer: ReturnType<typeof setTimeout> | undefined
+  const flush = () => {
+    timer = undefined
+    if (!latest || latest === written) return
+    written = latest
+    lastWriteAt = Date.now()
+    try {
+      updateRun(runId, { progress: latest })
+    } catch (err) {
+      // Progress is advisory; never let a store hiccup fail the run.
+      logEvent('progress.error', { runId, error: errorMessage(err) })
+    }
+  }
+  return {
+    onLine: observe
+      ? (line: string) => {
+          const next = observe(line, latest, new Date().toISOString())
+          if (!next) return
+          latest = next
+          const wait = PROGRESS_WRITE_INTERVAL_MS - (Date.now() - lastWriteAt)
+          if (wait <= 0) flush()
+          else timer ??= setTimeout(flush, wait)
+        }
+      : undefined,
+    stop() {
+      if (timer) clearTimeout(timer)
+      timer = undefined
+    },
+  }
 }
 
 /**
@@ -161,7 +219,11 @@ async function runToCompletion(record: RunRecord, spec: DispatchSpec): Promise<R
     harnessPid = proc.pid
     if (!proc.stdout || !proc.stderr) throw new Error('spawn did not provide piped stdio')
 
-    const [stdout, stderr] = await Promise.all([tee(proc.stdout, process.stdout), tee(proc.stderr, process.stderr)])
+    const progress = createProgressRecorder(record.runId, adapter)
+    const [stdout, stderr] = await Promise.all([
+      tee(proc.stdout, process.stdout, progress.onLine),
+      tee(proc.stderr, process.stderr),
+    ]).finally(() => progress.stop())
     const exitCode = await new Promise<number>((resolve, reject) => {
       proc.once('error', reject)
       proc.once('close', (code) => resolve(code ?? 1))

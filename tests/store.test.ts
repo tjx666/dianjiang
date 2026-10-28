@@ -129,6 +129,18 @@ test('structured failure roundtrips through the JSON column', () => {
   })
 })
 
+test('progress roundtrips through the JSON column', () => {
+  insertRun(record())
+  const progress = {
+    step: 'Save DKIM TXT record',
+    stepState: 'completed' as const,
+    observedPage: 'https://dash.cloudflare.com/zone/dns',
+    observedAt: '2026-10-28T04:00:00.000Z',
+  }
+  updateRun('r1', { progress })
+  expect(getRun('r1')?.progress).toEqual(progress)
+})
+
 test('a run with no structured failure reads back with failure undefined', () => {
   insertRun(record())
   expect(getRun('r1')?.failure).toBeUndefined()

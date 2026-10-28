@@ -4,7 +4,7 @@
  * camelCase, mapped explicitly below.
  */
 
-import type { HarnessName, RunFailure, RunRecord, RunStatus, RunUsage } from './types.ts'
+import type { HarnessName, RunFailure, RunProgress, RunRecord, RunStatus, RunUsage } from './types.ts'
 import { dbPath } from './paths.ts'
 import { openDatabase, type SqliteDatabase } from './sqlite.ts'
 
@@ -34,14 +34,15 @@ interface Row {
   turns: number | null
   cost_usd: number | null
   failure_json: string | null
+  progress_json: string | null
 }
 
 /**
- * camelCase field -> snake_case column, for dynamic UPDATE building. `usage`
- * and `failure` are intentionally absent: both have custom storage mappings
- * handled by insert/update/read.
+ * camelCase field -> snake_case column, for dynamic UPDATE building. `usage`,
+ * `failure`, and `progress` are intentionally absent: each has a custom
+ * storage mapping handled by insert/update/read.
  */
-const FIELD_TO_COLUMN: Record<Exclude<keyof RunRecord, 'usage' | 'failure'>, string> = {
+const FIELD_TO_COLUMN: Record<Exclude<keyof RunRecord, 'usage' | 'failure' | 'progress'>, string> = {
   runId: 'run_id',
   agent: 'agent',
   harness: 'harness',
@@ -90,6 +91,7 @@ function ensureColumns(db: SqliteDatabase): void {
     instructions: 'TEXT',
     failure_json: 'TEXT',
     external_resume_session_id: 'TEXT',
+    progress_json: 'TEXT',
   }
   for (const [column, type] of Object.entries(migrated)) {
     if (existing.has(column)) continue
@@ -172,6 +174,24 @@ function rowToFailure(row: Row): RunFailure | undefined {
   }
 }
 
+/** Parse the progress column defensively; a malformed value reads as no progress. */
+function rowToProgress(row: Row): RunProgress | undefined {
+  if (!row.progress_json) return undefined
+  try {
+    const value = JSON.parse(row.progress_json) as Partial<RunProgress>
+    if (typeof value.step !== 'string' || typeof value.observedAt !== 'string') return undefined
+    if (value.stepState !== 'started' && value.stepState !== 'completed' && value.stepState !== 'failed') return undefined
+    return {
+      step: value.step,
+      stepState: value.stepState,
+      ...(typeof value.observedPage === 'string' ? { observedPage: value.observedPage } : {}),
+      observedAt: value.observedAt,
+    }
+  } catch {
+    return undefined
+  }
+}
+
 function rowToRecord(row: Row): RunRecord {
   return {
     runId: row.run_id,
@@ -193,6 +213,7 @@ function rowToRecord(row: Row): RunRecord {
     instructions: row.instructions ?? undefined,
     usage: rowToUsage(row),
     failure: rowToFailure(row),
+    progress: rowToProgress(row),
   }
 }
 
@@ -204,8 +225,8 @@ export function insertRun(record: RunRecord, db = getStore()): void {
       harness_session_id, cwd, task, started_at, finished_at, pid, parent_run_id,
       instructions,
       input_tokens, output_tokens, cache_read_tokens, total_tokens, turns, cost_usd,
-      failure_json, external_resume_session_id
-    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      failure_json, external_resume_session_id, progress_json
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
   ).run(
     record.runId,
     record.agent ?? null,
@@ -231,6 +252,7 @@ export function insertRun(record: RunRecord, db = getStore()): void {
     u?.costUsd ?? null,
     record.failure ? JSON.stringify(record.failure) : null,
     record.externalResumeSessionId ?? null,
+    record.progress ? JSON.stringify(record.progress) : null,
   )
 }
 
@@ -249,8 +271,8 @@ export function updateRun(runId: string, patch: Partial<RunRecord>, db = getStor
       }
       continue
     }
-    if (field === 'failure') {
-      assignments.push('failure_json = ?')
+    if (field === 'failure' || field === 'progress') {
+      assignments.push(`${field}_json = ?`)
       values.push(value === undefined ? null : JSON.stringify(value))
       continue
     }

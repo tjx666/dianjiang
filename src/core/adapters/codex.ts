@@ -12,7 +12,7 @@
 
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import type { DispatchSpec, HarnessAdapter, HarnessResult, KnownModel, RunUsage } from '../types.ts'
+import type { DispatchSpec, HarnessAdapter, HarnessResult, KnownModel, RunProgress, RunUsage } from '../types.ts'
 import { asRecord, num, withInstructions } from './shared.ts'
 
 export const CODEX_EFFORTS = ['low', 'medium', 'high', 'xhigh', 'max', 'ultra'] as const
@@ -113,6 +113,73 @@ function extractAgentMessage(evt: Record<string, unknown>): string | undefined {
   return undefined
 }
 
+/**
+ * Fixed labels for non-MCP items. Commands and file paths are deliberately not
+ * echoed: a progress probe must not surface arguments that may carry secrets.
+ */
+const ITEM_STEP_LABELS: Record<string, string> = {
+  command_execution: 'Running a shell command',
+  file_change: 'Editing files',
+  web_search: 'Searching the web',
+}
+
+/**
+ * Computer-use (`cua_repl`) results open with the active tab, e.g.
+ * `Browser tab: 112…, Title: "Add domain · Resend", URL: "https://resend.com/domains/add"`
+ * (observed codex-cli 0.165, 2026-10-28). Keep origin + path only.
+ */
+function observedPageOf(item: Record<string, unknown>): string | undefined {
+  const content = asRecord(item['result'])?.['content']
+  if (!Array.isArray(content)) return undefined
+  for (const part of content) {
+    const text = asRecord(part)?.['text']
+    if (typeof text !== 'string') continue
+    const match = /URL: "([^"]+)"/.exec(text)
+    if (!match?.[1]) continue
+    try {
+      const url = new URL(match[1])
+      return `${url.origin}${url.pathname}`
+    } catch {
+      return undefined
+    }
+  }
+  return undefined
+}
+
+/**
+ * Map one `codex exec --json` line to progress. Steps come from
+ * `item.started`/`item.completed` events; an item's own `status` is
+ * `in_progress | completed | failed`. MCP calls use the delegate's
+ * `arguments.title` (computer use always sets one) before `server.tool`.
+ */
+function observeCodexProgress(
+  line: string,
+  previous: RunProgress | undefined,
+  observedAt: string,
+): RunProgress | undefined {
+  let evt: Record<string, unknown>
+  try {
+    evt = JSON.parse(line) as Record<string, unknown>
+  } catch {
+    return undefined
+  }
+  if (evt['type'] !== 'item.started' && evt['type'] !== 'item.completed') return undefined
+  const item = asRecord(evt['item'])
+  if (!item) return undefined
+  let step: string | undefined
+  if (item['type'] === 'mcp_tool_call') {
+    const title = asRecord(item['arguments'])?.['title']
+    step = typeof title === 'string' && title.trim() ? title.trim() : `${String(item['server'])}.${String(item['tool'])}`
+  } else {
+    step = ITEM_STEP_LABELS[String(item['type'])]
+  }
+  if (!step) return undefined
+  const stepState =
+    evt['type'] === 'item.started' ? 'started' : item['status'] === 'failed' || item['error'] ? 'failed' : 'completed'
+  const observedPage = (stepState === 'started' ? undefined : observedPageOf(item)) ?? previous?.observedPage
+  return { step, stepState, ...(observedPage ? { observedPage } : {}), observedAt }
+}
+
 export const codexAdapter: HarnessAdapter = {
   name: 'codex',
   efforts: CODEX_EFFORTS,
@@ -130,6 +197,8 @@ export const codexAdapter: HarnessAdapter = {
     cmd.push(withInstructions(spec))
     return { cmd, outputFile }
   },
+
+  observeProgress: observeCodexProgress,
 
   parseResult(spec: DispatchSpec, stdout: string, outputFileContents?: string): HarnessResult {
     let harnessSessionId = ''
