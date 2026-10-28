@@ -59,4 +59,9 @@ Run it from a worktree at the tagged commit after `bun run build`, because
 
 Upgrade it yourself. Resolve it with `readlink -f "$(which dianjiang)"`
 before choosing a command. Today it is a `bun link` to the primary checkout,
-so run `git pull --ff-only && bun run build` there.
+so run `git pull --ff-only && bun run build` there, then
+`dianjiang config sync-defaults` so `~/.dianjiang/config.jsonc` picks up the
+new preset defaults. A linked install does not depend on npm: do this right
+after merging the release PR, before the publish finishes or while it is
+blocked. Otherwise a delegate dispatched during the release, such as
+`operate-desktop` for npm settings, still runs the previous version's rules.

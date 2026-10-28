@@ -53,6 +53,11 @@ bun run src/cli/index.ts <command>   # run the CLI without linking
 - Verify changes end-to-end with `.agents/skills/verify/SKILL.md`. Hard
   isolation rules: always set `DIANJIANG_HOME=<tempdir>`; live AI calls must
   use the cheapest paths listed there.
+- In this repository, a request to change an agent's model or effort (for
+  example, "switch operate-desktop to terra") changes the shipped default in
+  `src/core/registry.ts`, adds the old value to `LEGACY_DEFAULTS` in
+  `src/core/sync-defaults.ts`, then runs `dianjiang config sync-defaults`.
+  Edit only `~/.dianjiang/config.jsonc` when the user says it is local.
 - Adapter quirks are documented in-code (grok's `-p` takes the prompt as its
   value; codex parses sessionId from JSONL events). Don't "unify" them.
 - Before answering harness capability questions, check each relevant installed

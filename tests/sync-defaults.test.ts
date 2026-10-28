@@ -166,7 +166,7 @@ describe('planSyncDefaults / applySyncDefaults', () => {
     expectSameConfig(applySyncDefaults(fixture, plan), defaultConfigJsonc())
   })
 
-  test('the v0.16.1 codex bindings upgrade to gpt-6.1-sol', () => {
+  test('the v0.16.1 codex bindings upgrade to the current GPT-6.1 defaults', () => {
     const fixture = shape([
       { path: ['agents', idx('review'), 'model'], value: 'gpt-6-sol' },
       { path: ['agents', idx('review'), 'useWhen'], value: V0161_REVIEW_USEWHEN },
@@ -195,12 +195,27 @@ describe('planSyncDefaults / applySyncDefaults', () => {
     expectSameConfig(applySyncDefaults(fixture, plan), defaultConfigJsonc())
   })
 
+  test('the v0.18.0 capability bindings upgrade from gpt-6.1-sol to gpt-6.1-terra', () => {
+    const fixture = shape([
+      { path: ['agents', idx('generate-image'), 'model'], value: 'gpt-6.1-sol' },
+      { path: ['agents', idx('operate-desktop'), 'model'], value: 'gpt-6.1-sol' },
+    ])
+
+    const plan = planSyncDefaults(fixture)
+    expect(actions(plan)).toEqual(new Set([
+      'set agents.generate-image.model',
+      'set agents.operate-desktop.model',
+    ]))
+    expect(plan.filter((c) => c.action === 'keep-custom')).toHaveLength(0)
+    expectSameConfig(applySyncDefaults(fixture, plan), defaultConfigJsonc())
+  })
+
   test('the v0.17.0 operate-desktop wording upgrades while a custom model is kept', () => {
     const fixture = shape([
       { path: ['agents', idx('operate-desktop'), 'useWhen'], value: "a task requires operating the user's signed-in Chrome or another desktop app through Codex computer use; tell the user to leave the target app untouched while the delegate works and review its final screenshot before reporting" },
       { path: ['agents', idx('operate-desktop'), 'dontUseWhen'], value: "the task can be completed through a CLI, API, or your own available browser/computer-use tools" },
       { path: ['agents', idx('operate-desktop'), 'instructions'], value: "Use the available computer-use tools to operate the target app. Stop before submitting, sending, paying, deleting, or any other irreversible action; return for user approval before continuing. Capture and save screenshots of the final state, inspect them, and return their paths with a concise account of the state reached. If computer use or screenshots are unavailable, say so instead of claiming completion." },
-      { path: ['agents', idx('operate-desktop'), 'model'], value: 'gpt-6.1-terra' },
+      { path: ['agents', idx('operate-desktop'), 'model'], value: 'gpt-6-astra' },
     ])
 
     const plan = planSyncDefaults(fixture)
