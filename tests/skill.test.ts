@@ -253,6 +253,8 @@ describe('renderSkillDoc collection-strategy conflict freedom', () => {
     const doc = renderSkillDoc(defaultConfig, 'claude')
     expect(doc).toContain('run_in_background')
     expect(doc).not.toContain('spawn_agent')
+    // a shell re-run loop whose output check misfires never exits or notifies
+    expect(doc.replace(/\s+/g, ' ')).toContain('Run the bare command: never wrap it in a shell loop')
   })
 
   test('grok render waits as a background task', () => {

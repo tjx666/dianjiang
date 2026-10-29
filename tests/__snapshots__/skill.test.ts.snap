@@ -220,8 +220,13 @@ reach for dianjiang only when an agent below clearly fits.
   exits with the final JSON the moment the run finishes; on timeout it prints
   \`status: "running"\` — just re-run it. Start that command in a background shell (\`run_in_background: true\`)
   immediately after dispatching — its completion notification delivers the
-  result while you keep working. Run it in the foreground only when the result
-  is the last thing you need before you can proceed.
+  result while you keep working. Run the bare command: never wrap it in a shell
+  loop or pipe its output into a parser (such as \`until … | jq …\`) to decide
+  whether to re-run — when that check misfires the loop never exits, so the
+  notification never arrives. Read the JSON in the notification yourself and
+  start the same command again only when it says \`status: "running"\`. Run it
+  in the foreground only when the result is the last thing you need before you
+  can proceed.
 - Check \`.status\` first: read \`.result\` only when it is "completed". On
   "failed", inspect \`.failure\` before \`.result\`; \`code: "quota_exhausted"\`
   means the selected harness has no available quota — recommend another
