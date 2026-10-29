@@ -33,12 +33,23 @@ import { resolveAgent } from './registry.ts'
  * one-hour wait explicitly, subject to the current session's limits.
  * Tool yields are not CLI timeouts: reuse the live shell session (and outer
  * orchestration cell, when available) before considering another collector.
+ * A fourth incident (2026-10): claude wrapped the wait in
+ * `until out=$(dianjiang result …); echo "$out" | jq …; do :; done` to avoid
+ * re-running it by hand. zsh's `echo` turned `\n` escapes into raw newlines,
+ * jq rejected every result, and the loop spun for two hours after the run had
+ * failed, so no notification ever arrived. The claude strategy therefore
+ * requires the bare command and leaves the re-run decision to the agent.
  */
 const COLLECTION_STRATEGY: Record<HarnessName, string> = {
   claude: `Start that command in a background shell (\`run_in_background: true\`)
   immediately after dispatching — its completion notification delivers the
-  result while you keep working. Run it in the foreground only when the result
-  is the last thing you need before you can proceed.`,
+  result while you keep working. Run the bare command: never wrap it in a shell
+  loop or pipe its output into a parser (such as \`until … | jq …\`) to decide
+  whether to re-run — when that check misfires the loop never exits, so the
+  notification never arrives. Read the JSON in the notification yourself and
+  start the same command again only when it says \`status: "running"\`. Run it
+  in the foreground only when the result is the last thing you need before you
+  can proceed.`,
   codex: `That re-run-on-"running" loop belongs INSIDE a waiter subagent —
   never in your own turn. The moment you hold a runId, spawn a waiter —
   \`spawn_agent\` with \`fork_turns: "none"\`. Explicitly choose an available
